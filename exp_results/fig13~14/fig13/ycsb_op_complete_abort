@@ -1,0 +1,26 @@
+@ spectrum complete revert; zipf=0.1
+average operations: 0.613951130193938
+@ spectrum complete revert; zipf=0.2
+average operations: 0.6578243104624042
+@ spectrum complete revert; zipf=0.30000000000000004
+average operations: 0.7348728279814185
+@ spectrum complete revert; zipf=0.4
+average operations: 1.016115374130721
+@ spectrum complete revert; zipf=0.5
+average operations: 2.187978538493458
+@ spectrum complete revert; zipf=0.6
+average operations: 8.444832457395083
+@ spectrum complete revert; zipf=0.7
+average operations: 49.51609102806179
+@ spectrum complete revert; zipf=0.7999999999999999
+average operations: 350.4178308530276
+@ spectrum complete revert; zipf=0.8999999999999999
+average operations: 2212.0399297910476
+@ spectrum complete revert; zipf=0.9999999999999999
+average operations: 7825.580232391895
+@ spectrum complete revert; zipf=1.0999999999999999
+average operations: 14949.007124785181
+@ spectrum complete revert; zipf=1.2
+average operations: 19640.261295283803
+@ spectrum complete revert; zipf=1.3
+average operations: 22133.722830795294

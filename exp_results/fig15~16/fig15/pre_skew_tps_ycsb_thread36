@@ -1,0 +1,49 @@
+
+zipf is changing
+keys=1000000
+threads=36
+synthetic=false
+two_partitions=false
+contract=11
+@ serial; zipf=0.1
+average commit: 27543.8 abort: 0 (0/0/0)
+@ spectrum-p; zipf=0.90001
+average commit: 158311 abort: 293969 (0/293969/0), abort cascade: 8924.2
+@ spectrum-p; zipf=1.00001
+average commit: 60700.6 abort: 396130 (0/396130/0), abort cascade: 19465.6
+@ spectrum-p; zipf=1.1000100000000002
+average commit: 33486.2 abort: 418829 (0/418829/0), abort cascade: 19924.8
+@ spectrum-p; zipf=1.20001
+average commit: 24524 abort: 401491 (0/401491/0), abort cascade: 14671.8
+@ spectrum-p; zipf=1.30001
+average commit: 20441.6 abort: 376382 (0/376382/0), abort cascade: 10756.4
+@ spectrum-pp; zipf=0.90001
+average commit: 215566 abort: 9816.2 (0/9816.2/0)
+@ spectrum-pp; zipf=1.00001
+average commit: 220528 abort: 23437 (0/23437/0)
+@ spectrum-pp; zipf=1.1000100000000002
+average commit: 231853 abort: 12971 (0/12971/0)
+@ spectrum-pp; zipf=1.20001
+average commit: 240851 abort: 3990.4 (0/3990.4/0)
+@ spectrum-pp; zipf=1.30001
+average commit: 241025 abort: 1399.6 (0/1399.6/0)
+@ aria fb; zipf=0.90001
+average commit: 112175 abort: 109584 (0/109584/0), abort cascade: 0
+@ aria fb; zipf=1.00001
+average commit: 61033.6 abort: 95884.2 (0/95884.2/0), abort cascade: 0
+@ aria fb; zipf=1.1000100000000002
+average commit: 38887.2 abort: 71324.6 (0/71324.6/0), abort cascade: 0
+@ aria fb; zipf=1.20001
+average commit: 32565 abort: 61541.2 (0/61541.2/0), abort cascade: 0
+@ aria fb; zipf=1.30001
+average commit: 32089 abort: 61252 (0/61252/0), abort cascade: 0
+@ sparkle; zipf=0.90001
+average commit: 135443 abort: 321895 (0/321895/0), abort cascade: 19458.2
+@ sparkle; zipf=1.00001
+average commit: 40997.8 abort: 439835 (0/439835/0), abort cascade: 33478
+@ sparkle; zipf=1.1000100000000002
+average commit: 19613.4 abort: 352707 (0/352707/0), abort cascade: 19640.6
+@ sparkle; zipf=1.20001
+average commit: 13202.4 abort: 255246 (0/255246/0), abort cascade: 9022.4
+@ sparkle; zipf=1.30001
+average commit: 10683.6 abort: 199034 (0/199034/0), abort cascade: 4773.2
