@@ -30,8 +30,8 @@ endif()
 file(GLOB_RECURSE SILKWORM_CORE_SRC CONFIGURE_DEPENDS "*.cpp" "*.hpp" "*.c" "*.h")
 list(FILTER SILKWORM_CORE_SRC EXCLUDE REGEX "_test\\.cpp$")
 # temporarily ignore old protocols
-file(GLOB_RECURSE OLD_PROTOCOLS_SRC "dcc/old_protocol/*.h")
-list(REMOVE_ITEM SILKWORM_CORE_SRC ${OLD_PROTOCOLS_SRC})
+# file(GLOB_RECURSE OLD_PROTOCOLS_SRC "dcc/old_protocol/*.h")
+# list(REMOVE_ITEM SILKWORM_CORE_SRC ${OLD_PROTOCOLS_SRC})
 
 # message(${SILKWORM_CORE_SRC})
 
