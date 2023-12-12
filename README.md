@@ -24,7 +24,7 @@ Different branches correspond to different implementations.
 ## Dependencies
 ```shell
 sudo apt-get update
-sudo apt-get install -y zip make cmake g++ libjemalloc-dev libboost-dev libgoogle-glog-dev
+sudo apt-get install -y zip make cmake g++-11 libjemalloc-dev libboost-dev libgoogle-glog-dev
 ```
 ## Build
 ```shell
