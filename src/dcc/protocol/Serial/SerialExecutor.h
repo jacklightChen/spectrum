@@ -144,8 +144,7 @@ class SerialExecutor : public Worker {
   void init_tables() {
     LOG(INFO) << "init tables for contracts";
 
-    auto init_func = [this](std::string &input_str_key) -> void {
-      auto partition_id = get_partition_id();
+    auto init_func = [this](std::string &input_str_key, std::size_t partition_id) -> void {
 
       auto transaction =
           workload.next_transaction(context, partition_id, storages[0]);
@@ -187,7 +186,8 @@ class SerialExecutor : public Worker {
       ss << std::setw(64) << std::setfill('0') << i;
       std::string str = ss.str();
       // LOG(INFO)<<"init"<< ss.str();
-      init_func(str);
+      auto partition_id = i / context.keysPerPartition;
+      init_func(str, partition_id);
     }
 
     LOG(INFO) << "init tables finished";
