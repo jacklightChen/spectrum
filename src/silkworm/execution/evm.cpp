@@ -482,7 +482,7 @@ evmc::bytes32 EvmHost::get_storage(const evmc::address &address,
 
       if (!evm_.txn_->is_init) {
         wrapped_txn->search_for_read(
-            tableId, get_partition_id(key, evm_.txn_->partition_num), key,
+            tableId, wrapped_txn->partition_id, key,
             read_val);
       }
       break;
@@ -491,14 +491,14 @@ evmc::bytes32 EvmHost::get_storage(const evmc::address &address,
       auto wrapped_txn =
           static_cast<dcc::AriaFBTransaction *>(evm_.txn_->wrapped_txn);
       wrapped_txn->search_for_read(
-          tableId, get_partition_id(key, evm_.txn_->partition_num), key, read_val);
+          tableId, wrapped_txn->partition_id, key, read_val);
       break;
     }
     case dcc::ExecType::Exec_Sparkle: {
       auto wrapped_txn =
           static_cast<dcc::SparkleTransaction *>(evm_.txn_->wrapped_txn);
       wrapped_txn->search_for_read(
-          tableId, get_partition_id(key, evm_.txn_->partition_num), key, read_val);
+          tableId, wrapped_txn->partition_id, key, read_val);
       // LOG(INFO) << "HZC get key: " << silkworm::to_hex(key);
       // LOG(INFO) << "HZC get value: " << silkworm::to_hex(read_val);
       break;
@@ -507,7 +507,7 @@ evmc::bytes32 EvmHost::get_storage(const evmc::address &address,
       auto wrapped_txn =
           static_cast<dcc::SpectrumTransaction *>(evm_.txn_->wrapped_txn);
       wrapped_txn->search_for_read(
-          tableId, get_partition_id(key, evm_.txn_->partition_num), key, read_val);
+          tableId, wrapped_txn->partition_id, key, read_val);
       break;
     }
     case dcc::ExecType::Exec_Undefined: {
@@ -543,7 +543,7 @@ evmc_storage_status EvmHost::set_storage(
       //   // LOG(INFO)<<"read val: "<<silkworm::to_hex(read);
       // }
       wrapped_txn->update(tableId,
-                          get_partition_id(key, evm_.txn_->partition_num), key,
+                          wrapped_txn->partition_id, key,
                           new_val);
       // LOG(INFO) << "HZC set key: " << silkworm::to_hex(key);
       // LOG(INFO) << "HZC set value: " << silkworm::to_hex(new_val);
@@ -557,7 +557,7 @@ evmc_storage_status EvmHost::set_storage(
       //     tableId, get_partition_id(key, evm_.txn_->partition_num), key,
       //     read_val);
       wrapped_txn->update(tableId,
-                          get_partition_id(key, evm_.txn_->partition_num), key,
+                          wrapped_txn->partition_id, key,
                           new_val);
       break;
     }
@@ -571,7 +571,7 @@ evmc_storage_status EvmHost::set_storage(
       //     tableId, get_partition_id(key, evm_.txn_->partition_num), key,
       //     read_val);
       wrapped_txn->update(tableId,
-                          get_partition_id(key, evm_.txn_->partition_num), key,
+                          wrapped_txn->partition_id, key,
                           new_val);
       break;
     }
@@ -583,7 +583,7 @@ evmc_storage_status EvmHost::set_storage(
       //     tableId, get_partition_id(key, evm_.txn_->partition_num), key,
       //     read_val);
       wrapped_txn->update(tableId,
-                          get_partition_id(key, evm_.txn_->partition_num), key,
+                          wrapped_txn->partition_id, key,
                           new_val);
       break;
     }

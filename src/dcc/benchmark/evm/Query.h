@@ -43,6 +43,7 @@ inline std::vector<int32_t> get_unique_keys(int _n, Context &context,
     if (_n == 1) {
       while (true) {
         int32_t key = Zipf::globalZipf().value(random.next_double());
+        key += partitionID * context.keysPerPartition;
         bool has_same = false;
         for (auto it = vec.begin(); it != vec.end(); ++it) {
           has_same |= (*it == key);
@@ -59,9 +60,8 @@ inline std::vector<int32_t> get_unique_keys(int _n, Context &context,
         if (i < mid) {
           while (true) {
             int32_t key = random.uniform_dist(
-                0, static_cast<int>(context.keysPerPartition *
-                                    context.partition_num) -
-                       1);
+                0, static_cast<int>(context.keysPerPartition) - 1);
+            key += partitionID * context.keysPerPartition;
             bool has_same = false;
             for (auto it = vec.begin(); it != vec.end(); ++it) {
               has_same |= (*it == key);
@@ -74,6 +74,7 @@ inline std::vector<int32_t> get_unique_keys(int _n, Context &context,
         } else {
           while (true) {
             int32_t key = Zipf::globalZipf().value(random.next_double());
+            key += partitionID * context.keysPerPartition;
             bool has_same = false;
             for (auto it = vec.begin(); it != vec.end(); ++it) {
               has_same |= (*it == key);
@@ -94,8 +95,8 @@ inline std::vector<int32_t> get_unique_keys(int _n, Context &context,
       while (true) {
         int32_t key = random.uniform_dist(
             0,
-            static_cast<int>(context.keysPerPartition * context.partition_num) -
-                1);
+            static_cast<int>(context.keysPerPartition) - 1);
+        key += partitionID * context.keysPerPartition;
         bool has_same = false;
         for (auto it = vec.begin(); it != vec.end(); ++it) {
           has_same |= (*it == key);
@@ -108,6 +109,7 @@ inline std::vector<int32_t> get_unique_keys(int _n, Context &context,
     } else {
       while (true) {
         int32_t key = Zipf::globalZipf().value(random.next_double());
+        key += partitionID * context.keysPerPartition;
         bool has_same = false;
         for (auto it = vec.begin(); it != vec.end(); ++it) {
           has_same |= (*it == key);
