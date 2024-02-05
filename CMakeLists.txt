@@ -1,109 +1,140 @@
-cmake_minimum_required(VERSION 3.16.2)
+# evmone: Ethereum Virtual Machine
+# Copyright 2019 The evmone Authors.
+# SPDX-License-Identifier: Apache-2.0
 
-# if(NOT EXISTS ${CMAKE_CURRENT_SOURCE_DIR}/third_party/evmone/evmc/.git)
-#   message(FATAL_ERROR "Git submodules not initialized, execute:\n  git submodule update --init --recursive")
-# endif()
+cmake_minimum_required(VERSION 3.16...3.27)
 
-get_directory_property(SILKWORM_HAS_PARENT PARENT_DIRECTORY)
-if(NOT SILKWORM_HAS_PARENT)
-  include(third_party/evmone/cmake/cable/bootstrap.cmake)
-  include(CableBuildType)
-  include(CableBuildInfo)
-  cable_set_build_type(DEFAULT Release CONFIGURATION_TYPES Release Debug)
-
-  if(NOT CMAKE_TOOLCHAIN_FILE)
-    set(CMAKE_TOOLCHAIN_FILE ${CMAKE_CURRENT_SOURCE_DIR}/cmake/toolchain/cxx20.cmake CACHE FILEPATH "" FORCE)
-  endif()
-
-  include(third_party/evmone/cmake/cable/HunterGate.cmake)
-  HunterGate(
-    URL "https://github.com/cpp-pm/hunter/archive/v0.24.3.tar.gz"
-    SHA1 "10738b59e539818a01090e64c2d09896247530c7"
-    LOCAL
-    )
+# -- Manage EVMC
+if(NOT EXISTS ${CMAKE_CURRENT_SOURCE_DIR}/evmc/.git)
+    message(FATAL_ERROR "Git submodules not initialized, execute:\n  git submodule update --init")
 endif()
 
-project(specturm)
-set(PROJECT_VERSION 0.0.1)
+option(BUILD_SHARED_LIBS "Build evmone as a shared library" ON)
 
-set(CMAKE_CXX_STANDARD 20)
-set(CMAKE_EXPORT_COMPILE_COMMANDS ON) 
+include(cmake/cable/bootstrap.cmake)
+include(CableBuildType)
+include(CableCompilerSettings)
+include(CablePackage)
+include(CableToolchains)
+include(CMakePackageConfigHelpers)
 
-cable_add_buildinfo_library(PROJECT_NAME ${PROJECT_NAME})
+cable_configure_toolchain(DEFAULT cxx17-pic)
+cable_set_build_type(DEFAULT Release CONFIGURATION_TYPES Release Debug)
 
-include(${CMAKE_CURRENT_SOURCE_DIR}/cmake/compiler_settings.cmake)
-include(${CMAKE_CURRENT_SOURCE_DIR}/cmake/Hunter/core_packages.cmake)
+include(Hunter/init)
 
-add_compile_definitions(EVMC_LOADER_MOCK)
+# -- Manage External Dependencies
+include(FetchContent)
+FetchContent_Declare(
+    gtest
+    GIT_REPOSITORY      "https://github.com/google/googletest"
+    GIT_TAG             "v1.14.0"
+)
+FetchContent_Declare(
+    gflags
+    GIT_REPOSITORY      "https://github.com/gflags/gflags"
+    GIT_TAG             "v2.2.2"
+)
+FetchContent_Declare(
+    glog
+    GIT_REPOSITORY      "https://github.com/google/glog"
+    GIT_TAG             "v0.7.0-rc1"
+)
+set(gtest_force_shared_crt ON CACHE BOOL "" FORCE)
+FetchContent_MakeAvailable(glog gtest gflags)
 
-find_package(intx CONFIG REQUIRED)   # Required from here below
-find_package(ethash CONFIG REQUIRED) # Required from here below
-find_package(Microsoft.GSL CONFIG REQUIRED)
-find_package(nlohmann_json CONFIG REQUIRED)
-find_package(Catch2 CONFIG REQUIRED)
+project(spectrum LANGUAGES CXX C)
+set(PROJECT_VERSION 0.12.0-dev)
 
-add_subdirectory(third_party/evmone/evmc)
+hunter_add_package(ethash)
+find_package(ethash CONFIG REQUIRED)
 
-add_library(evmone third_party/evmone/lib/evmone/advanced_analysis.cpp
-                   third_party/evmone/lib/evmone/advanced_analysis.hpp
-                   third_party/evmone/lib/evmone/advanced_execution.cpp
-                   third_party/evmone/lib/evmone/advanced_execution.hpp
-                   third_party/evmone/lib/evmone/advanced_instructions.cpp
-                   third_party/evmone/lib/evmone/baseline_instruction_table.cpp
-                   third_party/evmone/lib/evmone/baseline_instruction_table.hpp
-                   third_party/evmone/lib/evmone/baseline.cpp
-                   third_party/evmone/lib/evmone/baseline.hpp
-                   third_party/evmone/lib/evmone/execution_state.hpp
-                   third_party/evmone/lib/evmone/instructions_calls.cpp
-                   third_party/evmone/lib/evmone/instructions_traits.hpp
-                   third_party/evmone/lib/evmone/instructions_xmacro.hpp
-                   third_party/evmone/lib/evmone/instructions.hpp
-                   third_party/evmone/lib/evmone/opcodes_helpers.h
-                   third_party/evmone/lib/evmone/tracing.cpp
-                   third_party/evmone/lib/evmone/tracing.hpp
-                   third_party/evmone/lib/evmone/vm.cpp
-                   third_party/evmone/lib/evmone/vm.hpp)
-set_source_files_properties(third_party/evmone/lib/evmone/vm.cpp PROPERTIES COMPILE_DEFINITIONS PROJECT_VERSION="0.9.0-dev")
-target_include_directories(evmone PUBLIC third_party/evmone/include third_party/evmone/lib)
-target_link_libraries(evmone PUBLIC evmc intx::intx PRIVATE evmc::instructions evmc::hex)
+option(EVMC_TOOLS "Build EVMC test tools" ${EVMONE_TESTING})
+option(EVMC_INSTALL "Install EVMC" OFF)
 
-if(MSVC)
-  target_compile_options(evmone PRIVATE /EHsc /w)
-else()
-  target_compile_options(evmone PRIVATE -fno-exceptions)
-endif()
-# add_subdirectory(third_party/silkpre)
+add_subdirectory(evmc)
 
-if(NOT MSVC)
-  # add_compile_options(-Werror -Wall -Wextra -pedantic)
-  # add_compile_options(-Wshadow -Wimplicit-fallthrough -Wsign-conversion)
-  # add_compile_options($<$<COMPILE_LANGUAGE:CXX>:-Wold-style-cast>)
-  # add_compile_options(-Wno-missing-field-initializers -Wnon-virtual-dtor)
-  # HZC
-  add_compile_options(-pthread -Wall -Wextra -Wno-unused-variable -Wno-unused-function -Wno-unused-label -Wno-variadic-macros -Wno-unused-parameter -Wno-attributes -Wno-missing-field-initializers -Wno-type-limits -Wno-unused-but-set-variable -Wno-deprecated-copy -pedantic -O2)
+if(CMAKE_SYSTEM_PROCESSOR STREQUAL x86_64)
+    # Setup options for x86_64 micro-architecture levels.
+    # https://clang.llvm.org/docs/UsersManual.html#x86
 
-  if(CMAKE_CXX_COMPILER_ID STREQUAL "GNU")
-    add_compile_options(-Wno-attributes)
-
-    # coroutines support
-    if((CMAKE_CXX_STANDARD GREATER_EQUAL 20) AND (NOT SILKWORM_WASM_API))
-      add_compile_options(-fcoroutines)
+    set(EVMONE_X86_64_ARCH_LEVEL_INIT 2)
+    if(APPLE)
+        # On macos with Apple Silicon CPU (arm64) the x86 is emulated and SSE4.2 is not available.
+        set(EVMONE_X86_64_ARCH_LEVEL_INIT 1)
     endif()
-  endif()
 
-  if(CMAKE_CXX_COMPILER_ID MATCHES "Clang" AND CMAKE_SYSTEM_NAME MATCHES "Darwin")
-    add_compile_definitions(_LIBCPP_ENABLE_THREAD_SAFETY_ANNOTATIONS)
-    add_compile_options(-Wthread-safety)
-  endif()
+    set(EVMONE_X86_64_ARCH_LEVEL ${EVMONE_X86_64_ARCH_LEVEL_INIT} CACHE STRING "The x86_64 micro-architecture level")
+    if(EVMONE_X86_64_ARCH_LEVEL GREATER_EQUAL 1 AND EVMONE_X86_64_ARCH_LEVEL LESS_EQUAL 4)
+        message(STATUS "x86_64 micro-architecture level: ${EVMONE_X86_64_ARCH_LEVEL}")
+        if(EVMONE_X86_64_ARCH_LEVEL GREATER_EQUAL 2)
+            add_compile_options(-march=x86-64-v${EVMONE_X86_64_ARCH_LEVEL})
+        endif()
+    else()
+        message(FATAL_ERROR "Invalid EVMONE_X86_64_ARCH_LEVEL: ${EVMONE_X86_64_ARCH_LEVEL}")
+    endif()
 endif()
 
-find_package(Jemalloc REQUIRED)
+include(GNUInstallDirs)
 
-include_directories(${CMAKE_SOURCE_DIR}/src)
-add_subdirectory(src)
+add_compile_definitions(PROJECT_VERSION="${PROJECT_VERSION}" EVMONE_X86_64_ARCH_LEVEL=${EVMONE_X86_64_ARCH_LEVEL})
+add_compile_options(-Wno-attributes)
 
-add_executable(dcc_bench main.cpp)
-target_link_libraries(dcc_bench silkworm_core glog gflags ${JEMALLOC_LIBRARIES})
-# target_link_libraries(dcc_bench silkworm_core glog gflags)
-# target_link_libraries(dcc_bench silkworm_core glog gflags)
-# target_link_libraries(dcc_bench silkworm_core glog gflags tcmalloc)
+set(include_dir ${CMAKE_CURRENT_SOURCE_DIR}/include)
+
+hunter_add_package(intx)
+find_package(intx CONFIG REQUIRED)
+
+add_library(evmone
+    src/evmpersist/advanced_analysis.cpp
+    src/evmpersist/advanced_analysis.hpp
+    src/evmpersist/advanced_execution.cpp
+    src/evmpersist/advanced_execution.hpp
+    src/evmpersist/advanced_instructions.cpp
+    src/evmpersist/baseline.cpp
+    src/evmpersist/baseline.hpp
+    src/evmpersist/baseline_instruction_table.cpp
+    src/evmpersist/baseline_instruction_table.hpp
+    src/evmpersist/eof.cpp
+    src/evmpersist/eof.hpp
+    src/evmpersist/instructions.hpp
+    src/evmpersist/instructions_calls.cpp
+    src/evmpersist/instructions_opcodes.hpp
+    src/evmpersist/instructions_storage.cpp
+    src/evmpersist/instructions_traits.hpp
+    src/evmpersist/instructions_xmacro.hpp
+    src/evmpersist/opcodes_helpers.h
+    src/evmpersist/tracing.cpp
+    src/evmpersist/tracing.hpp
+    src/evmpersist/vm.cpp
+    src/evmpersist/vm.hpp
+    src/evmone/advanced_analysis.cpp
+    src/evmone/advanced_analysis.hpp
+    src/evmone/advanced_execution.cpp
+    src/evmone/advanced_execution.hpp
+    src/evmone/advanced_instructions.cpp
+    src/evmone/baseline.cpp
+    src/evmone/baseline.hpp
+    src/evmone/baseline_instruction_table.cpp
+    src/evmone/baseline_instruction_table.hpp
+    src/evmone/eof.cpp
+    src/evmone/eof.hpp
+    src/evmone/instructions.hpp
+    src/evmone/instructions_calls.cpp
+    src/evmone/instructions_opcodes.hpp
+    src/evmone/instructions_storage.cpp
+    src/evmone/instructions_traits.hpp
+    src/evmone/instructions_xmacro.hpp
+    src/evmone/opcodes_helpers.h
+    src/evmone/tracing.cpp
+    src/evmone/tracing.hpp
+    src/evmone/vm.cpp
+    src/evmone/vm.hpp
+    src/checkpoint.hpp
+)
+target_compile_features(evmone PUBLIC cxx_std_20)
+target_link_libraries(evmone PUBLIC evmc::evmc intx::intx PRIVATE ethash::keccak)
+target_include_directories(evmone PUBLIC
+    $<BUILD_INTERFACE:${CMAKE_CURRENT_SOUCE_DIR}/src/evmpersist>
+    $<BUILD_INTERFACE:${CMAKE_CURRENT_SOUCE_DIR}/src/evmone>
+)

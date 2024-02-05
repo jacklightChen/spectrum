@@ -1,26 +1,3 @@
-.DS_Store
-build
-.cache
-
-# local env files
-.env.local
-.env.*.local
-
-# Editor directories and files
-.idea
-.vscode
-*.suo
-*.ntvs*
-*.njsproj
-*.sln
-*.sw?
-
-xcode
-*.code-workspace
-.idea
-.vscode
-.vs
-CMakeFiles
-Makefile
-cmake-build-*
-build-*
+/build
+/cmake-build-*
+/.idea
