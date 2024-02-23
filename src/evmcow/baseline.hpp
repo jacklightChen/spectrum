@@ -1,5 +1,5 @@
-// evmone: Fast Ethereum Virtual Machine implementation
-// Copyright 2020 The evmone Authors.
+// evmcow: Fast Ethereum Virtual Machine implementation
+// Copyright 2020 The evmcow Authors.
 // SPDX-License-Identifier: Apache-2.0
 #pragma once
 
@@ -10,7 +10,7 @@
 #include <string_view>
 #include <vector>
 
-namespace evmone
+namespace evmcow
 {
 using bytes_view = std::basic_string_view<uint8_t>;
 
@@ -56,7 +56,7 @@ EVMC_EXPORT CodeAnalysis analyze(evmc_revision rev, bytes_view code);
 evmc_result execute(evmc_vm* vm, const evmc_host_interface* host, evmc_host_context* ctx,
     evmc_revision rev, const evmc_message* msg, const uint8_t* code, size_t code_size) noexcept;
 
-/// Executes in Baseline interpreter on evmone::VM, but using other parameters as EVMC-compatible parameters
+/// Executes in Baseline interpreter on evmcow::VM, but using other parameters as EVMC-compatible parameters
 evmc_result execute(VM&, const evmc_host_interface* host, evmc_host_context* ctx,
     evmc_revision rev, const evmc_message* msg, const uint8_t* code, size_t code_size) noexcept;
 
@@ -65,4 +65,4 @@ EVMC_EXPORT evmc_result execute(
     VM&, int64_t gas_limit, ExecutionState& state, const CodeAnalysis& analysis) noexcept;
 
 }  // namespace baseline
-}  // namespace evmone
+}  // namespace evmcow

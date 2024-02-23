@@ -1,14 +1,14 @@
-// evmone: Fast Ethereum Virtual Machine implementation
-// Copyright 2019 The evmone Authors.
+// evmcow: Fast Ethereum Virtual Machine implementation
+// Copyright 2019 The evmcow Authors.
 // SPDX-License-Identifier: Apache-2.0
 
 #include "./eof.hpp"
 #include "./instructions.hpp"
 
-namespace evmone::instr::core
+namespace evmcow::instr::core
 {
 template <Opcode Op>
-Result call_impl(StackTop stack, int64_t gas_left, ExecutionState& state) noexcept
+Result call_impl(StackTop& stack, int64_t gas_left, ExecutionState& state) noexcept
 {
     static_assert(
         Op == OP_CALL || Op == OP_CALLCODE || Op == OP_DELEGATECALL || Op == OP_STATICCALL);
@@ -113,7 +113,7 @@ Result call_impl(StackTop stack, int64_t gas_left, ExecutionState& state) noexce
 
     const auto result = state.host.call(msg);
     state.return_data.assign(result.output_data, result.output_size);
-    stack.top() = result.status_code == EVMC_SUCCESS;
+    stack.get_mut(0) = result.status_code == EVMC_SUCCESS;
 
     if (const auto copy_size = std::min(output_size, result.output_size); copy_size > 0)
         std::memcpy(&state.memory[output_offset], result.output_data, copy_size);
@@ -125,17 +125,16 @@ Result call_impl(StackTop stack, int64_t gas_left, ExecutionState& state) noexce
 }
 
 template Result call_impl<OP_CALL>(
-    StackTop stack, int64_t gas_left, ExecutionState& state) noexcept;
+    StackTop& stack, int64_t gas_left, ExecutionState& state) noexcept;
 template Result call_impl<OP_STATICCALL>(
-    StackTop stack, int64_t gas_left, ExecutionState& state) noexcept;
+    StackTop& stack, int64_t gas_left, ExecutionState& state) noexcept;
 template Result call_impl<OP_DELEGATECALL>(
-    StackTop stack, int64_t gas_left, ExecutionState& state) noexcept;
+    StackTop& stack, int64_t gas_left, ExecutionState& state) noexcept;
 template Result call_impl<OP_CALLCODE>(
-    StackTop stack, int64_t gas_left, ExecutionState& state) noexcept;
-
+    StackTop& stack, int64_t gas_left, ExecutionState& state) noexcept;
 
 template <Opcode Op>
-Result create_impl(StackTop stack, int64_t gas_left, ExecutionState& state) noexcept
+Result create_impl(StackTop& stack, int64_t gas_left, ExecutionState& state) noexcept
 {
     static_assert(Op == OP_CREATE || Op == OP_CREATE2);
 
@@ -194,13 +193,13 @@ Result create_impl(StackTop stack, int64_t gas_left, ExecutionState& state) noex
 
     state.return_data.assign(result.output_data, result.output_size);
     if (result.status_code == EVMC_SUCCESS)
-        stack.top() = intx::be::load<uint256>(result.create_address);
+        stack.get_mut(0) = intx::be::load<uint256>(result.create_address);
 
     return {EVMC_SUCCESS, gas_left};
 }
 
 template Result create_impl<OP_CREATE>(
-    StackTop stack, int64_t gas_left, ExecutionState& state) noexcept;
+    StackTop& stack, int64_t gas_left, ExecutionState& state) noexcept;
 template Result create_impl<OP_CREATE2>(
-    StackTop stack, int64_t gas_left, ExecutionState& state) noexcept;
-}  // namespace evmone::instr::core
+    StackTop& stack, int64_t gas_left, ExecutionState& state) noexcept;
+}  // namespace evmcow::instr::core

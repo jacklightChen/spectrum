@@ -1,5 +1,5 @@
-// evmone: Fast Ethereum Virtual Machine implementation
-// Copyright 2020 The evmone Authors.
+// evmcow: Fast Ethereum Virtual Machine implementation
+// Copyright 2020 The evmcow Authors.
 // SPDX-License-Identifier: Apache-2.0
 
 #include "./baseline.hpp"
@@ -24,7 +24,7 @@
 #define ASM_COMMENT(COMMENT)
 #endif
 
-namespace evmone::baseline
+namespace evmcow::baseline
 {
 namespace
 {
@@ -109,7 +109,7 @@ CodeAnalysis analyze(evmc_revision rev, bytes_view code)
 ///          or EVMC_SUCCESS if everything is fine.
 template <Opcode Op>
 inline evmc_status_code check_requirements(const CostTable& cost_table, int64_t& gas_left,
-    const uint256* stack_top, const uint256* stack_bottom) noexcept
+    const StackTop& stack_top, const uint256* stack_bottom) noexcept
 {
     static_assert(
         !instr::has_const_gas_cost(Op) || instr::gas_costs[EVMC_FRONTIER][Op] != instr::undefined,
@@ -132,14 +132,14 @@ inline evmc_status_code check_requirements(const CostTable& cost_table, int64_t&
     {
         static_assert(instr::traits[Op].stack_height_change == 1,
             "unexpected instruction with multiple results");
-        if (INTX_UNLIKELY(stack_top == stack_bottom + StackSpace::limit))
+        if (INTX_UNLIKELY(stack_top.height == StackSpace::limit))
             return EVMC_STACK_OVERFLOW;
     }
     if constexpr (instr::traits[Op].stack_height_required > 0)
     {
         // Check stack underflow using pointer comparison <= (better optimization).
         static constexpr auto min_offset = instr::traits[Op].stack_height_required - 1;
-        if (INTX_UNLIKELY(stack_top <= stack_bottom + min_offset))
+        if (INTX_UNLIKELY(stack_top.height <= min_offset))
             return EVMC_STACK_UNDERFLOW;
     }
 
@@ -151,18 +151,18 @@ inline evmc_status_code check_requirements(const CostTable& cost_table, int64_t&
 
 /// Helpers for invoking instruction implementations of different signatures.
 /// @{
-[[release_inline]] inline code_iterator invoke(void (*instr_fn)(StackTop) noexcept, Position pos,
-    int64_t& /*gas*/, ExecutionState& /*state*/) noexcept
+[[release_inline]] inline code_iterator invoke(void (*instr_fn)(StackTop&) noexcept, Position pos,
+    int64_t& /*gas*/, ExecutionState& state) noexcept
 {
-    instr_fn(pos.stack_top);
+    instr_fn(state.stack_top);
     return pos.code_it + 1;
 }
 
 [[release_inline]] inline code_iterator invoke(
-    Result (*instr_fn)(StackTop, int64_t, ExecutionState&) noexcept, Position pos, int64_t& gas,
+    Result (*instr_fn)(StackTop&, int64_t, ExecutionState&) noexcept, Position pos, int64_t& gas,
     ExecutionState& state) noexcept
 {
-    const auto o = instr_fn(pos.stack_top, gas, state);
+    const auto o = instr_fn(state.stack_top, gas, state);
     gas = o.gas_left;
     if (o.status != EVMC_SUCCESS)
     {
@@ -172,32 +172,32 @@ inline evmc_status_code check_requirements(const CostTable& cost_table, int64_t&
     return pos.code_it + 1;
 }
 
-[[release_inline]] inline code_iterator invoke(void (*instr_fn)(StackTop, ExecutionState&) noexcept,
+[[release_inline]] inline code_iterator invoke(void (*instr_fn)(StackTop&, ExecutionState&) noexcept,
     Position pos, int64_t& /*gas*/, ExecutionState& state) noexcept
 {
-    instr_fn(pos.stack_top, state);
+    instr_fn(state.stack_top, state);
     return pos.code_it + 1;
 }
 
 [[release_inline]] inline code_iterator invoke(
-    code_iterator (*instr_fn)(StackTop, ExecutionState&, code_iterator) noexcept, Position pos,
+    code_iterator (*instr_fn)(StackTop&, ExecutionState&, code_iterator) noexcept, Position pos,
     int64_t& /*gas*/, ExecutionState& state) noexcept
 {
-    return instr_fn(pos.stack_top, state, pos.code_it);
+    return instr_fn(state.stack_top, state, pos.code_it);
 }
 
 [[release_inline]] inline code_iterator invoke(
-    code_iterator (*instr_fn)(StackTop, code_iterator) noexcept, Position pos, int64_t& /*gas*/,
-    ExecutionState& /*state*/) noexcept
-{
-    return instr_fn(pos.stack_top, pos.code_it);
-}
-
-[[release_inline]] inline code_iterator invoke(
-    TermResult (*instr_fn)(StackTop, int64_t, ExecutionState&) noexcept, Position pos, int64_t& gas,
+    code_iterator (*instr_fn)(StackTop&, code_iterator) noexcept, Position pos, int64_t& /*gas*/,
     ExecutionState& state) noexcept
 {
-    const auto result = instr_fn(pos.stack_top, gas, state);
+    return instr_fn(state.stack_top, pos.code_it);
+}
+
+[[release_inline]] inline code_iterator invoke(
+    TermResult (*instr_fn)(StackTop&, int64_t, ExecutionState&) noexcept, Position pos, int64_t& gas,
+    ExecutionState& state) noexcept
+{
+    const auto result = instr_fn(state.stack_top, gas, state);
     gas = result.gas_left;
     state.status = result.status;
     return nullptr;
@@ -209,16 +209,16 @@ template <Opcode Op>
 [[release_inline]] inline Position invoke(const CostTable& cost_table, const uint256* stack_bottom,
     Position pos, int64_t& gas, ExecutionState& state) noexcept
 {
-    if (const auto status = check_requirements<Op>(cost_table, gas, pos.stack_top, stack_bottom);
-        status != EVMC_SUCCESS)
+    const auto status = check_requirements<Op>(cost_table, gas, state.stack_top, stack_bottom);
+    if (status != EVMC_SUCCESS)
     {
         state.status = status;
-        return {nullptr, pos.stack_top};
+        return {nullptr};
     }
-    const auto old_stack_top = pos.stack_top;
+    const auto old_height = state.stack_top.height;
     const auto new_pos = invoke(instr::core::impl<Op>, pos, gas, state);
-    const auto new_stack_top = old_stack_top + instr::traits[Op].stack_height_change;
-    return {new_pos, new_stack_top};
+    state.stack_top.height = old_height + instr::traits[Op].stack_height_change;
+    return {new_pos};
 }
 
 
@@ -228,16 +228,21 @@ int64_t dispatch(const CostTable& cost_table, ExecutionState& state, int64_t gas
 {
     const auto stack_bottom = state.stack_space.bottom();
 
+    #if EVM_PRINT_INSTRUCTIONS
+        std::cerr << "---" << std::endl;
+    #endif
+
     Position position = ([&](){
         if (state.position != std::nullopt) {
-            // if we jump out of interpreter loop, we have to come back with the right state. 
+            // We jumped out of interpreter loop in previous execution. 
+            // Now, we have to come back with the right position. 
             Position position = state.position.value();
             state.position = std::nullopt;
             return position;
         }
         else {
-            // Code iterator and stack top pointer for interpreter loop.
-            Position position{code, stack_bottom};
+            // Code iterator and stack top pointer
+            Position position{code};
             return position;
         }
     })();
@@ -248,11 +253,11 @@ int64_t dispatch(const CostTable& cost_table, ExecutionState& state, int64_t gas
         if constexpr (TracingEnabled)
         {
             const auto offset = static_cast<uint32_t>(position.code_it - code);
-            const auto stack_height = static_cast<int>(position.stack_top - stack_bottom);
+            const auto stack_height = static_cast<int>(state.stack_top.height);
             if (offset < state.original_code.size())  // Skip STOP from code padding.
             {
                 tracer->notify_instruction_start(
-                    offset, position.stack_top, stack_height, gas, state);
+                    offset, state.stack_top, stack_height, gas, state);
             }
         }
 
@@ -365,4 +370,4 @@ evmc_result execute(evmc_vm* c_vm, const evmc_host_interface* host, evmc_host_co
     return evmc::make_result(EVMC_FAILURE, 0, 0, nullptr, 0);
 }
 
-}  // namespace evmone::baseline
+}  // namespace evmcow::baseline

@@ -1,5 +1,5 @@
-// evmone: Fast Ethereum Virtual Machine implementation
-// Copyright 2021 The evmone Authors.
+// evmcow: Fast Ethereum Virtual Machine implementation
+// Copyright 2021 The evmcow Authors.
 // SPDX-License-Identifier: Apache-2.0
 #pragma once
 
@@ -15,14 +15,14 @@
 #define EVMONE_CGOTO_SUPPORTED 1
 #endif
 
-namespace evmone
+namespace evmcow
 {
-/// The evmone EVMC instance.
+/// The evmcow EVMC instance.
 class VM : public evmc_vm
 {
 public:
-    std::optional<std::unique_ptr<evmone::ExecutionState>> state{std::nullopt};
-    std::vector<std::unique_ptr<evmone::ExecutionState>> checkpoints{};
+    std::optional<std::unique_ptr<evmcow::ExecutionState>> state{std::nullopt};
+    std::vector<evmcow::Checkpoint> checkpoints{};
     bool cgoto = EVMONE_CGOTO_SUPPORTED;
     bool validate_eof = false;
 
@@ -43,4 +43,4 @@ public:
 
     [[nodiscard]] Tracer* get_tracer() const noexcept { return m_first_tracer.get(); }
 };
-}  // namespace evmone
+}  // namespace evmcow

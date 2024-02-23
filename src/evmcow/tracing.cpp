@@ -1,5 +1,5 @@
-// evmone: Fast Ethereum Virtual Machine implementation
-// Copyright 2021 The evmone Authors.
+// evmcow: Fast Ethereum Virtual Machine implementation
+// Copyright 2021 The evmcow Authors.
 // SPDX-License-Identifier: Apache-2.0
 
 #include "./tracing.hpp"
@@ -8,7 +8,7 @@
 #include <evmc/hex.hpp>
 #include <stack>
 
-namespace evmone
+namespace evmcow
 {
 namespace
 {
@@ -40,7 +40,7 @@ class HistogramTracer : public Tracer
         m_contexts.emplace(msg.depth, code.data());
     }
 
-    void on_instruction_start(uint32_t pc, const intx::uint256* /*stack_top*/, int /*stack_height*/,
+    void on_instruction_start(uint32_t pc, const StackTop& /*stack_top*/, int /*stack_height*/,
         int64_t /*gas*/, const ExecutionState& /*state*/) noexcept override
     {
         auto& ctx = m_contexts.top();
@@ -81,16 +81,12 @@ class InstructionTracer : public Tracer
     std::stack<Context> m_contexts;
     std::ostream& m_out;  ///< Output stream.
 
-    void output_stack(const intx::uint256* stack_top, int stack_height)
+    void output_stack(const StackTop& stack_top, int stack_height)
     {
         m_out << R"(,"stack":[)";
-        const auto stack_end = stack_top + 1;
-        const auto stack_begin = stack_end - stack_height;
-        for (auto it = stack_begin; it != stack_end; ++it)
+        for (auto i = 0; i < stack_top.height; ++i)
         {
-            if (it != stack_begin)
-                m_out << ',';
-            m_out << R"("0x)" << to_string(*it, 16) << '"';
+            m_out << R"("0x)" << to_string(stack_top[i], 16) << '"';
         }
         m_out << ']';
     }
@@ -101,7 +97,7 @@ class InstructionTracer : public Tracer
         m_contexts.emplace(msg.depth, code.data(), msg.gas);
     }
 
-    void on_instruction_start(uint32_t pc, const intx::uint256* stack_top, int stack_height,
+    void on_instruction_start(uint32_t pc, const StackTop& stack_top, int stack_height,
         int64_t gas, const ExecutionState& state) noexcept override
     {
         const auto& ctx = m_contexts.top();
@@ -146,4 +142,4 @@ std::unique_ptr<Tracer> create_instruction_tracer(std::ostream& out)
 {
     return std::make_unique<InstructionTracer>(out);
 }
-}  // namespace evmone
+}  // namespace evmcow

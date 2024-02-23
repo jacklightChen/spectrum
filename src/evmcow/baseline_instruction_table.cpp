@@ -1,11 +1,11 @@
-// evmone: Fast Ethereum Virtual Machine implementation
-// Copyright 2020 The evmone Authors.
+// evmcow: Fast Ethereum Virtual Machine implementation
+// Copyright 2020 The evmcow Authors.
 // SPDX-License-Identifier: Apache-2.0
 
 #include "./baseline_instruction_table.hpp"
 #include "./instructions_traits.hpp"
 
-namespace evmone::baseline
+namespace evmcow::baseline
 {
 namespace
 {
@@ -57,4 +57,4 @@ const CostTable& get_baseline_cost_table(evmc_revision rev, uint8_t eof_version)
     const auto& tables = (eof_version == 0) ? legacy_cost_tables : eof_cost_tables;
     return tables[rev];
 }
-}  // namespace evmone::baseline
+}  // namespace evmcow::baseline

@@ -666,8 +666,8 @@ public:
             m_instance->destroy(m_instance);
     }
 
-    VM(const VM&) = delete;
-    VM& operator=(const VM&) = delete;
+    VM(VM&) = delete;
+    VM& operator=(VM&) = delete;
 
     /// Move constructor.
     VM(VM&& other) noexcept : m_instance{other.m_instance} { other.m_instance = nullptr; }

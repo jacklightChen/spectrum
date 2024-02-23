@@ -1,5 +1,5 @@
-// evmone: Fast Ethereum Virtual Machine implementation
-// Copyright 2021 The evmone Authors.
+// evmcow: Fast Ethereum Virtual Machine implementation
+// Copyright 2021 The evmcow Authors.
 // SPDX-License-Identifier: Apache-2.0
 
 #include "./eof.hpp"
@@ -19,7 +19,7 @@
 #include <variant>
 #include <vector>
 
-namespace evmone
+namespace evmcow
 {
 namespace
 {
@@ -724,4 +724,4 @@ std::ostream& operator<<(std::ostream& os, EOFValidationError err) noexcept
     os << get_error_message(err);
     return os;
 }
-}  // namespace evmone
+}  // namespace evmcow

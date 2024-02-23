@@ -1,5 +1,5 @@
-// evmone: Fast Ethereum Virtual Machine implementation
-// Copyright 2019 The evmone Authors.
+// evmcow: Fast Ethereum Virtual Machine implementation
+// Copyright 2019 The evmcow Authors.
 // SPDX-License-Identifier: Apache-2.0
 #pragma once
 
@@ -8,8 +8,11 @@
 #include <string>
 #include <vector>
 #include <optional>
+#include <iostream>
+#include <sstream>
+#include <iomanip>
 
-namespace evmone
+namespace evmcow
 {
 namespace baseline
 {
@@ -34,12 +37,101 @@ public:
         return const_cast<uint256*>(m_stack_space - 1);
     }
 
-private:
     /// The storage allocated for maximum possible number of items.
     /// Items are aligned to 256 bits for better packing in cache lines.
     alignas(sizeof(uint256)) uint256 m_stack_space[limit];
 };
 
+/// COW Stack implementation
+class StackTop
+{
+public:
+    /// stack height
+    size_t height;
+    /// space bottom
+    uint256* base;
+    /// space limit
+    uint256* limit;
+    /// pointers to slices
+    std::array<uint256*, 16> slices;
+    /// ownership
+    std::array<bool, 16> ownership;
+    /// initialize a stack top for nothing
+    StackTop():
+        height{0},
+        base{nullptr},
+        limit{nullptr},
+        slices{{nullptr}},
+        ownership{{false}}
+    {}
+    /// initialize a stack top with given space
+    StackTop(uint256* base, uint256* limit): 
+        height{0},
+        base{base},
+        limit{limit},
+        slices{{nullptr}},
+        ownership{{false}}
+    {}
+    /// copy a stack top
+    StackTop(const StackTop& stack_top):
+        height{stack_top.height},
+        base{stack_top.base},
+        limit{stack_top.limit},
+        slices{stack_top.slices},
+        ownership{stack_top.ownership}
+    {}
+    /// declare ownership of a slice
+    inline void ensure(size_t slice_index) {
+        if (ownership[slice_index] && slices[slice_index]) {
+            return;
+        }
+        uint256* old_slice  = slices[slice_index];
+        slices[slice_index] = base;
+        uint256* new_slice  = base;
+        ownership[slice_index] = true;
+        base += 64;
+        if (base > limit) {
+            std::cerr << "exceed stack height limit" << std::endl;
+            std::terminate();
+        }
+        if (old_slice != nullptr) {
+            memcpy(new_slice, old_slice, 64 * sizeof(uint256));
+        }
+        else {
+            memset(new_slice, 0, 64 * sizeof(uint256));
+        }
+    }
+    /// push an item onto current stack top
+    inline void push(const uint256& item) {
+        ensure(height >> 6);
+        slices[height >> 6][height & 63] = item;
+        height += 1;
+    }
+    /// pop an item and return it
+    inline const uint256 &pop() {
+        height -= 1;
+        return slices[height >> 6][height & 63];
+    }
+    /// equivalent to get(0)
+    inline const uint256& top() {
+        return get(0);
+    }
+    /// equivalent to get(index)
+    inline const uint256& operator[](size_t index) const {
+        return get(index);
+    }
+    /// read item on stack, counting from stack top to stack bottom
+    inline const uint256& get(size_t index) const {
+        index = height - 1 - index;
+        return slices[index >> 6][index & 63];
+    }
+    /// write item to stack
+    inline uint256& get_mut(size_t index) {
+        index = height - 1 - index;
+        ensure(index >> 6);
+        return slices[index >> 6][index & 63];
+    }
+};
 
 /// The EVM memory.
 ///
@@ -67,7 +159,6 @@ public:
     ~Memory() noexcept {  }
 
     Memory(const Memory&) = default;
-    Memory& operator=(const Memory&) = delete;
 
     uint8_t& operator[](size_t index) noexcept { return m_data[index]; }
 
@@ -96,11 +187,15 @@ public:
     void clear() noexcept { m_size = 0; }
 };
 
+/// Checkpoint of an execution state
+struct Checkpoint {
+    code_iterator code_it;
+    StackTop    stack;
+};
+
 /// The execution position.
-struct Position
-{
+struct Position {
     code_iterator code_it;      ///< The position in the code.
-    uint256* stack_top;         ///< The pointer to the stack top.
 };
 
 /// Generic execution state for generic instructions implementations.
@@ -109,6 +204,7 @@ class ExecutionState
 {
 public:
     std::optional<Position> position{std::nullopt};
+    StackTop stack_top;
     int64_t gas_refund = 0;
     Memory memory;
     const evmc_message* msg = nullptr;
@@ -166,13 +262,9 @@ public:
         analysis{state_ref.analysis},
         call_stack{state_ref.call_stack},
         stack_space{state_ref.stack_space},
-        position{state_ref.position}
-    {
-        if (state_ref.position != std::nullopt) {
-            position->stack_top = stack_space.bottom() 
-                + (state_ref.position->stack_top - state_ref.stack_space.bottom());
-        }
-    }
+        position{state_ref.position},
+        stack_top{state_ref.stack_top}
+    {}
 
     ExecutionState(const evmc_message& message, evmc_revision revision,
         const evmc_host_interface& host_interface, evmc_host_context* host_ctx, bytes_view _code,
@@ -182,7 +274,28 @@ public:
         rev{revision},
         original_code{_code},
         data{_data}
-    {}
+    {
+        this->stack_top = StackTop(
+            &stack_space.m_stack_space[0], 
+            &stack_space.m_stack_space[stack_space.limit]
+        );
+    }
+
+    /// Make a checkpoint
+    inline Checkpoint save_checkpoint() {
+        auto checkpoint = Checkpoint{
+            .code_it = this->position.value().code_it,
+            .stack   = this->stack_top,
+        };
+        this->stack_top.ownership = std::array<bool, 16>{{false}};
+        return checkpoint;
+    }
+
+    /// Load a checkpoint
+    inline void load_checkpoint(const Checkpoint& checkpoint) {
+        this->stack_top = checkpoint.stack;
+        this->position  = std::optional{Position{checkpoint.code_it}};
+    }
 
     /// Resets the contents of the ExecutionState so that it could be reused.
     void reset(const evmc_message& message, evmc_revision revision,
@@ -213,4 +326,4 @@ public:
         return m_tx;
     }
 };
-}  // namespace evmone
+}  // namespace evmcow

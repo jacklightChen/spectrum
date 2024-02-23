@@ -1,10 +1,10 @@
-// evmone: Fast Ethereum Virtual Machine implementation
-// Copyright 2019 The evmone Authors.
+// evmcow: Fast Ethereum Virtual Machine implementation
+// Copyright 2019 The evmcow Authors.
 // SPDX-License-Identifier: Apache-2.0
 
 #include "./instructions.hpp"
 
-namespace evmone::instr::core
+namespace evmcow::instr::core
 {
 namespace
 {
@@ -92,9 +92,9 @@ constexpr auto sstore_costs = []() noexcept {
 }();
 }  // namespace
 
-Result sload(StackTop stack, int64_t gas_left, ExecutionState& state) noexcept
+Result sload(StackTop& stack, int64_t gas_left, ExecutionState& state) noexcept
 {
-    auto& x = stack.top();
+    auto& x = stack.get_mut(0);
     const auto key = intx::be::store<evmc::bytes32>(x);
 
     if (state.rev >= EVMC_BERLIN &&
@@ -113,7 +113,7 @@ Result sload(StackTop stack, int64_t gas_left, ExecutionState& state) noexcept
     return {EVMC_SUCCESS, gas_left};
 }
 
-Result sstore(StackTop stack, int64_t gas_left, ExecutionState& state) noexcept
+Result sstore(StackTop& stack, int64_t gas_left, ExecutionState& state) noexcept
 {
     if (state.in_static_mode())
         return {EVMC_STATIC_MODE_VIOLATION, gas_left};
@@ -141,4 +141,4 @@ Result sstore(StackTop stack, int64_t gas_left, ExecutionState& state) noexcept
     state.gas_refund += gas_refund;
     return {EVMC_SUCCESS, gas_left};
 }
-}  // namespace evmone::instr::core
+}  // namespace evmcow::instr::core

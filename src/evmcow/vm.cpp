@@ -1,16 +1,16 @@
-// evmone: Fast Ethereum Virtual Machine implementation
-// Copyright 2018 The evmone Authors.
+// evmcow: Fast Ethereum Virtual Machine implementation
+// Copyright 2018 The evmcow Authors.
 // SPDX-License-Identifier: Apache-2.0
 
 /// @file
-/// EVMC instance (class VM) and entry point of evmone is defined here.
+/// EVMC instance (class VM) and entry point of evmcow is defined here.
 
 #include "./vm.hpp"
 #include "./baseline.hpp"
 #include <cassert>
 #include <iostream>
 
-namespace evmone
+namespace evmcow
 {
 namespace
 {
@@ -68,13 +68,13 @@ evmc_set_option_result set_option(evmc_vm* c_vm, char const* c_name, char const*
 VM::VM() noexcept
   : evmc_vm{
         EVMC_ABI_VERSION,
-        "evmone",
+        "evmcow",
         PROJECT_VERSION,
-        evmone::destroy,
-        evmone::baseline::execute,
-        evmone::get_capabilities,
-        evmone::set_option,
+        evmcow::destroy,
+        evmcow::baseline::execute,
+        evmcow::get_capabilities,
+        evmcow::set_option,
     }
 {}
 
-}  // namespace evmone
+}  // namespace evmcow
