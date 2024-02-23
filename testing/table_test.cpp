@@ -1,5 +1,5 @@
 #include <gtest/gtest.h>
-#include <concurrent_hashmap.hpp>
+#include <table.hpp>
 #include <evmc/evmc.hpp>
 #include <hex.hpp>
 #include <span>

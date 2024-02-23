@@ -129,7 +129,7 @@ target_link_libraries(
 add_executable(
     test
     testing/evm_transaction_test.cpp
-    testing/concurrent_hashmap_test.cpp
+    testing/table_test.cpp
 )
 target_link_libraries(
     test
