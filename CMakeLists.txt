@@ -5,11 +5,18 @@
 cmake_minimum_required(VERSION 3.16...3.27)
 
 project(spectrum LANGUAGES CXX C)
+set(CMAKE_CXX_STANDARD 20)
+set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_EXPORT_COMPILE_COMMANDS true)
 add_compile_options(-Wno-attributes)
 
 # -- Manage External Dependencies
 include(FetchContent)
+FetchContent_Declare(
+    fmt
+    GIT_REPOSITORY      "https://github.com/fmtlib/fmt"
+    GIT_TAG             "10.2.1"
+)
 FetchContent_Declare(
     gtest
     GIT_REPOSITORY      "https://github.com/google/googletest"
@@ -35,7 +42,7 @@ FetchContent_Declare(
     GIT_REPOSITORY      "https://github.com/chfast/intx"
     GIT_TAG             "v0.10.1"
 )
-FetchContent_MakeAvailable(glog gtest gflags ethash intx)
+FetchContent_MakeAvailable(glog gtest gflags ethash intx fmt)
 set(gtest_force_shared_crt ON CACHE BOOL "" FORCE)
 
 # -- Manage EVMC
@@ -98,6 +105,7 @@ add_library(
     src/workload.cpp
     src/hex.cpp
     src/sparkle.cpp
+    src/statistics.cpp
 )
 
 target_compile_features(
@@ -107,7 +115,7 @@ target_compile_features(
 target_link_libraries(
     evmtwo
     PUBLIC evmc intx::intx
-    PRIVATE ethash::keccak
+    PRIVATE ethash::keccak fmt
 )
 target_include_directories(
     evmtwo
@@ -132,6 +140,7 @@ add_executable(
     testing/evm_transaction_test.cpp
     testing/table_test.cpp
     testing/sparkle_test.cpp
+    testing/statistics_test.cpp
 )
 target_link_libraries(
     test
