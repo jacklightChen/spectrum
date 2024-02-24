@@ -1,3 +1,5 @@
+#pragma once
+
 #include<unordered_map>
 #include<evmc/evmc.hpp>
 #include<tuple>
@@ -18,6 +20,7 @@ class Table {
     Table(size_t partitions);
     void Get(const K& k, V& v);
     void Put(const K& k, std::function<void(V& v)> vmap);
+
 };
 
 template<typename K, typename V, typename Hasher>

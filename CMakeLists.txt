@@ -97,6 +97,7 @@ add_library(
     src/evm_transaction.cpp
     src/workload.cpp
     src/hex.cpp
+    src/sparkle.cpp
 )
 
 target_compile_features(
@@ -130,6 +131,7 @@ add_executable(
     test
     testing/evm_transaction_test.cpp
     testing/table_test.cpp
+    testing/sparkle_test.cpp
 )
 target_link_libraries(
     test
