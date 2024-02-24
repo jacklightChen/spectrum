@@ -3,23 +3,11 @@
 #include <evmc/evmc.hpp>
 #include <hex.hpp>
 #include <span>
+#include <evm_hash.hpp>
 
 namespace {
 
-struct KeyHasher {
-    size_t operator()(const std::tuple<evmc::address, evmc::bytes32> key) const {
-        auto addr = std::get<0>(key);
-        auto keyx = std::get<1>(key);
-        size_t h = 0;
-        for (auto x: addr.bytes) {
-            h ^= std::hash<int>{}(x)  + 0x9e3779b9 + (h << 6) + (h >> 2);
-        }
-        for (auto x: keyx.bytes) {
-            h ^= std::hash<int>{}(x)  + 0x9e3779b9 + (h << 6) + (h >> 2);
-        }
-        return h;
-    } 
-};
+using namespace spectrum;
 
 TEST(Table, Operations) {
     auto table = spectrum::Table<std::tuple<evmc::address, evmc::bytes32>, evmc::bytes32, KeyHasher>(20);

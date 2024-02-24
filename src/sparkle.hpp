@@ -1,6 +1,7 @@
 #include "./workload.hpp"
 #include "./table.hpp"
 #include "./protocol.hpp"
+#include "./evm_hash.hpp"
 #include <list>
 #include <atomic>
 #include <tuple>
@@ -14,10 +15,6 @@ namespace spectrum {
 #define K std::tuple<evmc::address, evmc::bytes32>
 #define V SparkleValue
 #define T SparkleTransaction
-
-struct KeyHasher {
-    size_t operator()(const K& key) const;
-};
 
 struct SparkleTransaction: public Transaction {
     size_t      id;

@@ -102,6 +102,7 @@ add_library(
     src/evmone/vm.cpp
     src/evm_host_impl.cpp
     src/evm_transaction.cpp
+    src/evm_hash.cpp
     src/workload.cpp
     src/hex.cpp
     src/sparkle.cpp
