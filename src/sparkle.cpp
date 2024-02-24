@@ -3,8 +3,11 @@
 #include "./hex.hpp"
 #include <functional>
 #include <thread>
+#include <chrono>
 
 namespace spectrum {
+
+using namespace std::chrono;
 
 #define K std::tuple<evmc::address, evmc::bytes32>
 #define V SparkleValue
@@ -210,10 +213,10 @@ void Sparkle::Start(size_t n_threads) {
 /// @return statistics of this execution
 Statistics Sparkle::Stop() {
     stop_flag.store(true);
-    for (auto& thread: threads) {
-        thread.join();
+    for (auto& worker: threads) {
+        worker.join();
     }
-    return Statistics{};
+    return this->statistics;
 }
 
 /// @brief sparkle executor
@@ -223,12 +226,14 @@ SparkleExecutor::SparkleExecutor(Sparkle& sparkle):
     table{sparkle.table},
     last_commit{sparkle.last_commit},
     last_execute{sparkle.last_execute},
-    stop_flag{sparkle.stop_flag}
+    stop_flag{sparkle.stop_flag},
+    statistics{sparkle.statistics}
 {}
 
 /// @brief start an executor
 void SparkleExecutor::Run() { while (!stop_flag.load()) {
     auto tx = T(std::move(workload.Next()), last_execute.fetch_add(1));
+    auto start = steady_clock::now();
     tx.UpdateSetStorageHandler([&](
         const evmc::address &addr, 
         const evmc::bytes32 &key, 
@@ -263,6 +268,7 @@ void SparkleExecutor::Run() { while (!stop_flag.load()) {
             }
             tx.Reset();
             // execute and try to commit
+            statistics.JournalExecute();
             tx.Execute();
             if (tx.rerun_flag.load()) { continue; }
             for (auto entry: tx.tuples_put) {
@@ -282,6 +288,8 @@ void SparkleExecutor::Run() { while (!stop_flag.load()) {
             break;
         }
     }
+    auto latency = duration_cast<microseconds>(steady_clock::now() - start).count();
+    statistics.JournalCommit(latency);
 }}
 
 #undef T

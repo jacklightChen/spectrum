@@ -1,7 +1,16 @@
-#include"./statistics.hpp"
-#include<fmt/core.h>
+#include "./statistics.hpp"
+#include <fmt/core.h>
 
-void Statistics::Commit(size_t latency) {
+Statistics::Statistics(const Statistics& _):
+    count_commit{_.count_commit.load()},
+    count_execution{_.count_execution.load()},
+    count_latency_25ms{_.count_latency_25ms.load()},
+    count_latency_50ms{_.count_latency_50ms.load()},
+    count_latency_100ms{_.count_latency_100ms.load()},
+    count_latency_100ms_above{_.count_latency_100ms_above.load()}
+{}
+
+void Statistics::JournalCommit(size_t latency) {
     this->count_commit.fetch_add(1);
     if (latency <= 25) {
         this->count_latency_25ms.fetch_add(1);
@@ -16,7 +25,7 @@ void Statistics::Commit(size_t latency) {
         this->count_latency_100ms_above.fetch_add(1);
     }
 }
-void Statistics::Execute() {
+void Statistics::JournalExecute() {
     this->count_execution.fetch_add(1);
 }
 void Statistics::Print() {

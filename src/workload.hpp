@@ -1,6 +1,6 @@
-#include<variant>
-#include<functional>
-#include"./evm_transaction.hpp"
+#include <variant>
+#include <functional>
+#include "./evm_transaction.hpp"
 
 namespace spectrum {
 

@@ -3,8 +3,8 @@
 
 TEST(Statistics, Print) {
     auto statistics = Statistics();
-    statistics.Commit(10);
-    statistics.Commit(20);
-    statistics.Commit(30);
+    statistics.JournalCommit(10);
+    statistics.JournalCommit(20);
+    statistics.JournalCommit(30);
     statistics.Print();
 }

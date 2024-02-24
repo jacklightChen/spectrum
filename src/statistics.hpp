@@ -1,4 +1,4 @@
-#include<atomic>
+#include <atomic>
 
 class Statistics {
     public:
@@ -8,7 +8,9 @@ class Statistics {
     std::atomic<size_t> count_latency_50ms{0};
     std::atomic<size_t> count_latency_100ms{0};
     std::atomic<size_t> count_latency_100ms_above{0};
-    void Commit(size_t latency);
-    void Execute();
+    Statistics() = default;
+    Statistics(const Statistics& statistics);
+    void JournalCommit(size_t latency);
+    void JournalExecute();
     void Print();
 };

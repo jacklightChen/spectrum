@@ -1,12 +1,12 @@
-#include"./workload.hpp"
-#include"./table.hpp"
-#include"./protocol.hpp"
-#include<list>
-#include<atomic>
-#include<tuple>
-#include<vector>
-#include<unordered_set>
-#include<thread>
+#include "./workload.hpp"
+#include "./table.hpp"
+#include "./protocol.hpp"
+#include <list>
+#include <atomic>
+#include <tuple>
+#include <vector>
+#include <unordered_set>
+#include <thread>
 
 namespace spectrum {
 
@@ -40,6 +40,7 @@ struct SparkleValue {
 };
 
 class SparkleTable: Table<K, V, KeyHasher> {
+
     public:
     SparkleTable(size_t partitions);
     void Get(T* tx, const K& k, evmc::bytes32& v, size_t& version);
@@ -49,14 +50,17 @@ class SparkleTable: Table<K, V, KeyHasher> {
     void RegretPut(T* tx, const K& k);
     void ClearGet(T* tx, const K& k, size_t version);
     void ClearPut(T* tx, const K& k);
+
 };
 
 class SparkleExecutor;
 
 class Sparkle: virtual public Protocol {
+
     public:
     Workload&           workload;
     SparkleTable        table;
+    Statistics          statistics;
     std::atomic<size_t> last_execute{1};
     std::atomic<size_t> last_commit{1};
     std::atomic<bool>   stop_flag{false};
@@ -65,6 +69,7 @@ class Sparkle: virtual public Protocol {
     Sparkle(Workload& workload, size_t table_partitions);
     void Start(size_t n_threads) override;
     Statistics Stop() override;
+
 };
 
 class SparkleExecutor {
@@ -72,6 +77,7 @@ class SparkleExecutor {
     private:
     Workload&               workload;
     SparkleTable&           table;
+    Statistics&             statistics;
     std::atomic<size_t>&    last_execute;
     std::atomic<size_t>&    last_commit;
     std::atomic<bool>&      stop_flag;
