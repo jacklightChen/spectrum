@@ -20,7 +20,8 @@ enum EVMType {
 };
 
 class Transaction {
-  private:
+
+    private:
     std::variant<evmone::VM, evmcow::VM> vm;
     spectrum::Host host;
     spectrum::EVMType evm_type;
@@ -30,7 +31,7 @@ class Transaction {
     std::vector<uint8_t> input;
     evmc_message message;
 
-  public:
+    public:
     Transaction(
         EVMType evm_type, 
         evmc::address from, 
@@ -44,6 +45,7 @@ class Transaction {
     void Break();
     void ApplyCheckpoint(size_t checkpoint_id);
     size_t MakeCheckpoint();
+
 };
 
 } // namespace spectrum

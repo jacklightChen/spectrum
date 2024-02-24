@@ -40,8 +40,8 @@ Transaction::Transaction(
         .gas = 999999999,
         .recipient = to,
         .sender = from,
-        .input_data = &input[0],
-        .input_size = input.size(),
+        .input_data = &this->input[0],
+        .input_size = this->input.size(),
         .value{0},
     };
 }
