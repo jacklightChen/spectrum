@@ -27,6 +27,7 @@ class Transaction {
     evmc_tx_context tx_context;
     bool partial;
     std::span<uint8_t> code;
+    std::vector<uint8_t> input;
     evmc_message message;
 
   public:

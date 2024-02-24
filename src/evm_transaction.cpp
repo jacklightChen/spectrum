@@ -20,6 +20,7 @@ Transaction::Transaction(
     std::span<uint8_t> code,
     std::span<uint8_t> input
 ):
+    input(input.begin(), input.end()),
     evm_type{evm_type},
     vm{(evm_type == EVMType::BASIC || evm_type == EVMType::STRAWMAN) ? 
         std::variant<evmone::VM, evmcow::VM>(std::move(evmone::VM())) : 
@@ -31,8 +32,9 @@ Transaction::Transaction(
         .block_gas_limit = 10000000000,
     }},
     host{Host(this->tx_context)},
-    code{code},
-    message{evmc_message{
+    code{code}
+{
+    this->message = evmc_message{
         .kind = EVMC_CALL,
         .depth = 0,
         .gas = 999999999,
@@ -41,8 +43,8 @@ Transaction::Transaction(
         .input_data = &input[0],
         .input_size = input.size(),
         .value{0},
-    }}
-{}
+    };
+}
 
 // update set_storage handler
 void Transaction::UpdateSetStorageHandler(spectrum::SetStorage handler) {
