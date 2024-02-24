@@ -1,6 +1,8 @@
 #include "./statistics.hpp"
 #include <fmt/core.h>
 
+namespace spectrum {
+
 Statistics::Statistics(const Statistics& _):
     count_commit{_.count_commit.load()},
     count_execution{_.count_execution.load()},
@@ -28,6 +30,7 @@ void Statistics::JournalCommit(size_t latency) {
 void Statistics::JournalExecute() {
     this->count_execution.fetch_add(1);
 }
+
 void Statistics::Print() {
     fmt::print(
         "#commit        {}\n"
@@ -44,3 +47,5 @@ void Statistics::Print() {
         count_latency_100ms_above.load()
     );
 }
+
+} // namespace spectrum

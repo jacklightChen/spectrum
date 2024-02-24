@@ -7,4 +7,4 @@ class Protocol {
     virtual Statistics Stop() = 0;
 };
 
-}
+} // namespace spectrum

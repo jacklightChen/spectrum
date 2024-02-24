@@ -46,4 +46,4 @@ void Table<K, V, Hasher>::Put(const K& k, std::function<void(V& v)> vmap) {
     vmap(partition[k]);
 }
 
-}
+} // namespace spectrum

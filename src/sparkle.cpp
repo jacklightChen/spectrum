@@ -296,4 +296,4 @@ void SparkleExecutor::Run() { while (!stop_flag.load()) {
 #undef V
 #undef K
 
-}
+} // namespace spectrum

@@ -23,4 +23,4 @@ class Smallbank: Workload {
 
 };
 
-}
+} // namespace spectrum

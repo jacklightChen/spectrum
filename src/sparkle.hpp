@@ -10,6 +10,7 @@
 
 namespace spectrum {
 
+// some shorthands to prevent prohibitively long names
 #define K std::tuple<evmc::address, evmc::bytes32>
 #define V SparkleValue
 #define T SparkleTransaction
@@ -18,7 +19,7 @@ struct KeyHasher {
     size_t operator()(const K& key) const;
 };
 
-struct SparkleTransaction: Transaction {
+struct SparkleTransaction: public Transaction {
     size_t      id;
     std::vector<std::tuple<K, evmc::bytes32, size_t>>   tuples_get{};
     std::vector<std::tuple<K, evmc::bytes32>>           tuples_put{};
@@ -39,7 +40,7 @@ struct SparkleValue {
     std::list<SparkleEntry> entries;
 };
 
-class SparkleTable: Table<K, V, KeyHasher> {
+class SparkleTable: private Table<K, V, KeyHasher> {
 
     public:
     SparkleTable(size_t partitions);
@@ -57,7 +58,7 @@ class SparkleExecutor;
 
 class Sparkle: virtual public Protocol {
 
-    public:
+    private:
     Workload&           workload;
     SparkleTable        table;
     Statistics          statistics;
@@ -66,6 +67,9 @@ class Sparkle: virtual public Protocol {
     std::atomic<bool>   stop_flag{false};
     std::vector<SparkleExecutor>    executors{};
     std::vector<std::thread>        threads{};
+    friend class SparkleExecutor;
+
+    public:
     Sparkle(Workload& workload, size_t table_partitions);
     void Start(size_t n_threads) override;
     Statistics Stop() override;
@@ -92,4 +96,4 @@ class SparkleExecutor {
 #undef V
 #undef K
 
-}
+} // namespace spectrum

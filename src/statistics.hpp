@@ -1,5 +1,7 @@
 #include <atomic>
 
+namespace spectrum {
+
 class Statistics {
     public:
     std::atomic<size_t> count_commit{0};
@@ -14,3 +16,5 @@ class Statistics {
     void JournalExecute();
     void Print();
 };
+
+} // namespace spectrum
