@@ -1,10 +1,12 @@
 #include"./workload.hpp"
 #include"./table.hpp"
+#include"./protocol.hpp"
 #include<list>
 #include<atomic>
 #include<tuple>
 #include<vector>
 #include<unordered_set>
+#include<thread>
 
 namespace spectrum {
 
@@ -49,24 +51,35 @@ class SparkleTable: Table<K, V, KeyHasher> {
     void ClearPut(T* tx, const K& k);
 };
 
-class Sparkle {
+class SparkleExecutor;
+
+class Sparkle: virtual public Protocol {
     public:
     Workload&           workload;
     SparkleTable        table;
     std::atomic<size_t> last_execute{1};
     std::atomic<size_t> last_commit{1};
     std::atomic<bool>   stop_flag{false};
+    std::vector<SparkleExecutor>    executors{};
+    std::vector<std::thread>        threads{};
     Sparkle(Workload& workload, size_t table_partitions);
+    void Start(size_t n_threads) override;
+    Statistics Stop() override;
 };
 
 class SparkleExecutor {
+
+    private:
     Workload&               workload;
     SparkleTable&           table;
     std::atomic<size_t>&    last_execute;
     std::atomic<size_t>&    last_commit;
     std::atomic<bool>&      stop_flag;
+
+    public:
     SparkleExecutor(Sparkle& sparkle);
     void Run();
+
 };
 
 #undef T

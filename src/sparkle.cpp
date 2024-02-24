@@ -2,6 +2,7 @@
 #include "./table.hpp"
 #include "./hex.hpp"
 #include <functional>
+#include <thread>
 
 namespace spectrum {
 
@@ -194,6 +195,26 @@ Sparkle::Sparkle(Workload& workload, size_t table_partitions):
     workload{workload},
     table{table_partitions}
 {}
+
+/// @brief start sparkle protocol
+/// @param n_threads the number of threads to start
+void Sparkle::Start(size_t n_threads) {
+    stop_flag.store(false);
+    for (size_t i = 0; i != n_threads; ++i) {
+        executors.push_back(SparkleExecutor(*this));
+        threads.emplace_back(std::move(std::thread([&](){ executors.back().Run(); })));
+    }
+}
+
+/// @brief stop sparkle protocol
+/// @return statistics of this execution
+Statistics Sparkle::Stop() {
+    stop_flag.store(true);
+    for (auto& thread: threads) {
+        thread.join();
+    }
+    return Statistics{};
+}
 
 /// @brief sparkle executor
 /// @param sparkle sparkle initialization paremeters
