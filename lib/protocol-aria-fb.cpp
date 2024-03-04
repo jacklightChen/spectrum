@@ -3,12 +3,4 @@
 namespace spectrum 
 {
 
-AriaFB::AriaFB(/* args */)
-{
-}
-
-AriaFB::~AriaFB()
-{
-}
-
 } // namespace spectrum

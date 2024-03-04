@@ -2,18 +2,22 @@
 namespace spectrum
 {
 
-class AriaFB {
+class Aria {
 
     private:
-    /* data */
+    void Join(std::function<void(&AriaTransaction)>, std::vector<AriaTransaction>);
 
     public:
-    AriaFB(/* args */);
-    ~AriaFB();
+    Aria(/* args */);
+    ~Aria();
 
 };
 
-class AriaFBBatch {
+class AriaTransaction {
+
+};
+
+class AriaExecutor {
 
 };
 

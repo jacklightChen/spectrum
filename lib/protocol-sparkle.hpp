@@ -25,19 +25,16 @@ struct SparkleTransaction: public Transaction {
     void Reset();
 };
 
-class SparkleEntry {
+struct SparkleEntry {
     evmc::bytes32   value;
     size_t          version;
     std::unordered_set<T*>  readers;
-    friend SparkleTable;
 };
 
-class SparkleVersionList {
+struct SparkleVersionList {
     std::mutex  mu;
     T*          tx = nullptr;
     std::list<SparkleEntry> entries;
-    friend SparkleTable;
-    friend SparkleEntry;
 };
 
 class SparkleTable: private Table<K, V, KeyHasher> {
