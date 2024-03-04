@@ -84,6 +84,15 @@ add_compile_options(
     -DEVM_PRINT_INSTRUCTIONS=0
 )
 
+# -- handle header-only dependencies
+file(GLOB INC ${CMAKE_BINARY_DIR}/thread_pool/include/*.hpp ${CMAKE_BINARY_DIR}/thread_pool/include/*.h)
+
+foreach(F ${INC})
+    file(RELATIVE_PATH REL ${CMAKE_BINARY_DIR}/thread_pool/include ${F})
+    configure_file(${F} include/thread_pool/${REL} COPYONLY)
+    unset(REL)
+endforeach()
+
 # -- add the main library
 
 file(GLOB_RECURSE SRC lib/*.cpp)
