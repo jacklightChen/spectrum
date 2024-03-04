@@ -13,6 +13,11 @@ add_compile_options(-Wno-attributes)
 # -- Manage External Dependencies
 include(FetchContent)
 FetchContent_Declare(
+    evmc
+    GIT_REPOSITORY      "https://github.com/ethereum/evmc"
+    GIT_TAG             "v11.0.1"
+)
+FetchContent_Declare(
     fmt
     GIT_REPOSITORY      "https://github.com/fmtlib/fmt"
     GIT_TAG             "10.2.1"
@@ -42,17 +47,8 @@ FetchContent_Declare(
     GIT_REPOSITORY      "https://github.com/chfast/intx"
     GIT_TAG             "v0.10.1"
 )
-FetchContent_MakeAvailable(glog gtest gflags ethash intx fmt)
+FetchContent_MakeAvailable(glog gtest gflags ethash intx fmt evmc)
 set(gtest_force_shared_crt ON CACHE BOOL "" FORCE)
-
-# -- Manage EVMC
-if(NOT EXISTS ${CMAKE_CURRENT_SOURCE_DIR}/evmc/.git)
-    message(FATAL_ERROR "Git submodules not initialized, execute:\n  git submodule update --init")
-else()
-    option(EVMC_TOOLS "Build EVMC test tools" ${EVMONE_TESTING})
-    option(EVMC_INSTALL "Install EVMC" OFF)
-    add_subdirectory(evmc)
-endif()
 
 # -- Determine Compile Definitions
 if(CMAKE_SYSTEM_PROCESSOR STREQUAL x86_64)
@@ -84,66 +80,49 @@ add_compile_options(
 )
 
 # -- add the main library
-add_library(
-    evmtwo
-    src/evmcow/baseline.cpp
-    src/evmcow/baseline_instruction_table.cpp
-    src/evmcow/eof.cpp
-    src/evmcow/instructions_calls.cpp
-    src/evmcow/instructions_storage.cpp
-    src/evmcow/tracing.cpp
-    src/evmcow/vm.cpp
-    src/evmone/baseline.cpp
-    src/evmone/baseline_instruction_table.cpp
-    src/evmone/eof.cpp
-    src/evmone/instructions_calls.cpp
-    src/evmone/instructions_storage.cpp
-    src/evmone/tracing.cpp
-    src/evmone/vm.cpp
-    src/evm_host_impl.cpp
-    src/evm_transaction.cpp
-    src/evm_hash.cpp
-    src/workload.cpp
-    src/hex.cpp
-    src/sparkle.cpp
-    src/statistics.cpp
-)
 
+file(GLOB_RECURSE SRC lib/*.cpp)
+file(GLOB_RECURSE INC lib/*.hpp lib/*.h)
+
+foreach(F ${INC})
+    file(RELATIVE_PATH REL ${CMAKE_CURRENT_SOURCE_DIR}/lib ${F})
+    configure_file(lib/${REL} include/spectrum/${REL} COPYONLY)
+    unset(REL)
+endforeach()
+
+add_library(spectrum ${SRC})
+
+target_include_directories(
+    spectrum
+    PUBLIC ${CMAKE_CURRENT_BINARY_DIR}/include
+)
 target_compile_features(
-    evmtwo
+    spectrum
     PUBLIC cxx_std_20
 )
 target_link_libraries(
-    evmtwo
+    spectrum
     PUBLIC evmc intx::intx
     PRIVATE ethash::keccak fmt
 )
-target_include_directories(
-    evmtwo
-    PUBLIC
-    $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/src>
-    $<INSTALL_INTERFACE:src>
-)
 
-# -- add a bench driver
-add_executable(
-    bench
-    src/main.cpp
-)
-target_link_libraries(
-    bench
-    PRIVATE evmtwo
-)
+unset(SRC)
+unset(INC)
 
-# -- some unit tests
-add_executable(
-    test
-    testing/evm_transaction_test.cpp
-    testing/table_test.cpp
-    testing/sparkle_test.cpp
-    testing/statistics_test.cpp
-)
-target_link_libraries(
-    test
-    PRIVATE gtest_main evmtwo
-)
+# -- add some unit-tests
+
+file(GLOB_RECURSE SRC unit-tests/*.cpp)
+
+add_executable(unit-tests ${SRC})
+target_link_libraries(unit-tests PRIVATE gtest_main spectrum)
+
+unset(SRC)
+
+# -- add the bench
+
+file(GLOB_RECURSE SRC bench/*.cpp)
+
+add_executable(bench ${SRC})
+target_link_libraries(bench PRIVATE spectrum)
+
+unset(SRC)
