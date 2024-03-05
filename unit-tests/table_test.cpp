@@ -14,7 +14,7 @@ TEST(Table, Operations) {
     auto k = std::make_tuple(evmc::address{0x1}, evmc::bytes32{0x2});
     table.Put(k, [](evmc::bytes32& v) { v = evmc::bytes32{0x100}; });
     auto v = evmc::bytes32{0};
-    table.Get(k, v);
+    table.Get(k, [&](auto _v) { v = _v; });
     ASSERT_EQ(spectrum::to_hex(std::span{(uint8_t*)&v, 32}), "0000000000000000000000000000000000000000000000000000000000000100");
 }
 

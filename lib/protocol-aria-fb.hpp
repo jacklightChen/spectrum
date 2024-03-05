@@ -27,7 +27,6 @@ struct AriaTransaction: public Transaction {
     std::unordered_map<K, evmc::bytes32, KeyHasher>  local_put;
     std::unordered_map<K, evmc::bytes32, KeyHasher>  local_get;
     AriaTransaction(Transaction&& inner, size_t id, size_t batch_id);
-    void Reset();
 };
 
 /// @brief aria table entry for first round execution
@@ -84,6 +83,7 @@ struct AriaExecutor {
     static void Reserve(T& tx, AriaTable& table);
     static void Verify(T& tx, AriaTable& table);
     static void Commit(T& tx, AriaTable& table);
+    static void Fallback(T& tx, AriaTable& table);
     static void AcquireLock(T& tx, AriaTable& table);
     static void ReleaseLock(T& tx, AriaTable& table);
 };

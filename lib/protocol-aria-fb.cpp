@@ -58,7 +58,6 @@ void Aria::Start() {
         ParallelEach([&](auto& tx) {
             if (!tx.flag_conflict) { return; }
             AriaExecutor::AcquireLock(tx, table);
-            tx.Reset();
             AriaExecutor::Fallback(tx, table);
             AriaExecutor::ReleaseLock(tx, table);
         }, batch);
@@ -222,16 +221,41 @@ void AriaExecutor::Commit(T& tx, AriaTable& table) {
 void AriaExecutor::ReleaseLock(T& tx, AriaTable& table) {
 }
 
-/// @brief acquire lock from table
-/// @param tx 
-/// @param table 
-void AriaExecutor::AcquireLock(T& tx, AriaTable& table) {
+/// @brief acquire lock from table, only returns when last transaction has all locks or finished. 
+/// @param tx the transaction
+/// @param lock_table lock manager table of aria transaction
+void AriaExecutor::AcquireLock(T& tx, AriaTable& lock_table) {
 }
 
-/// @brief 
+/// @brief fallback execution with predicted keys
 /// @param tx 
 /// @param table 
 void AriaExecutor::Fallback(T& tx, AriaTable& table) {
+    // read from the public table
+    tx.UpdateGetStorageHandler([&](
+        const evmc::address &addr,
+        const evmc::bytes32 &key
+    ) {
+        auto tup = std::make_tuple(addr, key);
+        auto value = evmc::bytes32{0};
+        table.Put(tup, [&](auto& entry){
+            value = entry.value;
+        });
+        return value;
+    });
+    // write directly into the public table
+    tx.UpdateSetStorageHandler([&](
+        const evmc::address &addr, 
+        const evmc::bytes32 &key,
+        const evmc::bytes32 &value
+    ) {
+        auto tup = std::make_tuple(addr, key);
+        table.Put(tup, [&](auto& entry){
+            entry.value = value;
+        });
+        return evmc_storage_status::EVMC_STORAGE_MODIFIED;
+    });
+    tx.Execute();
 }
 
 #undef K
