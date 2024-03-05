@@ -11,6 +11,8 @@
 #include <list>
 #include <unordered_map>
 #include <optional>
+#include <atomic>
+#include <memory>
 
 namespace spectrum
 {
@@ -23,7 +25,7 @@ struct AriaTransaction: public Transaction {
     size_t      id;
     size_t      batch_id;
     bool        flag_conflict{false};
-    // std::atomic<bool>   commited{false};
+    std::atomic<bool>   commited{false};
     std::unordered_map<K, evmc::bytes32, KeyHasher>  local_put;
     std::unordered_map<K, evmc::bytes32, KeyHasher>  local_get;
     AriaTransaction(Transaction&& inner, size_t id, size_t batch_id);
@@ -48,8 +50,8 @@ struct AriaTable: public Table<K, AriaEntry, KeyHasher> {
 
 /// @brief aria table entry for fallback pessimistic execution
 struct AriaLockEntry {
-    std::vector<T*>     deps_get;     
-    std::vector<T*>     deps_put;     
+    std::vector<T*>     deps_get;
+    std::vector<T*>     deps_put;
 };
 
 /// @brief aria table for fallback pessimistic execution
@@ -70,10 +72,10 @@ class Aria: virtual public Protocol {
     std::atomic<size_t> tx_counter{1};
     BS::thread_pool     pool;
     void ParallelEach(
-        std::function<void(T&)>         map, 
-        std::vector<std::optional<T>>&  batch
+        std::function<void(T&)>             map, 
+        std::vector<std::optional<std::unique_ptr<T>>>&      batch
     );
-    T NextTransaction();
+    std::unique_ptr<T> NextTransaction();
 
     public:
     Aria(Workload& workload, size_t batch_size, size_t n_threads, size_t table_partitions);

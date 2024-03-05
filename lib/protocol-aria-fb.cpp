@@ -27,7 +27,7 @@ Aria::Aria(
 /// @param batch the current aria batch to work on
 void Aria::ParallelEach(
     std::function<void(T&)>             map, 
-    std::vector<std::optional<T>>&      batch
+    std::vector<std::optional<std::unique_ptr<T>>>&      batch
 ) {
     pool.submit_loop(
         size_t{0}, batch.size(), 
@@ -35,24 +35,25 @@ void Aria::ParallelEach(
             if (batch[i] == std::nullopt) {
                 batch[i].emplace(std::move(this->NextTransaction()));
             }
-            map(batch[i].value());
+            map(*batch[i].value());
         }
     ).wait();
 }
 
 /// @brief generate a wrapped transaction with atomic incremental id
 /// @return the wrapped transactions
-T Aria::NextTransaction() {
-
+std::unique_ptr<T> Aria::NextTransaction() {
+    auto id = tx_counter.fetch_add(1);
+    return std::unique_ptr<T>(new T(std::move(workload.Next()), id, id / batch_size));
 }
 
 /// @brief start aria protocol
 void Aria::Start() {
     while(!stop_flag.load()) {
         // -- construct an empty batch
-        auto batch = std::vector<std::optional<T>>();
+        auto batch = std::vector<std::optional<std::unique_ptr<T>>>();
         for (size_t i = 0; i < batch_size; ++i) {
-            batch.emplace_back(std::move(std::nullopt));
+            batch.push_back(std::nullopt);
         }
         // -- execution stage
         ParallelEach([&](auto& tx) {
@@ -60,12 +61,17 @@ void Aria::Start() {
             AriaExecutor::Reserve(tx, table);
         }, batch);
         // -- first commit stage
+        auto has_conflict = std::atomic<bool>{false};
         ParallelEach([&](auto& tx) {
             AriaExecutor::Verify(tx, table);
-            if (tx.flag_conflict) { return; }
+            if (tx.flag_conflict) {
+                has_conflict.store(true);
+                return;
+            }
             AriaExecutor::Commit(tx, table);
         }, batch);
         // -- prepare fallback, analyze dependencies
+        if (!has_conflict.load()) { continue; }
         auto lock_table = AriaLockTable(batch_size);
         ParallelEach([&](auto& tx) {
             if (!tx.flag_conflict) { return; }
@@ -293,7 +299,12 @@ void AriaExecutor::Fallback(T& tx, AriaTable& table, AriaLockTable& lock_table) 
         });
     }
     #undef COND
+    while(should_wait && !should_wait->commited.load()) {
+        continue;
+    }
+    // to do, wait for should_wait transaction
     tx.Execute();
+    tx.commited.store(true);
 }
 
 #undef K
