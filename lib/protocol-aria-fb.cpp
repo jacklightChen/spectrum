@@ -204,7 +204,7 @@ void AriaExecutor::Reserve(T& tx, AriaTable& table) {
 }
 
 /// @brief verify transaction by checking dependencies
-/// @param tx the transaction
+/// @param tx the transaction, flag_conflict will be altered
 /// @param table the aria shared table
 void AriaExecutor::Verify(T& tx, AriaTable& table) {
     // conceptually, we take a snapshot on the database before we execute a batch
