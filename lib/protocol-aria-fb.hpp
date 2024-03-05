@@ -8,6 +8,7 @@
 #include <tuple>
 #include <list>
 #include <unordered_map>
+#include <optional>
 
 namespace spectrum
 {
@@ -20,15 +21,18 @@ class AriaTransaction;
 class Aria {
 
     private:
-    Workload&       workload;
-    BS::thread_pool pool;
+    Workload&           workload;
+    size_t              batch_size;
+    std::atomic<size_t> transaction_counter;
+    std::unique_ptr<BS::thread_pool> pool;
     void ParallelEach(
-        std::function<void(T&)> map, 
-        std::vector<AriaTransaction>& batch
+        std::function<void(T&)>         map, 
+        std::vector<std::optional<T>>&  batch
     );
+    T NextTransaction();
 
     public:
-    void Start(size_t n_threads);
+    void Start();
 
 };
 
@@ -36,10 +40,10 @@ struct AriaTransaction: public Transaction {
 
     size_t     id;
     size_t     batch_id;
-    bool       flag_conflict;
+    bool       flag_conflict{false};
     std::unordered_map<K, evmc::bytes32, KeyHasher>  local_put;
     std::unordered_map<K, evmc::bytes32, KeyHasher>  local_get;
-    AriaTransaction();
+    AriaTransaction(Transaction&& inner, size_t id, size_t batch_id);
 
 };
 
@@ -63,14 +67,12 @@ struct AriaTable: public Table<K, AriaEntry, KeyHasher> {
 };
 
 struct AriaExecutor {
-
     void Execute(T& tx, AriaTable& table);
     void Reserve(T& tx, AriaTable& table);
     void Verify(T& tx, AriaTable& table);
     void Commit(T& tx, AriaTable& table);
-    void AcquireLock(T& tx);
-    void ReleaseLock(T& tx);
-
+    void AcquireLock(T& tx, AriaTable& table);
+    void ReleaseLock(T& tx, AriaTable& table);
 };
 
 #undef K

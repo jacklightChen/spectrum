@@ -56,6 +56,7 @@ class SparkleExecutor;
 class Sparkle: virtual public Protocol {
 
     private:
+    size_t              n_threads;
     Workload&           workload;
     SparkleTable        table;
     Statistics          statistics;
@@ -67,8 +68,8 @@ class Sparkle: virtual public Protocol {
     friend class SparkleExecutor;
 
     public:
-    Sparkle(Workload& workload, size_t table_partitions);
-    void Start(size_t n_threads) override;
+    Sparkle(Workload& workload, size_t n_threads, size_t table_partitions);
+    void Start() override;
     Statistics Stop() override;
 
 };

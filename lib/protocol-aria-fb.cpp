@@ -12,14 +12,36 @@ namespace spectrum
 #define T AriaTransaction
 
 void Aria::ParallelEach(
-    std::function<void(T&)>   map, 
-    std::vector<AriaTransaction>&           batch
+    std::function<void(T&)>         map, 
+    std::vector<std::optional<T>>&  batch
 ) {
-    pool.submit_loop(
+    pool->submit_loop(
         size_t{0}, batch.size(), 
-        [&](size_t i) { map(batch[i]); }
+        [&](size_t i) {
+            if (batch[i] == std::nullopt) {
+                batch[i].emplace(this->NextTransaction());
+            }
+            map(batch[i].value());
+        }
     ).wait();
 }
+
+T Aria::NextTransaction() {
+}
+
+void Aria::Start() {
+    while(true) {
+    }
+}
+
+AriaTransaction::AriaTransaction(
+    Transaction&& inner, 
+    size_t id, size_t batch_id
+):
+    Transaction{std::move(inner)},
+    id{id},
+    batch_id{batch_id}
+{}
 
 void AriaTable::ReserveGet(T* tx, const K& k) {
     Table::Put(k, [&](AriaEntry& entry) {
@@ -148,6 +170,8 @@ void AriaExecutor::Commit(T& tx, AriaTable& table) {
         });
     }
 }
+
+
 
 #undef K
 #undef T
