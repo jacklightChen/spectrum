@@ -11,6 +11,8 @@ namespace spectrum
 #define K std::tuple<evmc::address, evmc::bytes32>
 #define T AriaTransaction
 
+using namespace std::chrono;
+
 /// @brief initialize aria protocol
 /// @param workload an evm transaction workload
 /// @param batch_size batch size
@@ -54,6 +56,7 @@ std::unique_ptr<T> Aria::NextTransaction() {
 
 /// @brief start aria protocol
 void Aria::Start() {
+    #define TIME duration_cast<microseconds>(steady_clock::now() - tx.start_time).count()
     while(!stop_flag.load()) {
         // -- construct an empty batch
         auto batch = std::vector<std::optional<std::unique_ptr<T>>>();
@@ -64,6 +67,7 @@ void Aria::Start() {
         ParallelEach([&](auto& tx) {
             AriaExecutor::Execute(tx, table);
             AriaExecutor::Reserve(tx, table);
+            statistics.JournalExecute();
         }, batch);
         // -- first commit stage
         auto has_conflict = std::atomic<bool>{false};
@@ -74,6 +78,7 @@ void Aria::Start() {
                 return;
             }
             AriaExecutor::Commit(tx, table);
+            statistics.JournalCommit(TIME);
         }, batch);
         // -- prepare fallback, analyze dependencies
         if (!has_conflict.load()) { continue; }
@@ -86,8 +91,11 @@ void Aria::Start() {
         ParallelEach([&](auto& tx) {
             if (!tx.flag_conflict) { return; }
             AriaExecutor::Fallback(tx, table, lock_table);
+            statistics.JournalExecute();
+            statistics.JournalCommit(TIME);
         }, batch);
     }
+    #undef TIME
 }
 
 /// @brief stop aria protocol and return statistics
