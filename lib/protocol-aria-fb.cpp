@@ -11,28 +11,39 @@ namespace spectrum
 #define K std::tuple<evmc::address, evmc::bytes32>
 #define T AriaTransaction
 
+Aria::Aria(
+    Workload& workload, size_t batch_size, 
+    size_t n_threads, size_t table_partitions
+):
+    workload{workload},
+    batch_size{batch_size},
+    table_partitions{table_partitions},
+    pool{n_threads},
+    table(table_partitions)
+{}
+
 /// @brief execute multiple transactions in parallel
 /// @param map the function to execute
 /// @param batch the current aria batch to work on
 void Aria::ParallelEach(
-    std::function<void(T&)>         map, 
-    std::vector<std::optional<T>>&  batch
+    std::function<void(T&)>             map, 
+    std::vector<std::optional<T>>&      batch
 ) {
-    pool->submit_loop(
+    pool.submit_loop(
         size_t{0}, batch.size(), 
         [&](size_t i) {
             if (batch[i] == std::nullopt) {
-                batch[i].emplace(this->NextTransaction());
+                batch[i].emplace(std::move(this->NextTransaction()));
             }
             map(batch[i].value());
         }
     ).wait();
 }
 
-/// @brief generate a wrapped transaction with atomic id
-/// @return the wrapped transactoin
+/// @brief generate a wrapped transaction with atomic incremental id
+/// @return the wrapped transactions
 T Aria::NextTransaction() {
-    throw "todo";
+
 }
 
 /// @brief start aria protocol
@@ -54,12 +65,16 @@ void Aria::Start() {
             if (tx.flag_conflict) { return; }
             AriaExecutor::Commit(tx, table);
         }, batch);
-        // -- fallback stage
+        // -- prepare fallback, analyze dependencies
+        auto lock_table = AriaLockTable(batch_size);
         ParallelEach([&](auto& tx) {
             if (!tx.flag_conflict) { return; }
-            AriaExecutor::AcquireLock(tx, table);
-            AriaExecutor::Fallback(tx, table);
-            AriaExecutor::ReleaseLock(tx, table);
+            AriaExecutor::PrepareLockTable(tx, lock_table);
+        }, batch);
+        // -- run fallback strategy
+        ParallelEach([&](auto& tx) {
+            if (!tx.flag_conflict) { return; }
+            AriaExecutor::Fallback(tx, table, lock_table);
         }, batch);
     }
 }
@@ -68,7 +83,7 @@ void Aria::Start() {
 /// @return statistics of current execution
 Statistics Aria::Stop() {
     this->stop_flag.store(true);
-    return this->statistics;    
+    return this->statistics;
 }
 
 /// @brief construct an empty aria transaction
@@ -125,6 +140,10 @@ bool AriaTable::CompareReservedPut(T* tx, const K& k) {
     });
     return eq;
 }
+
+AriaLockTable::AriaLockTable(size_t partitions): 
+    Table::Table(partitions)
+{}
 
 /// @brief execute a transaction and journal write operations locally
 /// @param tx the transaction
@@ -215,23 +234,26 @@ void AriaExecutor::Commit(T& tx, AriaTable& table) {
     }
 }
 
-/// @brief release lock from table
+/// @brief put transaction id (local id) into table
 /// @param tx the transaction
-/// @param table 
-void AriaExecutor::ReleaseLock(T& tx, AriaTable& table) {
-}
-
-/// @brief acquire lock from table, only returns when last transaction has all locks or finished. 
-/// @param tx the transaction
-/// @param lock_table lock manager table of aria transaction
-void AriaExecutor::AcquireLock(T& tx, AriaTable& lock_table) {
-
+/// @param table the aria lock table
+void AriaExecutor::PrepareLockTable(T& tx, AriaLockTable& table) {
+    for (auto& tup: tx.local_get) {
+        table.Put(std::get<0>(tup), [&](auto& entry) {
+            entry.deps_get.push_back(&tx);
+        });
+    }
+    for (auto& tup: tx.local_put) {
+        table.Put(std::get<0>(tup), [&](auto& entry) {
+            entry.deps_put.push_back(&tx);
+        });
+    }
 }
 
 /// @brief fallback execution without constant
 /// @param tx 
 /// @param table 
-void AriaExecutor::Fallback(T& tx, AriaTable& table) {
+void AriaExecutor::Fallback(T& tx, AriaTable& table, AriaLockTable& lock_table) {
     // read from the public table
     tx.UpdateGetStorageHandler([&](
         const evmc::address &addr,
@@ -256,6 +278,21 @@ void AriaExecutor::Fallback(T& tx, AriaTable& table) {
         });
         return evmc_storage_status::EVMC_STORAGE_MODIFIED;
     });
+    // get the largest dependency and wait on it
+    T* should_wait = nullptr;
+    #define COND (_tx->id < tx.id && (should_wait == nullptr || _tx->id > should_wait->id))
+    for (auto& tup: tx.local_put) {
+        lock_table.Get(std::get<0>(tup), [&](auto& entry) {
+            for (auto _tx: entry.deps_get) { if (COND) { should_wait = _tx; } }
+            for (auto _tx: entry.deps_put) { if (COND) { should_wait = _tx; } }
+        });
+    }
+    for (auto& tup: tx.local_get) {
+        lock_table.Get(std::get<0>(tup), [&](auto& entry) {
+            for (auto _tx: entry.deps_put) { if (COND) { should_wait = _tx; } }
+        });
+    }
+    #undef COND
     tx.Execute();
 }
 

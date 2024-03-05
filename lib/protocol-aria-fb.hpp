@@ -19,11 +19,11 @@ namespace spectrum
 #define T AriaTransaction
 
 
-/// @brief 
 struct AriaTransaction: public Transaction {
-    size_t     id;
-    size_t     batch_id;
-    bool       flag_conflict{false};
+    size_t      id;
+    size_t      batch_id;
+    bool        flag_conflict{false};
+    // std::atomic<bool>   commited{false};
     std::unordered_map<K, evmc::bytes32, KeyHasher>  local_put;
     std::unordered_map<K, evmc::bytes32, KeyHasher>  local_get;
     AriaTransaction(Transaction&& inner, size_t id, size_t batch_id);
@@ -48,11 +48,13 @@ struct AriaTable: public Table<K, AriaEntry, KeyHasher> {
 
 /// @brief aria table entry for fallback pessimistic execution
 struct AriaLockEntry {
+    std::vector<T*>     deps_get;     
+    std::vector<T*>     deps_put;     
 };
 
 /// @brief aria table for fallback pessimistic execution
 struct AriaLockTable: public Table<K, AriaLockEntry, KeyHasher> {
-    
+    AriaLockTable(size_t partitions);
 };
 
 /// @brief aria protocol master class
@@ -62,10 +64,11 @@ class Aria: virtual public Protocol {
     Statistics          statistics;
     Workload&           workload;
     size_t              batch_size;
+    size_t              table_partitions;
     AriaTable           table;
-    std::atomic<bool>   stop_flag;
-    std::atomic<size_t> transaction_counter;
-    std::unique_ptr<BS::thread_pool> pool;
+    std::atomic<bool>   stop_flag{false};
+    std::atomic<size_t> tx_counter{1};
+    BS::thread_pool     pool;
     void ParallelEach(
         std::function<void(T&)>         map, 
         std::vector<std::optional<T>>&  batch
@@ -73,6 +76,7 @@ class Aria: virtual public Protocol {
     T NextTransaction();
 
     public:
+    Aria(Workload& workload, size_t batch_size, size_t n_threads, size_t table_partitions);
     void Start() override;
     Statistics Stop() override;
 
@@ -84,9 +88,8 @@ struct AriaExecutor {
     static void Reserve(T& tx, AriaTable& table);
     static void Verify(T& tx, AriaTable& table);
     static void Commit(T& tx, AriaTable& table);
-    static void Fallback(T& tx, AriaTable& table);
-    static void AcquireLock(T& tx, AriaTable& table);
-    static void ReleaseLock(T& tx, AriaTable& table);
+    static void PrepareLockTable(T& tx, AriaLockTable& table);
+    static void Fallback(T& tx, AriaTable& table, AriaLockTable& lock_table);
 };
 
 #undef K
