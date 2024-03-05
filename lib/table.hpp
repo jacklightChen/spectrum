@@ -35,7 +35,7 @@ void Table<K, V, Hasher>::Get(const K& k, std::function<void(const V& v)> vmap) 
     auto partition_id = (size_t)this->hasher(k) % this->partitions.size();
     auto& partition = this->partitions[partition_id];
     auto guard = std::shared_lock<std::shared_mutex>(locks[partition_id]);
-    vmap(partition[k]);
+    if (partition.contains(k)) vmap(partition[k]);
 }
 
 template<typename K, typename V, typename Hasher>

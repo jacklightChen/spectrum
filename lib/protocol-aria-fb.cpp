@@ -216,7 +216,7 @@ void AriaExecutor::Commit(T& tx, AriaTable& table) {
 }
 
 /// @brief release lock from table
-/// @param tx 
+/// @param tx the transaction
 /// @param table 
 void AriaExecutor::ReleaseLock(T& tx, AriaTable& table) {
 }
@@ -225,6 +225,7 @@ void AriaExecutor::ReleaseLock(T& tx, AriaTable& table) {
 /// @param tx the transaction
 /// @param lock_table lock manager table of aria transaction
 void AriaExecutor::AcquireLock(T& tx, AriaTable& lock_table) {
+
 }
 
 /// @brief fallback execution without constant

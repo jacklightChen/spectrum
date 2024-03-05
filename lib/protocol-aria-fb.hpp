@@ -52,6 +52,7 @@ struct AriaLockEntry {
 
 /// @brief aria table for fallback pessimistic execution
 struct AriaLockTable: public Table<K, AriaLockEntry, KeyHasher> {
+    
 };
 
 /// @brief aria protocol master class
