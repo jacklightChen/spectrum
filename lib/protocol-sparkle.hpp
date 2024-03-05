@@ -61,7 +61,7 @@ class Sparkle: virtual public Protocol {
     SparkleTable        table;
     Statistics          statistics;
     std::atomic<size_t> last_execute{1};
-    std::atomic<size_t> last_commit{1};
+    std::atomic<size_t> last_finalized{1};
     std::atomic<bool>   stop_flag{false};
     std::vector<SparkleExecutor>    executors{};
     std::vector<std::thread>        threads{};
@@ -81,7 +81,7 @@ class SparkleExecutor {
     SparkleTable&           table;
     Statistics&             statistics;
     std::atomic<size_t>&    last_execute;
-    std::atomic<size_t>&    last_commit;
+    std::atomic<size_t>&    last_finalized;
     std::atomic<bool>&      stop_flag;
 
     public:

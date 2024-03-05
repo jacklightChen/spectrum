@@ -209,7 +209,7 @@ Statistics Sparkle::Stop() {
 SparkleExecutor::SparkleExecutor(Sparkle& sparkle):
     workload{sparkle.workload},
     table{sparkle.table},
-    last_commit{sparkle.last_commit},
+    last_finalized{sparkle.last_finalized},
     last_execute{sparkle.last_execute},
     stop_flag{sparkle.stop_flag},
     statistics{sparkle.statistics}
@@ -281,7 +281,7 @@ void SparkleExecutor::Run() { while (!stop_flag.load()) {
                 table.Put(&tx, std::get<0>(entry), std::get<1>(entry));
             }
         }
-        else if (last_commit.load() + 1 == tx.id) {
+        else if (last_finalized.load() + 1 == tx.id) {
             // here no previous transaction will affect the result of this transaction. 
             // therefore, we can determine inaccessible values and remove them. 
             for (auto entry: tx.tuples_get) {
@@ -290,7 +290,7 @@ void SparkleExecutor::Run() { while (!stop_flag.load()) {
             for (auto entry: tx.tuples_put) {
                 table.ClearPut(&tx, std::get<0>(entry));
             }
-            last_commit.fetch_add(1);
+            last_finalized.fetch_add(1);
             break;
         }
     }
