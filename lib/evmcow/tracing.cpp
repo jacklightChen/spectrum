@@ -19,6 +19,20 @@ std::string get_name(uint8_t opcode)
     return (name != nullptr) ? name : "0x" + evmc::hex(opcode);
 }
 
+/// @see create_counting_tracer()
+class CountingTracer: public Tracer
+{
+    size_t& instruction_count;
+    void on_instruction_start(uint32_t /* pc */, const StackTop& /*stack_top*/, int /*stack_height*/,
+        int64_t /*gas*/, const ExecutionState& /*state*/) noexcept override
+    {
+        instruction_count += 1;
+    }
+
+public:
+    explicit CountingTracer(size_t& count): instruction_count{count} {}
+}
+
 /// @see create_histogram_tracer()
 class HistogramTracer : public Tracer
 {
@@ -142,4 +156,10 @@ std::unique_ptr<Tracer> create_instruction_tracer(std::ostream& out)
 {
     return std::make_unique<InstructionTracer>(out);
 }
+
+std::unique_ptr<Tracer> create_counting_tracer(std::size_t& count)
+{
+    return std::make_unique<CountingTracer>(count);
+}
+
 }  // namespace evmcow

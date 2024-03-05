@@ -21,7 +21,6 @@ namespace spectrum
 #define K std::tuple<evmc::address, evmc::bytes32>
 #define T AriaTransaction
 
-
 /// @brief aria tranaction with local read and write set. 
 struct AriaTransaction: public Transaction {
     size_t      id;

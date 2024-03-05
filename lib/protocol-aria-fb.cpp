@@ -33,8 +33,8 @@ Aria::Aria(
 /// @param map the function to execute
 /// @param batch the current aria batch to work on
 void Aria::ParallelEach(
-    std::function<void(T&)>             map, 
-    std::vector<std::optional<std::unique_ptr<T>>>&      batch
+    std::function<void(T&)>                                 map, 
+    std::vector<std::optional<std::unique_ptr<T>>>&         batch
 ) {
     pool.submit_loop(
         size_t{0}, batch.size(), 
