@@ -21,6 +21,7 @@ namespace spectrum
 #define T AriaTransaction
 
 
+/// @brief aria tranaction with local read and write set. 
 struct AriaTransaction: public Transaction {
     size_t      id;
     size_t      batch_id;
@@ -84,13 +85,13 @@ class Aria: virtual public Protocol {
 
 };
 
-/// @brief routines to be executed in various execution stage
+/// @brief routines to be executed in various execution stages
 struct AriaExecutor {
     static void Execute(T& tx, AriaTable& table);
     static void Reserve(T& tx, AriaTable& table);
     static void Verify(T& tx, AriaTable& table);
     static void Commit(T& tx, AriaTable& table);
-    static void PrepareLockTable(T& tx, AriaLockTable& table);
+    static void PrepareLockTable(T& tx, AriaLockTable& lock_table);
     static void Fallback(T& tx, AriaTable& table, AriaLockTable& lock_table);
 };
 

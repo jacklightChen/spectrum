@@ -11,6 +11,11 @@ namespace spectrum
 #define K std::tuple<evmc::address, evmc::bytes32>
 #define T AriaTransaction
 
+/// @brief initialize aria protocol
+/// @param workload an evm transaction workload
+/// @param batch_size batch size
+/// @param n_threads the number of threads in thread pool
+/// @param table_partitions the number of partitions in table
 Aria::Aria(
     Workload& workload, size_t batch_size, 
     size_t n_threads, size_t table_partitions
@@ -102,9 +107,9 @@ AriaTransaction::AriaTransaction(
     batch_id{batch_id}
 {}
 
-/// @brief 
-/// @param tx 
-/// @param k 
+/// @brief reserved a get entry
+/// @param tx the transaction
+/// @param k the reserved key
 void AriaTable::ReserveGet(T* tx, const K& k) {
     Table::Put(k, [&](AriaEntry& entry) {
         if (entry.batch_id_get != tx->batch_id) {
@@ -117,6 +122,9 @@ void AriaTable::ReserveGet(T* tx, const K& k) {
     });
 }
 
+/// @brief reserve a put entry
+/// @param tx the transaction
+/// @param k the reserved key
 void AriaTable::ReservePut(T* tx, const K& k) {
     Table::Put(k, [&](AriaEntry& entry) {
         if (entry.batch_id_get != tx->batch_id) {
@@ -129,24 +137,34 @@ void AriaTable::ReservePut(T* tx, const K& k) {
     });
 }
 
+/// @brief compare reserved get transaction
+/// @param tx the transaction
+/// @param k the compared key
+/// @return if current transaction reserved this entry successfully
 bool AriaTable::CompareReservedGet(T* tx, const K& k) {
     bool eq = true;
-    Table::Put(k, [&](AriaEntry& entry) {
+    Table::Get(k, [&](auto entry) {
         eq = entry.reserved_get_tx == nullptr || 
              entry.reserved_get_tx->id >= tx->id;
     });
     return eq;
 }
 
+/// @brief compare reserved put transaction
+/// @param tx the transaction
+/// @param k the compared key
+/// @return if current transaction reserved this entry successfully
 bool AriaTable::CompareReservedPut(T* tx, const K& k) {
     bool eq = true;
-    Table::Put(k, [&](AriaEntry& entry) {
+    Table::Get(k, [&](auto entry) {
         eq = entry.reserved_put_tx == nullptr || 
              entry.reserved_put_tx->id >= tx->id;
     });
     return eq;
 }
 
+/// @brief initialize an aria lock table
+/// @param partitions the number of partitions used in parallel hash table
 AriaLockTable::AriaLockTable(size_t partitions): 
     Table::Table(partitions)
 {}
@@ -257,8 +275,9 @@ void AriaExecutor::PrepareLockTable(T& tx, AriaLockTable& table) {
 }
 
 /// @brief fallback execution without constant
-/// @param tx 
-/// @param table 
+/// @param tx the transaction
+/// @param table the aria table
+/// @param lock_table the lock table with registered lock information
 void AriaExecutor::Fallback(T& tx, AriaTable& table, AriaLockTable& lock_table) {
     // read from the public table
     tx.UpdateGetStorageHandler([&](
@@ -284,7 +303,7 @@ void AriaExecutor::Fallback(T& tx, AriaTable& table, AriaLockTable& lock_table) 
         });
         return evmc_storage_status::EVMC_STORAGE_MODIFIED;
     });
-    // get the largest dependency and wait on it
+    // get the latest dependency and wait on it
     T* should_wait = nullptr;
     #define COND (_tx->id < tx.id && (should_wait == nullptr || _tx->id > should_wait->id))
     for (auto& tup: tx.local_put) {
