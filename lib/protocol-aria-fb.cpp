@@ -59,13 +59,20 @@ void Aria::Start() {
             if (!tx.flag_conflict) { return; }
             AriaExecutor::AcquireLock(tx, table);
             tx.Reset();
-            AriaExecutor::Execute(tx, table);
-            AriaExecutor::Commit(tx, table);
+            AriaExecutor::Fallback(tx, table);
             AriaExecutor::ReleaseLock(tx, table);
         }, batch);
     }
 }
 
+/// @brief stop aria protocol and return statistics
+/// @return statistics of current execution
+Statistics Aria::Stop() {
+    this->stop_flag.store(true);
+    return this->statistics;    
+}
+
+/// @brief construct an empty aria transaction
 AriaTransaction::AriaTransaction(
     Transaction&& inner, 
     size_t id, size_t batch_id
@@ -75,10 +82,9 @@ AriaTransaction::AriaTransaction(
     batch_id{batch_id}
 {}
 
-void AriaTransaction::Reset() {
-    throw "todo";
-}
-
+/// @brief 
+/// @param tx 
+/// @param k 
 void AriaTable::ReserveGet(T* tx, const K& k) {
     Table::Put(k, [&](AriaEntry& entry) {
         if (entry.batch_id_get != tx->batch_id) {
@@ -220,6 +226,12 @@ void AriaExecutor::ReleaseLock(T& tx, AriaTable& table) {
 /// @param tx 
 /// @param table 
 void AriaExecutor::AcquireLock(T& tx, AriaTable& table) {
+}
+
+/// @brief 
+/// @param tx 
+/// @param table 
+void AriaExecutor::Fallback(T& tx, AriaTable& table) {
 }
 
 #undef K

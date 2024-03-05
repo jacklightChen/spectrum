@@ -30,13 +30,9 @@ struct AriaTransaction: public Transaction {
 };
 
 struct AriaEntry {
-    // lock transactions sorted by id increasing
-    std::list<T*>   lock_transactions   = std::list<T*>();
-    // the value of this entry
-    evmc::bytes32   value               = evmc::bytes32{0};
-    // read and write reservation
-    size_t  batch_id_get;
-    size_t  batch_id_put;
+    evmc::bytes32   value   = evmc::bytes32{0};
+    size_t  batch_id_get    = 0;
+    size_t  batch_id_put    = 0;
     T*      reserved_get_tx = nullptr;
     T*      reserved_put_tx = nullptr;
 };
@@ -46,6 +42,14 @@ struct AriaTable: public Table<K, AriaEntry, KeyHasher> {
     void ReservePut(T* tx, const K& k);
     bool CompareReservedGet(T* tx, const K& k);
     bool CompareReservedPut(T* tx, const K& k);
+};
+
+struct AriaLockEntry {
+    
+};
+
+struct AriaLockTable: public Table<K, AriaEntry, KeyHasher> {
+
 };
 
 class Aria: virtual public Protocol {
