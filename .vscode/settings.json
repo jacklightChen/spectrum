@@ -103,7 +103,8 @@
         "__mutex_base": "cpp",
         "ranges": "cpp",
         "typeindex": "cpp",
-        "source_location": "cpp"
+        "source_location": "cpp",
+        "__tuple": "cpp"
     },
     "C_Cpp.clang_format_fallbackStyle": 
         "{ BasedOnStyle: LLVM, IndentWidth: 4 }",
