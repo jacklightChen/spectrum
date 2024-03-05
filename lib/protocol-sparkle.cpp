@@ -16,13 +16,13 @@ using namespace std::chrono;
 /// @brief wrap a base transaction into a sparkle transaction
 /// @param inner the base transaction
 /// @param id transaction id
-T::T(Transaction&& inner, size_t id):
+SparkleTransaction::SparkleTransaction(Transaction&& inner, size_t id):
     Transaction{std::move(inner)},
     id{id}
 {}
 
 /// @brief reset the transaction (local) information
-void T::Reset() {
+void SparkleTransaction::Reset() {
     tuples_get.resize(0);
     tuples_put.resize(0);
     rerun_flag.store(0);
@@ -229,6 +229,14 @@ void SparkleExecutor::Run() { while (!stop_flag.load()) {
         while (!table.Lock(&tx, _key)) {
             std::this_thread::yield(); 
         }
+        // when there exists some key, do this
+        for (auto& tup: tx.tuples_put) {
+            if (std::get<0>(tup) == _key) {
+                std::get<1>(tup) = value;
+                return evmc_storage_status::EVMC_STORAGE_MODIFIED;
+            }
+        }
+        // else just push back
         tx.tuples_put.push_back(std::make_tuple(_key, value));
         return evmc_storage_status::EVMC_STORAGE_MODIFIED;
     });
@@ -239,6 +247,17 @@ void SparkleExecutor::Run() { while (!stop_flag.load()) {
         auto _key   = std::make_tuple(addr, key);
         auto value  = evmc::bytes32{0};
         auto version = size_t{0};
+        // one key from one transaction will be commited once
+        for (auto& tup: tx.tuples_put) {
+            if (std::get<0>(tup) == _key) {
+                return std::get<1>(tup);
+            }
+        }
+        for (auto& tup: tx.tuples_get) {
+            if (std::get<0>(tup) == _key) {
+                return std::get<1>(tup);
+            }
+        }
         table.Get(&tx, _key, value, version);
         tx.tuples_get.push_back(std::make_tuple(_key, value, version));
         return value;

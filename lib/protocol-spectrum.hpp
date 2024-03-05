@@ -1,8 +1,7 @@
-#include "./protocol-sparkle.hpp"
-
 namespace spectrum
 {
 
+/// @brief the spectrum deterministic concurrency control protocol. 
 class Spectrum {
 
 };
