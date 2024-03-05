@@ -27,12 +27,16 @@ void Aria::ParallelEach(
 }
 
 T Aria::NextTransaction() {
-
+    throw "todo";
 }
 
 void Aria::Start() {
     while(!stop_flag.load()) {
-        auto batch = std::vector<std::optional<T>>(batch_size, std::nullopt);
+        // -- construct an empty batch
+        auto batch = std::vector<std::optional<T>>();
+        for (size_t i = 0; i < batch_size; ++i) {
+            batch.emplace_back(std::move(std::nullopt));
+        }
         // -- execution stage
         ParallelEach([&](auto& tx) {
             AriaExecutor::Execute(tx, table);
@@ -64,6 +68,10 @@ AriaTransaction::AriaTransaction(
     id{id},
     batch_id{batch_id}
 {}
+
+void AriaTransaction::Reset() {
+    throw "todo";
+}
 
 void AriaTable::ReserveGet(T* tx, const K& k) {
     Table::Put(k, [&](AriaEntry& entry) {
@@ -196,7 +204,17 @@ void AriaExecutor::Commit(T& tx, AriaTable& table) {
     }
 }
 
+/// @brief release lock from table
+/// @param tx 
+/// @param table 
+void AriaExecutor::ReleaseLock(T& tx, AriaTable& table) {
+}
 
+/// @brief acquire lock from table
+/// @param tx 
+/// @param table 
+void AriaExecutor::AcquireLock(T& tx, AriaTable& table) {
+}
 
 #undef K
 #undef T

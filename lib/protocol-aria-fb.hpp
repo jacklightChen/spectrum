@@ -27,6 +27,18 @@ struct AriaTransaction: public Transaction {
     void Reset();
 };
 
+struct AriaEntry {
+    // lock transactions sorted by id increasing
+    std::list<T*>   lock_transactions   = std::list<T*>();
+    // the value of this entry
+    evmc::bytes32   value               = evmc::bytes32{0};
+    // read and write reservation
+    size_t  batch_id_get;
+    size_t  batch_id_put;
+    T*      reserved_get_tx = nullptr;
+    T*      reserved_put_tx = nullptr;
+};
+
 struct AriaTable: public Table<K, AriaEntry, KeyHasher> {
     void ReserveGet(T* tx, const K& k);
     void ReservePut(T* tx, const K& k);
@@ -54,25 +66,13 @@ class Aria {
 
 };
 
-struct AriaEntry {
-    // lock transactions sorted by id increasing
-    std::list<T*>   lock_transactions   = std::list<T*>();
-    // the value of this entry
-    evmc::bytes32   value               = evmc::bytes32{0};
-    // read and write reservation
-    size_t  batch_id_get;
-    size_t  batch_id_put;
-    T*      reserved_get_tx = nullptr;
-    T*      reserved_put_tx = nullptr;
-};
-
 struct AriaExecutor {
-    void Execute(T& tx, AriaTable& table);
-    void Reserve(T& tx, AriaTable& table);
-    void Verify(T& tx, AriaTable& table);
-    void Commit(T& tx, AriaTable& table);
-    void AcquireLock(T& tx, AriaTable& table);
-    void ReleaseLock(T& tx, AriaTable& table);
+    static void Execute(T& tx, AriaTable& table);
+    static void Reserve(T& tx, AriaTable& table);
+    static void Verify(T& tx, AriaTable& table);
+    static void Commit(T& tx, AriaTable& table);
+    static void AcquireLock(T& tx, AriaTable& table);
+    static void ReleaseLock(T& tx, AriaTable& table);
 };
 
 #undef K
