@@ -23,7 +23,7 @@ class Aria {
     Workload&       workload;
     BS::thread_pool pool;
     void ParallelEach(
-        std::function<void(AriaTransaction&)> map, 
+        std::function<void(T&)> map, 
         std::vector<AriaTransaction>& batch
     );
 
@@ -34,6 +34,9 @@ class Aria {
 
 struct AriaTransaction: public Transaction {
 
+    size_t     id;
+    size_t     batch_id;
+    bool       flag_conflict;
     std::unordered_map<K, evmc::bytes32, KeyHasher>  local_put;
     std::unordered_map<K, evmc::bytes32, KeyHasher>  local_get;
     AriaTransaction();
@@ -45,20 +48,28 @@ struct AriaEntry {
     std::list<T*>   lock_transactions   = std::list<T*>();
     // the value of this entry
     evmc::bytes32   value               = evmc::bytes32{0};
+    // read and write reservation
+    size_t  batch_id_get;
+    size_t  batch_id_put;
+    T*      reserved_get_tx = nullptr;
+    T*      reserved_put_tx = nullptr;
 };
 
-class AriaTable: public Table<K, AriaEntry, KeyHasher> {
-
+struct AriaTable: public Table<K, AriaEntry, KeyHasher> {
+    void ReserveGet(T* tx, const K& k);
+    void ReservePut(T* tx, const K& k);
+    bool CompareReservedGet(T* tx, const K& k);
+    bool CompareReservedPut(T* tx, const K& k);
 };
 
-class AriaExecutor {
+struct AriaExecutor {
 
-    public:
-    void Execute(AriaTransaction& tx, AriaTable& table);
-    void Reserve(AriaTransaction& tx);
-    void Commit(AriaTransaction& tx);
-    void AcquireLock(AriaTransaction& tx);
-    void ReleaseLock(AriaTransaction& tx);
+    void Execute(T& tx, AriaTable& table);
+    void Reserve(T& tx, AriaTable& table);
+    void Verify(T& tx, AriaTable& table);
+    void Commit(T& tx, AriaTable& table);
+    void AcquireLock(T& tx);
+    void ReleaseLock(T& tx);
 
 };
 

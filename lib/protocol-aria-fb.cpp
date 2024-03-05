@@ -1,10 +1,18 @@
 #include "./protocol-aria-fb.hpp"
 
+/*
+    This is a implementation of "Aria: A Fast and Practical Deterministic OLTP Database" (Yi Lu, Xiangyao Yu, Lei Cao, Samuel Madden). 
+    In this implementation we adopt the fallback strategy and reordering strategy discussed in this paper. 
+ */
+
 namespace spectrum 
 {
 
+#define K std::tuple<evmc::address, evmc::bytes32>
+#define T AriaTransaction
+
 void Aria::ParallelEach(
-    std::function<void(AriaTransaction&)>   map, 
+    std::function<void(T&)>   map, 
     std::vector<AriaTransaction>&           batch
 ) {
     pool.submit_loop(
@@ -13,13 +21,55 @@ void Aria::ParallelEach(
     ).wait();
 }
 
-void AriaExecutor::Execute(AriaTransaction& tx, AriaTable& table) {
+void AriaTable::ReserveGet(T* tx, const K& k) {
+    Table::Put(k, [&](AriaEntry& entry) {
+        if (entry.batch_id_get != tx->batch_id) {
+            entry.reserved_get_tx = nullptr;
+            entry.batch_id_get = tx->batch_id;
+        }
+        if (entry.reserved_get_tx == nullptr || entry.reserved_get_tx->id < tx->id) {
+            entry.reserved_get_tx = tx;
+        }
+    });
+}
+
+void AriaTable::ReservePut(T* tx, const K& k) {
+    Table::Put(k, [&](AriaEntry& entry) {
+        if (entry.batch_id_get != tx->batch_id) {
+            entry.reserved_put_tx = nullptr;
+            entry.batch_id_put = tx->batch_id;
+        }
+        if (entry.reserved_put_tx == nullptr || entry.reserved_put_tx->id < tx->id) {
+            entry.reserved_put_tx = tx;
+        }
+    });
+}
+
+bool AriaTable::CompareReservedGet(T* tx, const K& k) {
+    bool eq = true;
+    Table::Put(k, [&](AriaEntry& entry) {
+        eq = entry.reserved_get_tx == nullptr || 
+             entry.reserved_get_tx->id >= tx->id;
+    });
+    return eq;
+}
+
+bool AriaTable::CompareReservedPut(T* tx, const K& k) {
+    bool eq = true;
+    Table::Put(k, [&](AriaEntry& entry) {
+        eq = entry.reserved_put_tx == nullptr || 
+             entry.reserved_put_tx->id >= tx->id;
+    });
+    return eq;
+}
+
+void AriaExecutor::Execute(T& tx, AriaTable& table) {
     // read from the public table
     tx.UpdateGetStorageHandler([&](
         const evmc::address &addr,
         const evmc::bytes32 &key
     ) {
-        // if some write is issued previously, 
+        // if some write on this entry is issued previously, 
         //  the read dependency will be barricated from journal. 
         auto tup = std::make_tuple(addr, key);
         if (tx.local_put.contains(tup)) {
@@ -45,20 +95,61 @@ void AriaExecutor::Execute(AriaTransaction& tx, AriaTable& table) {
         tx.local_put[tup] = value;
         return evmc_storage_status::EVMC_STORAGE_MODIFIED;
     });
-    // just execute the transaction
+    // execute the transaction
     tx.Execute();
 }
 
-void AriaExecutor::Reserve(AriaTransaction& tx) {
-    // write entries to reservation table
-
-    // for each written entry touched, 
-    // transactions with larger id is aborted. 
-
+/// @brief journal the smallest reader/writer transaction to table
+/// @param tx the transaction
+/// @param table the aria shared table
+void AriaExecutor::Reserve(T& tx, AriaTable& table) {
+    // journal all entries to the reservation table
+    for (auto& tup: tx.local_get) {
+        table.ReserveGet(&tx, std::get<0>(tup));
+    }
+    for (auto& tup: tx.local_put) {
+        table.ReservePut(&tx, std::get<0>(tup));
+    }
 }
 
-void AriaExecutor::Commit(AriaTransaction& tx) {
-    // commit changes when possible
+/// @brief verify transaction by checking dependencies
+/// @param tx the transaction
+/// @param table the aria shared table
+void AriaExecutor::Verify(T& tx, AriaTable& table) {
+    // conceptually, we take a snapshot on the database before we execute a batch
+    //  , and all transactions are executed viewing the snapshot. 
+    // however, we want the global state transitioned 
+    //  as if we executed some of these transactions sequentially. 
+    // therefore, we have to pick some transactions and arange them into a sequence. 
+    // this algorithm implicitly does it for us. 
+    bool war = false, raw = false, waw = false;
+    for (auto& tup: tx.local_get) {
+        // the value is updated, snapshot contains out-dated value
+        raw |= !table.CompareReservedPut(&tx, std::get<0>(tup));
+    }
+    for (auto& tup: tx.local_put) {
+        // the value is read before, therefore we should not update it
+        war |= !table.CompareReservedGet(&tx, std::get<0>(tup));
+    }
+    for (auto& tup: tx.local_put) {
+        // if some write happened after write
+        waw |= !table.CompareReservedPut(&tx, std::get<0>(tup));
+    }
+    tx.flag_conflict = waw || (raw && war);
 }
+
+/// @brief commit written values into table
+/// @param tx the transaction
+/// @param table the aria shared table
+void AriaExecutor::Commit(T& tx, AriaTable& table) {
+    for (auto& tup: tx.local_put) {
+        table.Put(std::get<0>(tup), [&](auto& entry) {
+            entry.value = std::get<1>(tup);
+        });
+    }
+}
+
+#undef K
+#undef T
 
 } // namespace spectrum
