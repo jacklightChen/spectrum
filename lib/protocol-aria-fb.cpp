@@ -11,6 +11,9 @@ namespace spectrum
 #define K std::tuple<evmc::address, evmc::bytes32>
 #define T AriaTransaction
 
+/// @brief execute multiple transactions in parallel
+/// @param map the function to execute
+/// @param batch the current aria batch to work on
 void Aria::ParallelEach(
     std::function<void(T&)>         map, 
     std::vector<std::optional<T>>&  batch
@@ -26,10 +29,13 @@ void Aria::ParallelEach(
     ).wait();
 }
 
+/// @brief generate a wrapped transaction with atomic id
+/// @return the wrapped transactoin
 T Aria::NextTransaction() {
     throw "todo";
 }
 
+/// @brief start aria protocol
 void Aria::Start() {
     while(!stop_flag.load()) {
         // -- construct an empty batch

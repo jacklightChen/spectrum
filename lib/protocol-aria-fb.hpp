@@ -5,6 +5,8 @@
 #include "evm_hash.hpp"
 #include "evm_transaction.hpp"
 #include "workload.hpp"
+#include "protocol.hpp"
+#include "statistics.hpp"
 #include <tuple>
 #include <list>
 #include <unordered_map>
@@ -46,9 +48,10 @@ struct AriaTable: public Table<K, AriaEntry, KeyHasher> {
     bool CompareReservedPut(T* tx, const K& k);
 };
 
-class Aria {
+class Aria: virtual public Protocol {
 
     private:
+    Statistics          statistics;
     Workload&           workload;
     size_t              batch_size;
     AriaTable           table;
@@ -62,7 +65,8 @@ class Aria {
     T NextTransaction();
 
     public:
-    void Start();
+    void Start() override;
+    Statistics Stop() override;
 
 };
 
