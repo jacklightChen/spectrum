@@ -27,10 +27,32 @@ void Aria::ParallelEach(
 }
 
 T Aria::NextTransaction() {
+
 }
 
 void Aria::Start() {
-    while(true) {
+    while(!stop_flag.load()) {
+        auto batch = std::vector<std::optional<T>>(batch_size, std::nullopt);
+        // -- execution stage
+        ParallelEach([&](auto& tx) {
+            AriaExecutor::Execute(tx, table);
+            AriaExecutor::Reserve(tx, table);
+        }, batch);
+        // -- first commit stage
+        ParallelEach([&](auto& tx) {
+            AriaExecutor::Verify(tx, table);
+            if (tx.flag_conflict) { return; }
+            AriaExecutor::Commit(tx, table);
+        }, batch);
+        // -- fallback stage
+        ParallelEach([&](auto& tx) {
+            if (!tx.flag_conflict) { return; }
+            AriaExecutor::AcquireLock(tx, table);
+            tx.Reset();
+            AriaExecutor::Execute(tx, table);
+            AriaExecutor::Commit(tx, table);
+            AriaExecutor::ReleaseLock(tx, table);
+        }, batch);
     }
 }
 
@@ -85,6 +107,9 @@ bool AriaTable::CompareReservedPut(T* tx, const K& k) {
     return eq;
 }
 
+/// @brief execute a transaction and journal write operations locally
+/// @param tx the transaction
+/// @param table the table
 void AriaExecutor::Execute(T& tx, AriaTable& table) {
     // read from the public table
     tx.UpdateGetStorageHandler([&](

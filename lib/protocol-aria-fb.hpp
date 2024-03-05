@@ -23,6 +23,8 @@ class Aria {
     private:
     Workload&           workload;
     size_t              batch_size;
+    AriaTable           table;
+    std::atomic<bool>   stop_flag;
     std::atomic<size_t> transaction_counter;
     std::unique_ptr<BS::thread_pool> pool;
     void ParallelEach(
