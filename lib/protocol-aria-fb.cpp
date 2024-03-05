@@ -300,7 +300,7 @@ void AriaExecutor::Fallback(T& tx, AriaTable& table, AriaLockTable& lock_table) 
     }
     #undef COND
     while(should_wait && !should_wait->commited.load()) {
-        continue;
+        std::this_thread::yield();
     }
     // to do, wait for should_wait transaction
     tx.Execute();
