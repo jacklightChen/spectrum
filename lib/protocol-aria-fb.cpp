@@ -145,7 +145,7 @@ void AriaExecutor::Execute(T& tx, AriaTable& table) {
             return tx.local_get[tup];
         }
         auto value = evmc::bytes32{0};
-        table.Put(tup, [&](auto& entry){
+        table.Get(tup, [&](auto& entry){
             value = entry.value;
         });
         tx.local_get[tup] = value;
@@ -227,7 +227,7 @@ void AriaExecutor::ReleaseLock(T& tx, AriaTable& table) {
 void AriaExecutor::AcquireLock(T& tx, AriaTable& lock_table) {
 }
 
-/// @brief fallback execution with predicted keys
+/// @brief fallback execution without constant
 /// @param tx 
 /// @param table 
 void AriaExecutor::Fallback(T& tx, AriaTable& table) {
@@ -238,7 +238,7 @@ void AriaExecutor::Fallback(T& tx, AriaTable& table) {
     ) {
         auto tup = std::make_tuple(addr, key);
         auto value = evmc::bytes32{0};
-        table.Put(tup, [&](auto& entry){
+        table.Get(tup, [&](auto& entry){
             value = entry.value;
         });
         return value;
