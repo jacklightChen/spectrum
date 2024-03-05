@@ -13,6 +13,7 @@
 #include <optional>
 #include <atomic>
 #include <memory>
+#include <chrono>
 
 namespace spectrum
 {
@@ -27,6 +28,7 @@ struct AriaTransaction: public Transaction {
     size_t      batch_id;
     bool        flag_conflict{false};
     std::atomic<bool>   commited{false};
+    std::chrono::time_point<std::chrono::steady_clock> start_time;
     std::unordered_map<K, evmc::bytes32, KeyHasher>  local_put;
     std::unordered_map<K, evmc::bytes32, KeyHasher>  local_get;
     AriaTransaction(Transaction&& inner, size_t id, size_t batch_id);

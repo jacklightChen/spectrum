@@ -23,7 +23,7 @@ Aria::Aria(
     workload{workload},
     batch_size{batch_size},
     table_partitions{table_partitions},
-    pool{n_threads},
+    pool{(unsigned int) n_threads},
     table(table_partitions)
 {}
 
@@ -104,7 +104,8 @@ AriaTransaction::AriaTransaction(
 ):
     Transaction{std::move(inner)},
     id{id},
-    batch_id{batch_id}
+    batch_id{batch_id},
+    start_time{std::chrono::steady_clock::now()}
 {}
 
 /// @brief reserved a get entry
