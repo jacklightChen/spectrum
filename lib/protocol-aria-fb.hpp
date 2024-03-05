@@ -16,7 +16,23 @@ namespace spectrum
 #define K std::tuple<evmc::address, evmc::bytes32>
 #define T AriaTransaction
 
-class AriaTransaction;
+
+struct AriaTransaction: public Transaction {
+    size_t     id;
+    size_t     batch_id;
+    bool       flag_conflict{false};
+    std::unordered_map<K, evmc::bytes32, KeyHasher>  local_put;
+    std::unordered_map<K, evmc::bytes32, KeyHasher>  local_get;
+    AriaTransaction(Transaction&& inner, size_t id, size_t batch_id);
+    void Reset();
+};
+
+struct AriaTable: public Table<K, AriaEntry, KeyHasher> {
+    void ReserveGet(T* tx, const K& k);
+    void ReservePut(T* tx, const K& k);
+    bool CompareReservedGet(T* tx, const K& k);
+    bool CompareReservedPut(T* tx, const K& k);
+};
 
 class Aria {
 
@@ -38,17 +54,6 @@ class Aria {
 
 };
 
-struct AriaTransaction: public Transaction {
-
-    size_t     id;
-    size_t     batch_id;
-    bool       flag_conflict{false};
-    std::unordered_map<K, evmc::bytes32, KeyHasher>  local_put;
-    std::unordered_map<K, evmc::bytes32, KeyHasher>  local_get;
-    AriaTransaction(Transaction&& inner, size_t id, size_t batch_id);
-
-};
-
 struct AriaEntry {
     // lock transactions sorted by id increasing
     std::list<T*>   lock_transactions   = std::list<T*>();
@@ -59,13 +64,6 @@ struct AriaEntry {
     size_t  batch_id_put;
     T*      reserved_get_tx = nullptr;
     T*      reserved_put_tx = nullptr;
-};
-
-struct AriaTable: public Table<K, AriaEntry, KeyHasher> {
-    void ReserveGet(T* tx, const K& k);
-    void ReservePut(T* tx, const K& k);
-    bool CompareReservedGet(T* tx, const K& k);
-    bool CompareReservedPut(T* tx, const K& k);
 };
 
 struct AriaExecutor {
