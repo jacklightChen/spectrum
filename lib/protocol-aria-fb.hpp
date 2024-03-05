@@ -19,6 +19,7 @@ namespace spectrum
 #define T AriaTransaction
 
 
+/// @brief 
 struct AriaTransaction: public Transaction {
     size_t     id;
     size_t     batch_id;
@@ -29,6 +30,7 @@ struct AriaTransaction: public Transaction {
     void Reset();
 };
 
+/// @brief aria table entry for first round execution
 struct AriaEntry {
     evmc::bytes32   value   = evmc::bytes32{0};
     size_t  batch_id_get    = 0;
@@ -37,6 +39,7 @@ struct AriaEntry {
     T*      reserved_put_tx = nullptr;
 };
 
+/// @brief aria table for first round execution
 struct AriaTable: public Table<K, AriaEntry, KeyHasher> {
     void ReserveGet(T* tx, const K& k);
     void ReservePut(T* tx, const K& k);
@@ -44,14 +47,15 @@ struct AriaTable: public Table<K, AriaEntry, KeyHasher> {
     bool CompareReservedPut(T* tx, const K& k);
 };
 
+/// @brief aria table entry for fallback pessimistic execution
 struct AriaLockEntry {
-    
 };
 
-struct AriaLockTable: public Table<K, AriaEntry, KeyHasher> {
-
+/// @brief aria table for fallback pessimistic execution
+struct AriaLockTable: public Table<K, AriaLockEntry, KeyHasher> {
 };
 
+/// @brief aria protocol master class
 class Aria: virtual public Protocol {
 
     private:
@@ -74,6 +78,7 @@ class Aria: virtual public Protocol {
 
 };
 
+/// @brief routines to be executed in various execution stage
 struct AriaExecutor {
     static void Execute(T& tx, AriaTable& table);
     static void Reserve(T& tx, AriaTable& table);
