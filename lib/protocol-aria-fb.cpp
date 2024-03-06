@@ -56,8 +56,9 @@ std::unique_ptr<T> Aria::NextTransaction() {
 
 /// @brief start aria protocol
 void Aria::Start() {
-    #define TIME duration_cast<microseconds>(steady_clock::now() - tx.start_time).count()
-    while(!stop_flag.load()) {
+    // this macro computes the latency of one transaction
+    #define LATENCY duration_cast<microseconds>(steady_clock::now() - tx.start_time).count()
+    pool.submit_task([&]() {while(!stop_flag.load()) {
         // -- construct an empty batch
         auto batch = std::vector<std::optional<std::unique_ptr<T>>>();
         for (size_t i = 0; i < batch_size; ++i) {
@@ -78,7 +79,7 @@ void Aria::Start() {
                 return;
             }
             AriaExecutor::Commit(tx, table);
-            statistics.JournalCommit(TIME);
+            statistics.JournalCommit(LATENCY);
         }, batch);
         // -- prepare fallback, analyze dependencies
         if (!has_conflict.load()) { continue; }
@@ -92,10 +93,10 @@ void Aria::Start() {
             if (!tx.flag_conflict) { return; }
             AriaExecutor::Fallback(tx, table, lock_table);
             statistics.JournalExecute();
-            statistics.JournalCommit(TIME);
+            statistics.JournalCommit(LATENCY);
         }, batch);
-    }
-    #undef TIME
+    }});
+    #undef LATENCY
 }
 
 /// @brief stop aria protocol and return statistics
