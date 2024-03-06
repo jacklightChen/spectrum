@@ -105,6 +105,13 @@ Statistics Aria::Stop() {
     return this->statistics;
 }
 
+
+/// @brief report aria statistics
+/// @return current statistics of aria execution
+Statistics Aria::Report() {
+    return this->statistics;
+}
+
 /// @brief construct an empty aria transaction
 AriaTransaction::AriaTransaction(
     Transaction&& inner, 

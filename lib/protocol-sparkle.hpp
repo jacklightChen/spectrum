@@ -37,9 +37,8 @@ struct SparkleVersionList {
     std::list<SparkleEntry> entries;
 };
 
-class SparkleTable: private Table<K, V, KeyHasher> {
+struct SparkleTable: private Table<K, V, KeyHasher> {
 
-    public:
     SparkleTable(size_t partitions);
     void Get(T* tx, const K& k, evmc::bytes32& v, size_t& version);
     void Put(T* tx, const K& k, const evmc::bytes32& v);
@@ -71,6 +70,7 @@ class Sparkle: virtual public Protocol {
     Sparkle(Workload& workload, size_t n_threads, size_t table_partitions);
     void Start() override;
     Statistics Stop() override;
+    Statistics Report() override;
 
 };
 

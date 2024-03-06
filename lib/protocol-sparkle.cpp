@@ -204,6 +204,12 @@ Statistics Sparkle::Stop() {
     return this->statistics;
 }
 
+/// @brief report sparkle statistics
+/// @return current statistics of sparkle execution
+Statistics Sparkle::Report() {
+    return this->statistics;
+}
+
 /// @brief sparkle executor
 /// @param sparkle sparkle initialization paremeters
 SparkleExecutor::SparkleExecutor(Sparkle& sparkle):

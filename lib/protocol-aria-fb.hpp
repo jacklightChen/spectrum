@@ -83,6 +83,7 @@ class Aria: virtual public Protocol {
     Aria(Workload& workload, size_t batch_size, size_t n_threads, size_t table_partitions);
     void Start() override;
     Statistics Stop() override;
+    Statistics Report() override;
 
 };
 
