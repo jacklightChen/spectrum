@@ -75,11 +75,21 @@ inline std::string to_string(int32_t key) {
 }
 
 Transaction Smallbank::Next() {
-    auto input = spectrum::from_hex(std::string{"1e010439"} + to_string(Random())).value();
+    #define X to_string(Random())
+    auto option = Random() % 5;
+    auto input = ([&](){switch (option) {
+        case 0: return spectrum::from_hex(std::string{"1e010439"} + X).value(),
+        case 1: return spectrum::from_hex(std::string{"bb27eb2c"} + X + X).value(),
+        case 2: return spectrum::from_hex(std::string{"ad0f98c0"} + X + X).value(),
+        case 3: return spectrum::from_hex(std::string{"83406251"} + X + X).value(),
+        case 4: return spectrum::from_hex(std::string{"8ac10b9c"} + X + X + X).value(),
+        case 5: return spectrum::from_hex(std::string{"97b63212"} + X + X).value(),
+    }})();
+    #undef X
     return Transaction(
-        this->evm_type, 
-        evmc::address{0x1}, 
-        evmc::address{0x2}, 
+        this->evm_type,
+        evmc::address{0x1},
+        evmc::address{0x2},
         std::span{code}, 
         std::span{input}
     );
