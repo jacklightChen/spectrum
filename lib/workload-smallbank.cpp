@@ -1,6 +1,7 @@
 #include "./workload-smallbank.hpp"
 #include "./hex.hpp"
 #include <optional>
+#include <glog/logging.h>
 
 namespace spectrum {
 

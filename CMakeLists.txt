@@ -143,7 +143,7 @@ unset(INC)
 file(GLOB_RECURSE SRC unit-tests/*.cpp)
 
 add_executable(unit-tests ${SRC})
-target_link_libraries(unit-tests PRIVATE gtest_main spectrum)
+target_link_libraries(unit-tests PRIVATE gtest_main spectrum glog)
 
 unset(SRC)
 

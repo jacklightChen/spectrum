@@ -1,7 +1,9 @@
 #include <spectrum/workload-smallbank.hpp>
 #include <spectrum/evm_hash.hpp>
+#include <spectrum/hex.hpp>
 #include <gtest/gtest.h>
 #include <evmc/evmc.hpp>
+#include <glog/logging.h>
 
 namespace {
 

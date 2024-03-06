@@ -235,7 +235,7 @@ SpectrumExecutor::SpectrumExecutor(Spectrum& spectrum):
     queue_amplification{spectrum.queue_amplification}
 {}
 
-/// @brief generate a transaction
+/// @brief generate a transaction and execute it
 std::unique_ptr<T> SpectrumExecutor::Create() {
     auto tx = std::unique_ptr<T>(new T(std::move(workload.Next()), last_execute.fetch_add(1)));
     tx->UpdateSetStorageHandler([&](
@@ -282,6 +282,7 @@ std::unique_ptr<T> SpectrumExecutor::Create() {
         });
         return value;
     });
+    DLOG(INFO) << "spectrum execute " << tx->id << std::endl;
     tx->Execute();
     statistics.JournalExecute();
     return tx;
@@ -290,6 +291,7 @@ std::unique_ptr<T> SpectrumExecutor::Create() {
 /// @brief rollback transaction with given rollback signal
 /// @param tx the transaction to rollback
 void SpectrumExecutor::ReExecute(SpectrumTransaction& tx) {
+    DLOG(INFO) << "spectrum re-execute " << tx.id << std::endl;
     // get current rerun keys
     std::vector<K> rerun_keys{};
     {
@@ -331,6 +333,9 @@ void SpectrumExecutor::Run() {while (!stop_flag.load()) {
         LOG(WARNING) << "queue is empty, performance may deteriorate. " << std::endl;
         goto PASS;
     }
+    if (last_finalized.load() < tx->should_wait) {
+        goto REQUEUE;
+    }
     if (tx->HasRerunKeys()) {
         // sweep all operations from previous execution
         ReExecute(*tx);
@@ -342,6 +347,7 @@ void SpectrumExecutor::Run() {while (!stop_flag.load()) {
         }
     }
     if (last_finalized.load() + 1 == tx->id && !tx->HasRerunKeys()) {
+        DLOG(INFO) << "spectrum finalize " << tx->id << std::endl;
         last_finalized.fetch_add(1);
         for (auto entry: tx->tuples_get) {
             table.ClearGet(tx.get(), entry.key, entry.version);
