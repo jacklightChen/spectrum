@@ -236,7 +236,9 @@ SpectrumExecutor::SpectrumExecutor(Spectrum& spectrum):
     statistics{spectrum.statistics},
     queue{spectrum.queue},
     queue_amplification{spectrum.queue_amplification}
-{}
+{
+    workload.SetEVMType(EVMType::COPYONWRITE);
+}
 
 /// @brief generate a transaction and execute it
 std::unique_ptr<T> SpectrumExecutor::Create() {
@@ -328,43 +330,49 @@ void SpectrumExecutor::ReExecute(SpectrumTransaction* tx) {
 /// @brief start an executor
 void SpectrumExecutor::Run() {while (!stop_flag.load()) {
     if (last_execute.load() - last_finalized.load() < this->queue_amplification) {
-        queue.Push(std::move(Create()));
+        queue.enqueue(std::move(Create()));
         continue;
     }
-    auto _tx = queue.Pop();
-    if (!_tx.has_value()) {
+    auto tx = std::unique_ptr<T>(nullptr);
+    queue.try_dequeue(tx);
+    if (tx.get() == nullptr) {
         LOG(WARNING) << "queue is empty, performance may deteriorate. ";
         continue;
     }
-    auto tx = *std::move(_tx);
     if (last_finalized.load() < tx->should_wait) {
-        goto REQUEUE;
+        DLOG(INFO) << "requeue " << tx->id;
+        queue.enqueue(std::move(tx));
+        continue;
     }
-    if (tx->HasRerunKeys()) {
-        // sweep all operations from previous execution
-        ReExecute(tx.get());
-        if (tx->HasRerunKeys()) { goto REQUEUE; }
-        // commit all results
-        for (auto entry: tx->tuples_put) {
-            table.Put(tx.get(), entry.key, entry.value);
-            if (tx->HasRerunKeys()) { goto REQUEUE; }
+    while (true) {
+        if (tx->HasRerunKeys()) {
+            // sweep all operations from previous execution
+            ReExecute(tx.get());
+            if (tx->HasRerunKeys()) { continue; }
+            // commit all results
+            for (auto entry: tx->tuples_put) {
+                table.Put(tx.get(), entry.key, entry.value);
+                if (tx->HasRerunKeys()) { continue; }
+            }
+        }
+        else if (last_finalized.load() + 1 == tx->id) {
+            DLOG(INFO) << "spectrum finalize " << tx->id;
+            last_finalized.fetch_add(1);
+            for (auto entry: tx->tuples_get) {
+                table.ClearGet(tx.get(), entry.key, entry.version);
+            }
+            for (auto entry: tx->tuples_put) {
+                table.ClearPut(tx.get(), entry.key);
+            }
+            auto latency = duration_cast<microseconds>(steady_clock::now() - tx->start_time).count();
+            statistics.JournalCommit(latency);
+            break;
+        }
+        else {
+            queue.enqueue(std::move(tx));
+            break;
         }
     }
-    if (last_finalized.load() + 1 == tx->id && !tx->HasRerunKeys()) {
-        DLOG(INFO) << "spectrum finalize " << tx->id;
-        last_finalized.fetch_add(1);
-        for (auto entry: tx->tuples_get) {
-            table.ClearGet(tx.get(), entry.key, entry.version);
-        }
-        for (auto entry: tx->tuples_put) {
-            table.ClearPut(tx.get(), entry.key);
-        }
-        auto latency = duration_cast<microseconds>(steady_clock::now() - tx->start_time).count();
-        statistics.JournalCommit(latency);
-        goto PASS;
-    }
-    REQUEUE: DLOG(INFO) << "requeue " << tx->id; queue.Push(std::move(tx)); continue;
-    PASS:    continue;
 }}
 
 #undef T

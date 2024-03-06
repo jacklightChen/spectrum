@@ -13,7 +13,7 @@ using namespace std::chrono_literals;
 
 TEST(Spectrum, JustRunSmallbank) {
     auto workload = Smallbank();
-    auto protocol = Spectrum(workload, 8, 32, 32);
+    auto protocol = Spectrum(workload, 8, 32, 16);
     protocol.Start();
     std::this_thread::sleep_for(2000ms);
     auto statistics = protocol.Stop();

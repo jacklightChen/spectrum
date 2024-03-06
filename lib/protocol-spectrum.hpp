@@ -10,6 +10,7 @@
 #include <thread>
 #include <queue>
 #include <optional>
+#include <conqueue/concurrentqueue.h>
 
 namespace spectrum {
 
@@ -19,6 +20,7 @@ namespace spectrum {
 #define T SpectrumTransaction
 
 using namespace std::chrono;
+using namespace moodycamel;
 
 struct SpectrumPutTuple {
     K               key;
@@ -75,21 +77,20 @@ struct SpectrumTable: private Table<K, V, KeyHasher> {
 
 class SpectrumExecutor;
 
-template<typename T>
+template<typename X>
 class LockQueue {
-    
-    private:
+
     std::mutex      mu;
-    std::queue<T>   queue{};
+    std::queue<X>   queue;
     
     public:
-    void Push(T&& t) {
-        auto lock = std::lock_guard{mu};
-        queue.push(std::move(t));
+    Push(X&& x) {
+        auto guard = std::lock_guard{mu};
+        queue.push_back(std::move(x));
     }
-    std::optional<T> Pop() {
-        auto lock = std::lock_guard{mu};
-        if (queue.size() == 0) {
+    std::optional<X> Pop() {
+        auto guard = std::lock_guard{mu};
+        if (queue.is_empty()) {
             return std::nullopt;
         }
         else {
@@ -101,7 +102,7 @@ class LockQueue {
 
 };
 
-using ConQueue = LockQueue<std::unique_ptr<T>>;
+using ConQueue = ConcurrentQueue<std::unique_ptr<T>>;
 
 class Spectrum: virtual public Protocol {
 
@@ -128,7 +129,6 @@ class Spectrum: virtual public Protocol {
 };
 
 class SpectrumExecutor {
-
 
     private:
     Workload&               workload;

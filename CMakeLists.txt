@@ -55,8 +55,8 @@ FetchContent_Declare(
 )
 FetchContent_Declare(
     conqueue
-    GIT_REPOSITORY      "https://github.com/rigtorp/MPMCQueue"
-    GIT_TAG             "v1.0"
+    GIT_REPOSITORY      "https://github.com/cameron314/concurrentqueue"
+    GIT_TAG             "v1.0.4"
 )
 FetchContent_MakeAvailable(glog gtest gflags ethash intx fmt evmc thread_pool conqueue)
 set(gtest_force_shared_crt ON CACHE BOOL "" FORCE)
@@ -101,10 +101,10 @@ foreach(F ${INC})
     unset(REL)
 endforeach()
 
-file(GLOB INC ${CMAKE_BINARY_DIR}/_deps/conqueue-src/include/rigtorp/*.hpp ${CMAKE_BINARY_DIR}/_deps/conqueue-src/include/rigtorp/*.h)
+file(GLOB INC ${CMAKE_BINARY_DIR}/_deps/conqueue-src/*.hpp ${CMAKE_BINARY_DIR}/_deps/conqueue-src/*.h)
 
 foreach(F ${INC})
-    file(RELATIVE_PATH REL ${CMAKE_BINARY_DIR}/_deps/conqueue-src/include/rigtorp ${F})
+    file(RELATIVE_PATH REL ${CMAKE_BINARY_DIR}/_deps/conqueue-src ${F})
     configure_file(${F} include/conqueue/${REL} COPYONLY)
     unset(REL)
 endforeach()
