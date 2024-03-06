@@ -11,6 +11,7 @@
 #include <memory>
 #include <optional>
 #include <iostream>
+#include <glog/logging.h>
 
 #ifdef NDEBUG
 #define release_inline gnu::always_inline, msvc::forceinline
@@ -262,7 +263,7 @@ int64_t dispatch(const CostTable& cost_table, ExecutionState& state, int64_t gas
         switch (op) {
             #define ON_OPCODE(OPCODE)                                                                                     \
             case OPCODE:                                                                                                  \
-                std::cerr << #OPCODE << "\t\t" << static_cast<uint32_t>(position.code_it - code) << std::endl;            \
+                DLOG(INFO) << #OPCODE << "\t\t" << static_cast<uint32_t>(position.code_it - code);            \
                 break;
             MAP_OPCODES
             #undef ON_OPCODE
@@ -351,7 +352,7 @@ evmc_result execute(VM& vm, const evmc_host_interface* host, evmc_host_context* 
     const auto data = code_analysis.eof_header.get_data(container);
     ExecutionState& state = *([&](){
         if (vm.state == std::nullopt) {
-            vm.state.emplace(std::make_unique<ExecutionState>(*msg, rev, *host, ctx, container, data));
+            vm.state.emplace(std::move(std::make_unique<ExecutionState>(*msg, rev, *host, ctx, container, data)));
         }
         return vm.state.value().get();
     })();

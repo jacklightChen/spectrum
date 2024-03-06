@@ -30,7 +30,7 @@ SparkleTransaction::SparkleTransaction(Transaction&& inner, size_t id):
 void SparkleTransaction::Reset() {
     tuples_get.resize(0);
     tuples_put.resize(0);
-    rerun_flag.store(0);
+    rerun_flag.store(false);
 }
 
 /// @brief the multi-version table for sparkle
@@ -46,7 +46,6 @@ SparkleTable::SparkleTable(size_t partitions):
 /// @param version (mutated to be) the version of read entry
 void SparkleTable::Get(T* tx, const K& k, evmc::bytes32& v, size_t& version) {
     Table::Put(k, [&](V& _v) {
-        auto guard = std::lock_guard{_v.mu};
         auto rit = _v.entries.rbegin();
         auto end = _v.entries.rend();
         while (rit != end) {
@@ -69,9 +68,9 @@ void SparkleTable::Get(T* tx, const K& k, evmc::bytes32& v, size_t& version) {
 /// @param v the value to write
 void SparkleTable::Put(T* tx, const K& k, const evmc::bytes32& v) {
     CHECK(tx->id > 0) << "we reserve version(0) for default value";
+    DLOG(INFO) << "commit " << tx->id;
     Table::Put(k, [&](V& _v) {
         _v.tx = nullptr;
-        auto guard = std::lock_guard{_v.mu};
         auto rit = _v.entries.rbegin();
         auto end = _v.entries.rend();
         // search from insertion position
@@ -83,6 +82,7 @@ void SparkleTable::Put(T* tx, const K& k, const evmc::bytes32& v) {
             for (auto _tx: rit->readers) {
                 if (_tx->id > tx->id) {
                     _tx->rerun_flag.store(true);
+                    DLOG(INFO) << tx->id << " abort " << _tx->id;
                 }
             }
             break;
@@ -90,6 +90,7 @@ void SparkleTable::Put(T* tx, const K& k, const evmc::bytes32& v) {
         for (auto _tx: _v.readers_default) {
             if (_tx->id > tx->id) {
                 _tx->rerun_flag.store(true);
+                DLOG(INFO) << tx->id << " abort " << _tx->id;
             }
         }
         // insert an entry
@@ -108,10 +109,10 @@ void SparkleTable::Put(T* tx, const K& k, const evmc::bytes32& v) {
 bool SparkleTable::Lock(T* tx, const K& k) {
     bool succeed = false;
     Table::Put(k, [&](V& _v) {
-        auto guard = std::lock_guard{_v.mu};
         succeed = !_v.tx || _v.tx->id >= tx->id;
         if (_v.tx && _v.tx->id < tx->id) {
             _v.tx->rerun_flag.store(true);
+            DLOG(INFO) << tx->id << " abort " << _v.tx->id;
         }
         if (succeed) { _v.tx = tx; }
     });
@@ -123,7 +124,6 @@ bool SparkleTable::Lock(T* tx, const K& k) {
 /// @param k the key of read entry
 void SparkleTable::RegretGet(T* tx, const K& k, size_t version) {
     Table::Put(k, [&](V& _v) {
-        auto guard = std::lock_guard{_v.mu};
         auto vit = _v.entries.begin();
         auto end = _v.entries.end();
         while (vit != end) {
@@ -144,7 +144,6 @@ void SparkleTable::RegretGet(T* tx, const K& k, size_t version) {
 /// @param k the key of this put entry
 void SparkleTable::RegretPut(T* tx, const K& k) {
     Table::Put(k, [&](V& _v) {
-        auto guard = std::lock_guard{_v.mu};
         auto vit = _v.entries.begin();
         auto end = _v.entries.end();
         while (vit != end) {
@@ -154,6 +153,7 @@ void SparkleTable::RegretPut(T* tx, const K& k) {
             // abort transactions that read from current transaction
             for (auto _tx: vit->readers) {
                 _tx->rerun_flag.store(true);
+                DLOG(INFO) << tx->id << " abort " << _tx->id;
             }
             break;
         }
@@ -167,7 +167,6 @@ void SparkleTable::RegretPut(T* tx, const K& k) {
 /// @param version the version of read entry, which indicates the transaction that writes this value
 void SparkleTable::ClearGet(T* tx, const K& k, size_t version) {
     Table::Put(k, [&](V& _v) {
-        auto guard = std::lock_guard{_v.mu};
         auto vit = _v.entries.begin();
         auto end = _v.entries.end();
         while (vit != end) {
@@ -187,7 +186,6 @@ void SparkleTable::ClearGet(T* tx, const K& k, size_t version) {
 /// @param k the key of written entry
 void SparkleTable::ClearPut(T* tx, const K& k) {
     Table::Put(k, [&](V& _v) {
-        auto guard = std::lock_guard{_v.mu};
         while (_v.entries.size() && _v.entries.front().version < tx->id) {
             _v.entries.pop_front();
         }
@@ -236,8 +234,8 @@ SparkleExecutor::SparkleExecutor(Sparkle& sparkle):
     table{sparkle.table},
     last_finalized{sparkle.last_finalized},
     last_execute{sparkle.last_execute},
-    stop_flag{sparkle.stop_flag},
-    statistics{sparkle.statistics}
+    statistics{sparkle.statistics},
+    stop_flag{sparkle.stop_flag}
 {}
 
 /// @brief start an executor
@@ -249,10 +247,11 @@ void SparkleExecutor::Run() { while (!stop_flag.load()) {
         const evmc::bytes32 &key, 
         const evmc::bytes32 &value
     ) {
+        DLOG(INFO) << tx.id << " set";
         auto _key   = std::make_tuple(addr, key);
         auto version = size_t{0};
         while (!table.Lock(&tx, _key)) {
-            std::this_thread::yield(); 
+            DLOG(INFO) << tx.id << " lock";
         }
         // when there exists some key, do this
         for (auto& tup: tx.tuples_put) {
@@ -269,6 +268,7 @@ void SparkleExecutor::Run() { while (!stop_flag.load()) {
         const evmc::address &addr, 
         const evmc::bytes32 &key
     ) {
+        DLOG(INFO) << tx.id << " get";
         auto _key   = std::make_tuple(addr, key);
         auto value  = evmc::bytes32{0};
         auto version = size_t{0};
@@ -289,6 +289,7 @@ void SparkleExecutor::Run() { while (!stop_flag.load()) {
     });
     tx.rerun_flag.store(true);
     while (true) {
+        DLOG(INFO) << "recycle " << tx.id << " finalized " << last_finalized.load();
         if (tx.rerun_flag.load()) {
             // sweep all operations from previous execution
             for (auto entry: tx.tuples_get) {
@@ -299,8 +300,10 @@ void SparkleExecutor::Run() { while (!stop_flag.load()) {
             }
             tx.Reset();
             // execute and try to commit
+            DLOG(INFO) << "execute (in) " << tx.id;
             statistics.JournalExecute();
             tx.Execute();
+            DLOG(INFO) << "execute (out) " << tx.id;
             if (tx.rerun_flag.load()) { continue; }
             for (auto entry: tx.tuples_put) {
                 table.Put(&tx, std::get<0>(entry), std::get<1>(entry));
@@ -319,6 +322,7 @@ void SparkleExecutor::Run() { while (!stop_flag.load()) {
             break;
         }
     }
+    DLOG(INFO) << "commit " << tx.id;
     auto latency = duration_cast<microseconds>(steady_clock::now() - start).count();
     statistics.JournalCommit(latency);
 }}

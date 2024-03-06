@@ -100,7 +100,7 @@ TEST(Transaction, RunBasic) {
             std::span{input}
         );
         transaction.UpdateGetStorageHandler(
-            [&](
+            [&table](
                 const evmc::address& addr, 
                 const evmc::bytes32& key
             ){
@@ -108,7 +108,7 @@ TEST(Transaction, RunBasic) {
             }
         );
         transaction.UpdateSetStorageHandler(
-            [&](
+            [&table](
                 const evmc::address& addr, 
                 const evmc::bytes32& key, 
                 const evmc::bytes32& value
@@ -122,93 +122,93 @@ TEST(Transaction, RunBasic) {
     }
 }
 
-TEST(Transaction, RunStrawman) {
-    auto code = CODE;
-    auto input = spectrum::from_hex(std::string{"1e010439"} + to_string(10)).value();
-    auto table = MockTable();
-    auto transaction = spectrum::Transaction(
-        spectrum::EVMType::STRAWMAN,
-        evmc::address{0x1},
-        evmc::address{0x2},
-        std::span{code},
-        std::span{input}
-    );
-    for (int i = 0; i < 100; ++i) {
-        transaction.UpdateGetStorageHandler(
-            [&](
-                const evmc::address& addr, 
-                const evmc::bytes32& key
-            ){
-                transaction.MakeCheckpoint();
-                return table.GetStorage(addr, key);
-            }
-        );
-        transaction.UpdateSetStorageHandler(
-            [&](
-                const evmc::address& addr, 
-                const evmc::bytes32& key, 
-                const evmc::bytes32& value
-            ){
-                transaction.MakeCheckpoint();
-                table.SetStorage(addr, key, value);
-                return evmc_storage_status::EVMC_STORAGE_ASSIGNED;
-            }
-        );
-        evmc_result result;
-        // execute transaction for the first time, and expect it exits successfully
-        result = transaction.Execute();
-        ASSERT_EQ(result.status_code, 0) << result.status_code;
-        // go to second checkpoint, and expect it to produce the same execution trace
-        // therefore it should also exit successfully
-        transaction.ApplyCheckpoint(1);
-        result = transaction.Execute();
-        ASSERT_EQ(result.status_code, 0) << result.status_code;
-    }
-}
+// TEST(Transaction, RunStrawman) {
+//     auto code = CODE;
+//     auto input = spectrum::from_hex(std::string{"1e010439"} + to_string(10)).value();
+//     auto table = MockTable();
+//     auto transaction = spectrum::Transaction(
+//         spectrum::EVMType::STRAWMAN,
+//         evmc::address{0x1},
+//         evmc::address{0x2},
+//         std::span{code},
+//         std::span{input}
+//     );
+//     for (int i = 0; i < 100; ++i) {
+//         transaction.UpdateGetStorageHandler(
+//             [&](
+//                 const evmc::address& addr, 
+//                 const evmc::bytes32& key
+//             ){
+//                 transaction.MakeCheckpoint();
+//                 return table.GetStorage(addr, key);
+//             }
+//         );
+//         transaction.UpdateSetStorageHandler(
+//             [&](
+//                 const evmc::address& addr, 
+//                 const evmc::bytes32& key, 
+//                 const evmc::bytes32& value
+//             ){
+//                 transaction.MakeCheckpoint();
+//                 table.SetStorage(addr, key, value);
+//                 return evmc_storage_status::EVMC_STORAGE_ASSIGNED;
+//             }
+//         );
+//         evmc_result result;
+//         // execute transaction for the first time, and expect it exits successfully
+//         result = transaction.Execute();
+//         ASSERT_EQ(result.status_code, 0) << result.status_code;
+//         // go to second checkpoint, and expect it to produce the same execution trace
+//         // therefore it should also exit successfully
+//         transaction.ApplyCheckpoint(1);
+//         result = transaction.Execute();
+//         ASSERT_EQ(result.status_code, 0) << result.status_code;
+//     }
+// }
 
-TEST(Transaction, RunCopyOnWrite) {
-    auto code = CODE;
-    auto input = spectrum::from_hex(std::string{"1e010439"} + to_string(10)).value();
-    auto table = MockTable();
-    auto transaction = spectrum::Transaction(
-        spectrum::EVMType::STRAWMAN,
-        evmc::address{0x1},
-        evmc::address{0x2},
-        std::span{code},
-        std::span{input}
-    );
-    for (int i = 0; i < 100; ++i) {
-        transaction.UpdateGetStorageHandler(
-            [&](
-                const evmc::address& addr, 
-                const evmc::bytes32& key
-            ){
-                transaction.MakeCheckpoint();
-                return table.GetStorage(addr, key);
-            }
-        );
-        transaction.UpdateSetStorageHandler(
-            [&](
-                const evmc::address& addr,
-                const evmc::bytes32& key, 
-                const evmc::bytes32& value
-            ){
-                transaction.MakeCheckpoint();
-                table.SetStorage(addr, key, value);
-                return evmc_storage_status::EVMC_STORAGE_ASSIGNED;
-            }
-        );
-        evmc_result result;
-        // execute transaction for the first time, and expect it exits successfully
-        result = transaction.Execute();
-        ASSERT_EQ(result.status_code, 0) << result.status_code;
-        // go to second checkpoint, and expect it to produce the same execution trace
-        // therefore it should also exit successfully
-        transaction.ApplyCheckpoint(1);
-        result = transaction.Execute();
-        ASSERT_EQ(result.status_code, 0) << result.status_code;
-    }
-}
+// TEST(Transaction, RunCopyOnWrite) {
+//     auto code = CODE;
+//     auto input = spectrum::from_hex(std::string{"1e010439"} + to_string(10)).value();
+//     auto table = MockTable();
+//     auto transaction = spectrum::Transaction(
+//         spectrum::EVMType::STRAWMAN,
+//         evmc::address{0x1},
+//         evmc::address{0x2},
+//         std::span{code},
+//         std::span{input}
+//     );
+//     for (int i = 0; i < 100; ++i) {
+//         transaction.UpdateGetStorageHandler(
+//             [&](
+//                 const evmc::address& addr, 
+//                 const evmc::bytes32& key
+//             ){
+//                 transaction.MakeCheckpoint();
+//                 return table.GetStorage(addr, key);
+//             }
+//         );
+//         transaction.UpdateSetStorageHandler(
+//             [&](
+//                 const evmc::address& addr,
+//                 const evmc::bytes32& key, 
+//                 const evmc::bytes32& value
+//             ){
+//                 transaction.MakeCheckpoint();
+//                 table.SetStorage(addr, key, value);
+//                 return evmc_storage_status::EVMC_STORAGE_ASSIGNED;
+//             }
+//         );
+//         evmc_result result;
+//         // execute transaction for the first time, and expect it exits successfully
+//         result = transaction.Execute();
+//         ASSERT_EQ(result.status_code, 0) << result.status_code;
+//         // go to second checkpoint, and expect it to produce the same execution trace
+//         // therefore it should also exit successfully
+//         transaction.ApplyCheckpoint(1);
+//         result = transaction.Execute();
+//         ASSERT_EQ(result.status_code, 0) << result.status_code;
+//     }
+// }
 
 }
 

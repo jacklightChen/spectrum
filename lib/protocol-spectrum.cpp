@@ -244,7 +244,6 @@ std::unique_ptr<T> SpectrumExecutor::Create() {
         const evmc::bytes32 &value
     ) {
         auto _key   = std::make_tuple(addr, key);
-        auto version = size_t{0};
         // when there exists some key, do this
         for (auto& tup: tx->tuples_put) {
             if (tup.key == _key) {
@@ -282,7 +281,8 @@ std::unique_ptr<T> SpectrumExecutor::Create() {
         });
         return value;
     });
-    DLOG(INFO) << "spectrum execute " << tx->id << std::endl;
+    DLOG(INFO) << "here";
+    DLOG(INFO) << "spectrum execute " << tx->id;
     tx->Execute();
     statistics.JournalExecute();
     return tx;
@@ -291,7 +291,7 @@ std::unique_ptr<T> SpectrumExecutor::Create() {
 /// @brief rollback transaction with given rollback signal
 /// @param tx the transaction to rollback
 void SpectrumExecutor::ReExecute(SpectrumTransaction& tx) {
-    DLOG(INFO) << "spectrum re-execute " << tx.id << std::endl;
+    DLOG(INFO) << "spectrum re-execute " << tx.id;
     // get current rerun keys
     std::vector<K> rerun_keys{};
     {
@@ -325,14 +325,16 @@ void SpectrumExecutor::ReExecute(SpectrumTransaction& tx) {
 
 /// @brief start an executor
 void SpectrumExecutor::Run() {while (!stop_flag.load()) {
-    if (queue.size_approx() < this->queue_amplification) {
-        queue.enqueue(Create());
+    if (last_execute.load() - last_finalized.load() < this->queue_amplification) {
+        queue.Push(std::move(Create()));
+        continue;
     }
-    auto tx = std::unique_ptr<T>(nullptr);
-    if (!queue.try_dequeue(tx)) {
-        LOG(WARNING) << "queue is empty, performance may deteriorate. " << std::endl;
-        goto PASS;
+    auto _tx = queue.Pop();
+    if (!_tx.has_value()) {
+        LOG(WARNING) << "queue is empty, performance may deteriorate. ";
+        continue;
     }
+    auto tx = *std::move(_tx);
     if (last_finalized.load() < tx->should_wait) {
         goto REQUEUE;
     }
@@ -347,7 +349,7 @@ void SpectrumExecutor::Run() {while (!stop_flag.load()) {
         }
     }
     if (last_finalized.load() + 1 == tx->id && !tx->HasRerunKeys()) {
-        DLOG(INFO) << "spectrum finalize " << tx->id << std::endl;
+        DLOG(INFO) << "spectrum finalize " << tx->id;
         last_finalized.fetch_add(1);
         for (auto entry: tx->tuples_get) {
             table.ClearGet(tx.get(), entry.key, entry.version);
@@ -359,7 +361,7 @@ void SpectrumExecutor::Run() {while (!stop_flag.load()) {
         statistics.JournalCommit(latency);
         goto PASS;
     }
-    REQUEUE: queue.enqueue(std::move(tx)); continue;
+    REQUEUE: DLOG(INFO) << "requeue " << tx->id; queue.Push(std::move(tx)); continue;
     PASS:    continue;
 }}
 

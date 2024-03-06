@@ -11,6 +11,7 @@
 #include <iostream>
 #include <sstream>
 #include <iomanip>
+#include <glog/logging.h>
 
 namespace evmcow
 {
@@ -91,7 +92,7 @@ public:
         ownership[slice_index] = true;
         base += 64;
         if (base > limit) {
-            std::cerr << "exceed stack height limit" << std::endl;
+            DLOG(INFO) << "exceed stack height limit";
             std::terminate();
         }
         if (old_slice != nullptr) {

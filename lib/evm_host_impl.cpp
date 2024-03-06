@@ -1,6 +1,7 @@
 #include "evm_host_impl.hpp"
 #include <evmc/evmc.hpp>
 #include <iostream>
+#include <glog/logging.h>
 
 namespace spectrum {
 
@@ -61,7 +62,7 @@ bool Host::selfdestruct(const evmc::address &addr,
 }
 
 evmc::Result Host::call(const evmc_message &msg) noexcept {
-    std::cerr << "call" << std::endl;
+    DLOG(INFO) << "call";
     return evmc::Result{EVMC_REVERT, msg.gas, 0, msg.input_data,
                         msg.input_size};
 }

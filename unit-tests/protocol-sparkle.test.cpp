@@ -1,13 +1,15 @@
-#include<gtest/gtest.h>
-#include<spectrum/protocol-sparkle.hpp>
-#include<spectrum/evm_transaction.hpp>
-#include<span>
+#include <gtest/gtest.h>
+#include <spectrum/protocol-sparkle.hpp>
+#include <spectrum/evm_transaction.hpp>
+#include <spectrum/workload-smallbank.hpp>
+#include <span>
 
 namespace {
 
 #define TX(CODE, INPUT) Transaction(EVMType::BASIC, evmc::address{0}, evmc::address{1}, std::span{(CODE)}, std::span<uint8_t>{(INPUT)})
 
 using namespace spectrum;
+using namespace std::chrono_literals;
 
 TEST(Sparkle, TableWriteAfterRead) {
     auto code   = std::array<uint8_t, 2>();
@@ -49,6 +51,15 @@ TEST(Sparkle, TableWriteAfterWrite) {
     ASSERT_FALSE(t2.rerun_flag.load()) << "t2 rerun_flag";
     ASSERT_FALSE(t0.rerun_flag.load()) << "t0 rerun_flag";
     ASSERT_FALSE(t1.rerun_flag.load()) << "t1 rerun_flag";
+}
+
+TEST(Sparkle, JustRunSmallbank) {
+    auto workload = Smallbank();
+    auto protocol = Sparkle(workload, 8, 8);
+    protocol.Start();
+    std::this_thread::sleep_for(2000ms);
+    auto statistics = protocol.Stop();
+    statistics.Print();   
 }
 
 #undef TX

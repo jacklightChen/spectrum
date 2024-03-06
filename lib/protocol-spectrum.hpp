@@ -8,7 +8,8 @@
 #include <vector>
 #include <unordered_set>
 #include <thread>
-#include <conqueue/concurrentqueue.h>
+#include <queue>
+#include <optional>
 
 namespace spectrum {
 
@@ -34,7 +35,7 @@ struct SpectrumGetTuple {
 
 struct SpectrumTransaction: public Transaction {
     size_t      id;
-    size_t      should_wait;
+    size_t      should_wait{0};
     time_point<steady_clock>            start_time;
     std::vector<SpectrumGetTuple>       tuples_get{};
     std::vector<SpectrumPutTuple>       tuples_put{};
@@ -74,7 +75,33 @@ struct SpectrumTable: private Table<K, V, KeyHasher> {
 
 class SpectrumExecutor;
 
-using ConQueue = moodycamel::ConcurrentQueue<std::unique_ptr<T>>;
+template<typename T>
+class LockQueue {
+    
+    private:
+    std::mutex      mu;
+    std::queue<T>   queue{};
+    
+    public:
+    void Push(T&& t) {
+        auto lock = std::lock_guard{mu};
+        queue.push(std::move(t));
+    }
+    std::optional<T> Pop() {
+        auto lock = std::lock_guard{mu};
+        if (queue.size() == 0) {
+            return std::nullopt;
+        }
+        else {
+            auto front = std::move(queue.front());
+            queue.pop();
+            return front;
+        }
+    }
+
+};
+
+using ConQueue = LockQueue<std::unique_ptr<T>>;
 
 class Spectrum: virtual public Protocol {
 

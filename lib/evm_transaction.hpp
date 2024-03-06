@@ -19,6 +19,13 @@ enum EVMType {
     COPYONWRITE
 };
 
+struct Result: public evmc_result {
+
+    Result(evmc_result result);
+    ~Result();
+
+};
+
 class Transaction {
 
     private:
@@ -39,9 +46,9 @@ class Transaction {
         std::span<uint8_t> code,
         std::span<uint8_t> input
     );
-    void UpdateSetStorageHandler(spectrum::SetStorage handler);
-    void UpdateGetStorageHandler(spectrum::GetStorage handler);
-    evmc_result Execute();
+    void UpdateSetStorageHandler(spectrum::SetStorage&& handler);
+    void UpdateGetStorageHandler(spectrum::GetStorage&& handler);
+    Result Execute();
     void Break();
     void ApplyCheckpoint(size_t checkpoint_id);
     size_t MakeCheckpoint();

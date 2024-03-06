@@ -62,9 +62,9 @@ class Sparkle: virtual public Protocol {
     Workload&           workload;
     SparkleTable        table;
     Statistics          statistics;
-    std::atomic<size_t> last_execute{1};
-    std::atomic<size_t> last_finalized{1};
-    std::atomic<bool>   stop_flag{false};
+    volatile std::atomic<size_t> last_execute{1};
+    volatile std::atomic<size_t> last_finalized{0};
+    volatile std::atomic<bool>   stop_flag{false};
     std::vector<SparkleExecutor>    executors{};
     std::vector<std::thread>        threads{};
     friend class SparkleExecutor;
@@ -83,9 +83,9 @@ class SparkleExecutor {
     Workload&               workload;
     SparkleTable&           table;
     Statistics&             statistics;
-    std::atomic<size_t>&    last_execute;
-    std::atomic<size_t>&    last_finalized;
-    std::atomic<bool>&      stop_flag;
+    volatile std::atomic<size_t>&    last_execute;
+    volatile std::atomic<size_t>&    last_finalized;
+    volatile std::atomic<bool>&      stop_flag;
 
     public:
     SparkleExecutor(Sparkle& sparkle);

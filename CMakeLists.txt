@@ -8,7 +8,6 @@ project(spectrum LANGUAGES CXX C)
 set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_EXPORT_COMPILE_COMMANDS true)
-add_compile_options(-Wno-attributes)
 
 option(EVM_PRINT_INSTRUCTIONS "print each evm instruction on instruction start" 0)
 
@@ -56,8 +55,8 @@ FetchContent_Declare(
 )
 FetchContent_Declare(
     conqueue
-    GIT_REPOSITORY      "https://github.com/cameron314/concurrentqueue"
-    GIT_TAG             "v1.0.4"
+    GIT_REPOSITORY      "https://github.com/rigtorp/MPMCQueue"
+    GIT_TAG             "v1.0"
 )
 FetchContent_MakeAvailable(glog gtest gflags ethash intx fmt evmc thread_pool conqueue)
 set(gtest_force_shared_crt ON CACHE BOOL "" FORCE)
@@ -85,7 +84,9 @@ if(CMAKE_SYSTEM_PROCESSOR STREQUAL x86_64)
 endif()
 
 add_compile_options(
-    -Og -g
+    -O0 -ggdb
+    -Wall -Wno-reorder -Wno-attributes
+    -DNDEBUG
     -DPROJECT_VERSION="0.12.0-dev"
     -DEVMONE_X86_64_ARCH_LEVEL=${EVMONE_X86_64_ARCH_LEVEL}
     -DEVM_PRINT_INSTRUCTIONS=${EVM_PRINT_INSTRUCTIONS}
@@ -100,10 +101,10 @@ foreach(F ${INC})
     unset(REL)
 endforeach()
 
-file(GLOB INC ${CMAKE_BINARY_DIR}/_deps/conqueue-src/*.hpp ${CMAKE_BINARY_DIR}/_deps/conqueue-src/*.h)
+file(GLOB INC ${CMAKE_BINARY_DIR}/_deps/conqueue-src/include/rigtorp/*.hpp ${CMAKE_BINARY_DIR}/_deps/conqueue-src/include/rigtorp/*.h)
 
 foreach(F ${INC})
-    file(RELATIVE_PATH REL ${CMAKE_BINARY_DIR}/_deps/conqueue-src ${F})
+    file(RELATIVE_PATH REL ${CMAKE_BINARY_DIR}/_deps/conqueue-src/include/rigtorp ${F})
     configure_file(${F} include/conqueue/${REL} COPYONLY)
     unset(REL)
 endforeach()
@@ -132,7 +133,7 @@ target_compile_features(
 target_link_libraries(
     spectrum
     PUBLIC evmc intx::intx
-    PRIVATE ethash::keccak fmt glog
+    PRIVATE ethash::keccak fmt glog::glog
 )
 
 unset(SRC)
@@ -142,8 +143,12 @@ unset(INC)
 
 file(GLOB_RECURSE SRC unit-tests/*.cpp)
 
-add_executable(unit-tests ${SRC})
-target_link_libraries(unit-tests PRIVATE gtest_main spectrum glog)
+foreach(F ${SRC})
+    file(RELATIVE_PATH REL ${CMAKE_CURRENT_SOURCE_DIR}/unit-tests ${F})
+    string(REPLACE ".test.cpp" "" REL ${REL})
+    add_executable(unit-test-${REL} ${F})
+    target_link_libraries(unit-test-${REL} PRIVATE gtest_main spectrum glog::glog)
+endforeach()
 
 unset(SRC)
 

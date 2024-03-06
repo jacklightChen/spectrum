@@ -11,6 +11,7 @@
 #include <memory>
 #include <optional>
 #include <iostream>
+#include <glog/logging.h>
 
 #ifdef NDEBUG
 #define release_inline gnu::always_inline, msvc::forceinline
@@ -229,7 +230,7 @@ int64_t dispatch(const CostTable& cost_table, ExecutionState& state, int64_t gas
     const auto stack_bottom = state.stack_space.bottom();
 
     #if EVM_PRINT_INSTRUCTIONS
-        std::cerr << "---" << std::endl;
+        DLOG(INFO) << "---";
     #endif
 
     Position position = ([&](){
@@ -267,7 +268,7 @@ int64_t dispatch(const CostTable& cost_table, ExecutionState& state, int64_t gas
         switch (op) {
             #define ON_OPCODE(OPCODE)                                                                                     \
             case OPCODE:                                                                                                  \
-                std::cerr << #OPCODE << "\t\t" << static_cast<uint32_t>(position.code_it - code) << std::endl;            \
+                DLOG(INFO) << #OPCODE << "\t\t" << static_cast<uint32_t>(position.code_it - code);            \
                 break;
             MAP_OPCODES
             #undef ON_OPCODE
@@ -292,6 +293,7 @@ int64_t dispatch(const CostTable& cost_table, ExecutionState& state, int64_t gas
                 {                                                                                     \
                     /* Update current position only when no error,                                    \
                        this improves compiler optimization. */                                        \
+                    if (next.code_it == position.code_it) { std::terminate(); }                       \
                     position = next;                                                                  \
                                                                                                       \
                 }                                                                                     \

@@ -9,6 +9,7 @@
 #include <variant>
 #include <iostream>
 #include <span>
+#include <glog/logging.h>
 
 namespace spectrum {
 
@@ -47,12 +48,12 @@ Transaction::Transaction(
 }
 
 // update set_storage handler
-void Transaction::UpdateSetStorageHandler(spectrum::SetStorage handler) {
+void Transaction::UpdateSetStorageHandler(spectrum::SetStorage&& handler) {
     host.set_storage_inner = handler;
 }
 
 // update get_storage handler
-void Transaction::UpdateGetStorageHandler(spectrum::GetStorage handler) {
+void Transaction::UpdateGetStorageHandler(spectrum::GetStorage&& handler) {
     host.get_storage_inner = handler;
 }
 
@@ -102,7 +103,7 @@ void Transaction::Break() {
     }
 }
 
-evmc_result Transaction::Execute() {
+Result Transaction::Execute() {
     if (evm_type == EVMType::BASIC || evm_type == EVMType::STRAWMAN) {
         auto& _vm = std::get<evmone::VM>(vm);
         auto host_interface = &host.get_interface();
@@ -112,7 +113,7 @@ evmc_result Transaction::Execute() {
             EVMC_SHANGHAI, &message,
             &code[0], code.size() - 1
         );
-        return result;
+        return Result(result);
     }
     if (evm_type == EVMType::COPYONWRITE) {
         auto& _vm = std::get<evmcow::VM>(vm);
@@ -123,10 +124,18 @@ evmc_result Transaction::Execute() {
             EVMC_SHANGHAI, &message,
             &code[0], code.size() - 1
         );
-        return result;
+        return Result(result);
     }
-    std::cerr << "not possible" << std::endl;
+    DLOG(INFO) << "not possible";
     std::terminate();
+}
+
+Result::Result(evmc_result result):
+    evmc_result{result}
+{}
+
+Result::~Result() {
+    this->release(this);
 }
 
 } // namespace spectrum
