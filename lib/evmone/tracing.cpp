@@ -22,16 +22,23 @@ std::string get_name(uint8_t opcode)
 /// @see create_counting_tracer()
 class CountingTracer: public Tracer
 {
-    size_t& instruction_count;
+    size_t* instruction_count;
     void on_instruction_start(uint32_t /* pc */, const StackTop& /*stack_top*/, int /*stack_height*/,
         int64_t /*gas*/, const ExecutionState& /*state*/) noexcept override
     {
-        instruction_count += 1;
+        *instruction_count += 1;
     }
 
+    void on_execution_start(
+        evmc_revision /*rev*/, const evmc_message& /* msg */, bytes_view /* code */) noexcept override
+    {}
+
+    void on_execution_end(const evmc_result& /*result*/) noexcept override
+    {}
+
 public:
-    explicit CountingTracer(size_t& count): instruction_count{count} {}
-}
+    explicit CountingTracer(size_t* count): instruction_count{count} {}
+};
 
 /// @see create_histogram_tracer()
 class HistogramTracer : public Tracer
@@ -161,7 +168,7 @@ std::unique_ptr<Tracer> create_instruction_tracer(std::ostream& out)
     return std::make_unique<InstructionTracer>(out);
 }
 
-std::unique_ptr<Tracer> create_counting_tracer(std::size_t& count)
+std::unique_ptr<Tracer> create_counting_tracer(std::size_t* count)
 {
     return std::make_unique<CountingTracer>(count);
 }

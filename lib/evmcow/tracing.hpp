@@ -66,6 +66,6 @@ EVMC_EXPORT std::unique_ptr<Tracer> create_histogram_tracer(std::ostream& out);
 
 EVMC_EXPORT std::unique_ptr<Tracer> create_instruction_tracer(std::ostream& out);
 
-EVMC_EXPORT std::unique_ptr<Tracer> create_counting_tracer(size_t& count);
+EVMC_EXPORT std::unique_ptr<Tracer> create_counting_tracer(size_t* count);
 
 }  // namespace evmcow
