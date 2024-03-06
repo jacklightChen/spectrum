@@ -250,8 +250,8 @@ SpectrumExecutor::SpectrumExecutor(Spectrum& spectrum):
     queue{spectrum.queue}
 {}
 
-/// @brief start an executor
-void SpectrumExecutor::Run() {while (!stop_flag.load()) {
+/// @brief generate a transaction
+std::unique_ptr<T> SpectrumExecutor::Generate() {
     auto tx = std::unique_ptr<T>(new T(std::move(workload.Next()), last_execute.fetch_add(1)));
     tx->UpdateSetStorageHandler([&](
         const evmc::address &addr, 
@@ -296,9 +296,15 @@ void SpectrumExecutor::Run() {while (!stop_flag.load()) {
         tx->tuples_get.push_back(std::make_tuple(_key, value, version));
         return value;
     });
-    auto first_run = bool{true};
+    tx->Execute();
+    return tx;
+}
+
+/// @brief start an executor
+void SpectrumExecutor::Run() {while (!stop_flag.load()) {
+    auto tx = Generate();
     while (true) {
-        if (first_run || tx->HasRerunKeys()) {
+        if (tx->HasRerunKeys()) {
             // sweep all operations from previous execution
             for (auto entry: tx->tuples_get) {
                 table.RegretGet(tx.get(), std::get<0>(entry), std::get<2>(entry));

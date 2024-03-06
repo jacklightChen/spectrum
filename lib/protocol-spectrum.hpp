@@ -20,7 +20,6 @@ namespace spectrum {
 struct SpectrumTransaction: public Transaction {
     size_t      id;
     size_t      should_wait;
-    bool        first_run{false};
     std::chrono::time_point<std::chrono::steady_clock>  start_time;
     std::vector<std::tuple<K, evmc::bytes32, size_t>>   tuples_get{};
     std::vector<std::tuple<K, evmc::bytes32>>           tuples_put{};
@@ -100,6 +99,7 @@ class SpectrumExecutor {
 
     public:
     SpectrumExecutor(Spectrum& spectrum);
+    std::unique_ptr<T> Generate();
     void Run();
 
 };
