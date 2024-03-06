@@ -58,7 +58,7 @@ std::unique_ptr<T> Aria::NextTransaction() {
 void Aria::Start() {
     // this macro computes the latency of one transaction
     #define LATENCY duration_cast<microseconds>(steady_clock::now() - tx.start_time).count()
-    pool.submit_task([&]() {while(!stop_flag.load()) {
+    pool.detach_task([&]() {while(!stop_flag.load()) {
         // -- construct an empty batch
         auto batch = std::vector<std::optional<std::unique_ptr<T>>>();
         for (size_t i = 0; i < batch_size; ++i) {

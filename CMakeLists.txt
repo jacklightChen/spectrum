@@ -10,6 +10,8 @@ set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_EXPORT_COMPILE_COMMANDS true)
 add_compile_options(-Wno-attributes)
 
+option(EVM_PRINT_INSTRUCTIONS "print each evm instruction on instruction start" 0)
+
 # -- Manage External Dependencies
 include(FetchContent)
 FetchContent_Declare(
@@ -52,7 +54,7 @@ FetchContent_Declare(
     GIT_REPOSITORY      "https://github.com/chfast/intx"
     GIT_TAG             "v0.10.1"
 )
-FetchContent_MakeAvailable(glog gtest gflags ethash intx fmt evmc)
+FetchContent_MakeAvailable(glog gtest gflags ethash intx fmt evmc thread_pool)
 set(gtest_force_shared_crt ON CACHE BOOL "" FORCE)
 
 # -- Determine Compile Definitions
@@ -78,17 +80,17 @@ if(CMAKE_SYSTEM_PROCESSOR STREQUAL x86_64)
 endif()
 
 add_compile_options(
-    -O2
+    -O2 -g
     -DPROJECT_VERSION="0.12.0-dev"
     -DEVMONE_X86_64_ARCH_LEVEL=${EVMONE_X86_64_ARCH_LEVEL}
-    -DEVM_PRINT_INSTRUCTIONS=0
+    -DEVM_PRINT_INSTRUCTIONS=${EVM_PRINT_INSTRUCTIONS}
 )
 
 # -- handle header-only dependencies
-file(GLOB INC ${CMAKE_BINARY_DIR}/thread_pool/include/*.hpp ${CMAKE_BINARY_DIR}/thread_pool/include/*.h)
+file(GLOB INC ${CMAKE_BINARY_DIR}/_deps/thread_pool-src/include/*.hpp ${CMAKE_BINARY_DIR}/_deps/thread_pool-src/include/*.h)
 
 foreach(F ${INC})
-    file(RELATIVE_PATH REL ${CMAKE_BINARY_DIR}/thread_pool/include ${F})
+    file(RELATIVE_PATH REL ${CMAKE_BINARY_DIR}/_deps/thread_pool-src/include ${F})
     configure_file(${F} include/thread_pool/${REL} COPYONLY)
     unset(REL)
 endforeach()

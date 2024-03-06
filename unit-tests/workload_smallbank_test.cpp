@@ -1,12 +1,14 @@
 #include <spectrum/workload-smallbank.hpp>
+#include <spectrum/evm_hash.hpp>
 #include <gtest/gtest.h>
+#include <evmc/evmc.hpp>
 
 namespace {
 
 class MockTable {
 
     private:
-    std::unordered_map<std::tuple<evmc::address, evmc::bytes32>, evmc::bytes32, KeyHasher> inner;
+    std::unordered_map<std::tuple<evmc::address, evmc::bytes32>, evmc::bytes32, spectrum::KeyHasher> inner;
 
     public:
     evmc::bytes32 GetStorage(
@@ -26,7 +28,7 @@ class MockTable {
 };
 
 TEST(Smallbank, JustRunWorkload) {
-    auto workload    = Smallbank();
+    auto workload    = spectrum::Smallbank();
     auto table       = MockTable();
     for (size_t i = 0; i < 1000; ++i) {
         auto transaction = workload.Next();

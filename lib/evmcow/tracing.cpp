@@ -166,7 +166,7 @@ std::unique_ptr<Tracer> create_instruction_tracer(std::ostream& out)
 
 std::unique_ptr<Tracer> create_counting_tracer(std::size_t* count)
 {
-    return std::make_unique<CountingTracer>(count);
+    return std::make_unique<CountingTracer>(std::move(count));
 }
 
 }  // namespace evmcow

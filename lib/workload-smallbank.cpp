@@ -1,4 +1,4 @@
-#include "./workload.hpp"
+#include "./workload-smallbank.hpp"
 #include "./hex.hpp"
 #include <optional>
 
@@ -78,12 +78,13 @@ Transaction Smallbank::Next() {
     #define X to_string(Random())
     auto option = Random() % 5;
     auto input = ([&](){switch (option) {
-        case 0: return spectrum::from_hex(std::string{"1e010439"} + X).value(),
-        case 1: return spectrum::from_hex(std::string{"bb27eb2c"} + X + X).value(),
-        case 2: return spectrum::from_hex(std::string{"ad0f98c0"} + X + X).value(),
-        case 3: return spectrum::from_hex(std::string{"83406251"} + X + X).value(),
-        case 4: return spectrum::from_hex(std::string{"8ac10b9c"} + X + X + X).value(),
-        case 5: return spectrum::from_hex(std::string{"97b63212"} + X + X).value(),
+        case 0: return spectrum::from_hex(std::string{"1e010439"} + X).value();
+        case 1: return spectrum::from_hex(std::string{"bb27eb2c"} + X + X).value();
+        case 2: return spectrum::from_hex(std::string{"ad0f98c0"} + X + X).value();
+        case 3: return spectrum::from_hex(std::string{"83406251"} + X + X).value();
+        case 4: return spectrum::from_hex(std::string{"8ac10b9c"} + X + X + X).value();
+        case 5: return spectrum::from_hex(std::string{"97b63212"} + X + X).value();
+        default: throw "unreachable";
     }})();
     #undef X
     return Transaction(

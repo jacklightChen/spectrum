@@ -23,15 +23,16 @@ std::string get_name(uint8_t opcode)
 class CountingTracer: public Tracer
 {
     size_t* instruction_count;
-    void on_instruction_start(uint32_t /* pc */, const StackTop& /*stack_top*/, int /*stack_height*/,
+    void on_instruction_start(uint32_t /* pc */, const intx::uint256* /*stack_top*/, int /*stack_height*/,
         int64_t /*gas*/, const ExecutionState& /*state*/) noexcept override
     {
         *instruction_count += 1;
     }
 
     void on_execution_start(
-        evmc_revision /*rev*/, const evmc_message& /* msg */, bytes_view /* code */) noexcept override
+        evmc_revision /*rev*/, const evmc_message& msg, bytes_view code) noexcept override
     {}
+
 
     void on_execution_end(const evmc_result& /*result*/) noexcept override
     {}
