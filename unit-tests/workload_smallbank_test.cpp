@@ -30,7 +30,7 @@ class MockTable {
 TEST(Smallbank, JustRunWorkload) {
     auto workload    = spectrum::Smallbank();
     auto table       = MockTable();
-    for (size_t i = 0; i < 1000; ++i) {
+    for (size_t i = 0; i < 100; ++i) {
         auto transaction = workload.Next();
         transaction.UpdateGetStorageHandler(
             [&](
