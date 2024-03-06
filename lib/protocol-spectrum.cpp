@@ -190,11 +190,12 @@ void SpectrumTable::ClearPut(T* tx, const K& k) {
 /// @brief spectrum initialization parameters
 /// @param workload the transaction generator
 /// @param table_partitions the number of parallel partitions to use in the hash table
-Spectrum::Spectrum(Workload& workload, size_t n_threads, size_t table_partitions, size_t queue_amplification):
+Spectrum::Spectrum(Workload& workload, size_t n_threads, size_t table_partitions, size_t queue_amplification, EVMType evm_type):
     workload{workload},
     n_threads{n_threads},
     table{table_partitions},
-    queue_amplification{queue_amplification}
+    queue_amplification{queue_amplification},
+    evm_type{evm_type}
 {}
 
 /// @brief start spectrum protocol
@@ -237,7 +238,7 @@ SpectrumExecutor::SpectrumExecutor(Spectrum& spectrum):
     queue{spectrum.queue},
     queue_amplification{spectrum.queue_amplification}
 {
-    workload.SetEVMType(EVMType::COPYONWRITE);
+    workload.SetEVMType(spectrum.evm_type);
 }
 
 /// @brief generate a transaction and execute it

@@ -113,6 +113,7 @@ class Spectrum: virtual public Protocol {
     ConQueue            queue;
     SpectrumTable       table;
     Statistics          statistics;
+    EVMType             evm_type;
     std::atomic<size_t> last_execute{1};
     std::atomic<size_t> last_finalized{1};
     std::atomic<bool>   stop_flag{false};
@@ -121,7 +122,7 @@ class Spectrum: virtual public Protocol {
     friend class SpectrumExecutor;
 
     public:
-    Spectrum(Workload& workload, size_t n_threads, size_t table_partitions, size_t queue_amplification);
+    Spectrum(Workload& workload, size_t n_threads, size_t table_partitions, size_t queue_amplification, EVMType evm_type);
     void Start() override;
     Statistics Stop() override;
     Statistics Report() override;
