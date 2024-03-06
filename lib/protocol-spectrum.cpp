@@ -249,14 +249,7 @@ std::unique_ptr<T> SpectrumExecutor::Create() {
         const evmc::bytes32 &value
     ) {
         auto _key   = std::make_tuple(addr, key);
-        // when there exists some key, do this
-        for (auto& tup: tx->tuples_put) {
-            if (tup.key == _key) {
-                tup.value = value;
-                return evmc_storage_status::EVMC_STORAGE_MODIFIED;
-            }
-        }
-        // else just push back
+        // push back
         tx->tuples_put.push_back({.key = _key, .value = value});
         if (tx->HasRerunKeys()) { tx->Break(); }
         return evmc_storage_status::EVMC_STORAGE_MODIFIED;
@@ -368,6 +361,7 @@ void SpectrumExecutor::Run() {while (!stop_flag.load()) {
             break;
         }
         else {
+            // if cannot commit, then do something else
             queue.Push(std::move(tx));
             break;
         }

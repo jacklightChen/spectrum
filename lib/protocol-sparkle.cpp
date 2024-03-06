@@ -267,6 +267,7 @@ void SparkleExecutor::Run() { while (!stop_flag.load()) {
     ) {
         DLOG(INFO) << tx->id << " set";
         auto _key   = std::make_tuple(addr, key);
+        table.Lock(tx.get(), _key);
         // when there exists some key, do this
         for (auto& tup: tx->tuples_put) {
             if (std::get<0>(tup) == _key) {
