@@ -7,8 +7,7 @@
 #include <glog/logging.h>
 
 /*
-    This is a implementation of "Aria: A Fast and Practical Deterministic OLTP Database" (Yi Lu, Xiangyao Yu, Lei Cao, Samuel Madden). 
-    In this implementation we adopt the fallback strategy and reordering strategy discussed in this paper. 
+    This is a implementation of "Sparkle: Speculative Deterministic Concurrency Control for Partially Replicated Transactional Data Stores" (Zhongmiao Li, Peter Van Roy and Paolo Romano). 
  */
 
 namespace spectrum {
