@@ -84,7 +84,7 @@ class LockQueue {
     std::queue<X>   queue;
     
     public:
-    Push(X&& x) {
+    void Push(X&& x) {
         auto guard = std::lock_guard{mu};
         queue.push_back(std::move(x));
     }
