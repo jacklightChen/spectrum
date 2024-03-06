@@ -2,6 +2,7 @@
 #include <string>
 #include <optional>
 #include <span>
+#include <iostream>
 
 namespace spectrum {
 
@@ -85,7 +86,7 @@ std::optional<std::basic_string<uint8_t>> from_hex(std::string_view hex) noexcep
         }
         *dst++ = a | b;
     }
-    return out;
+    return std::optional{out};
 }
 
 std::string to_hex(std::span<uint8_t> bytes) noexcept {

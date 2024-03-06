@@ -68,7 +68,7 @@ uint32_t Smallbank::Random() {
     return x;
 }
 
-inline std::string to_string(int32_t key) {
+inline std::string to_string(uint32_t key) {
     auto ss = std::ostringstream();
     ss << std::setw(64) << std::setfill('0') << key;
     return ss.str();
@@ -77,23 +77,17 @@ inline std::string to_string(int32_t key) {
 Transaction Smallbank::Next() {
     #define X to_string(Random())
     auto option = Random() % 5;
-    auto input = ([&](){switch (option) {
-        case 0: return spectrum::from_hex(std::string{"1e010439"} + X).value();
-        case 1: return spectrum::from_hex(std::string{"bb27eb2c"} + X + X).value();
-        case 2: return spectrum::from_hex(std::string{"ad0f98c0"} + X + X).value();
-        case 3: return spectrum::from_hex(std::string{"83406251"} + X + X).value();
-        case 4: return spectrum::from_hex(std::string{"8ac10b9c"} + X + X + X).value();
-        case 5: return spectrum::from_hex(std::string{"97b63212"} + X + X).value();
+    auto input = spectrum::from_hex([&](){switch (option) {
+        case 0: return std::string{"1e010439"} + X;
+        case 1: return std::string{"bb27eb2c"} + X + X;
+        case 2: return std::string{"ad0f98c0"} + X + X;
+        case 3: return std::string{"83406251"} + X + X;
+        case 4: return std::string{"8ac10b9c"} + X + X + X;
+        case 5: return std::string{"97b63212"} + X + X;
         default: throw "unreachable";
-    }})();
+    }}()).value();
     #undef X
-    return Transaction(
-        this->evm_type,
-        evmc::address{0x1},
-        evmc::address{0x2},
-        std::span{code}, 
-        std::span{input}
-    );
+    return Transaction(this->evm_type, evmc::address{0x1}, evmc::address{0x2}, std::span{code}, std::span{input});
 }
 
 } // namespace spectrum
