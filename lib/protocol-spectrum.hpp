@@ -17,14 +17,29 @@ namespace spectrum {
 #define V SpectrumVersionList
 #define T SpectrumTransaction
 
+using namespace std::chrono;
+
+struct SpectrumPutTuple {
+    K               key;
+    evmc::bytes32   value;
+};
+
+struct SpectrumGetTuple {
+    K               key;
+    evmc::bytes32   value;
+    size_t          version;
+    size_t          tuples_put_len;
+    size_t          checkpoint_id;
+};
+
 struct SpectrumTransaction: public Transaction {
     size_t      id;
     size_t      should_wait;
-    std::chrono::time_point<std::chrono::steady_clock>  start_time;
-    std::vector<std::tuple<K, evmc::bytes32, size_t>>   tuples_get{};
-    std::vector<std::tuple<K, evmc::bytes32>>           tuples_put{};
+    time_point<steady_clock>            start_time;
+    std::vector<SpectrumGetTuple>       tuples_get{};
+    std::vector<SpectrumPutTuple>       tuples_put{};
     std::mutex       rerun_keys_mu;
-    std::vector<K>   rerun_keys{false};
+    std::vector<K>   rerun_keys;
     SpectrumTransaction(Transaction&& inner, size_t id);
     bool HasRerunKeys();
     void AddRerunKeys(const K& key, size_t cause_id);
@@ -50,7 +65,6 @@ struct SpectrumTable: private Table<K, V, KeyHasher> {
     SpectrumTable(size_t partitions);
     void Get(T* tx, const K& k, evmc::bytes32& v, size_t& version);
     void Put(T* tx, const K& k, const evmc::bytes32& v);
-    bool Lock(T* tx, const K& k);
     void RegretGet(T* tx, const K& k, size_t version);
     void RegretPut(T* tx, const K& k);
     void ClearGet(T* tx, const K& k, size_t version);
@@ -66,6 +80,7 @@ class Spectrum: virtual public Protocol {
 
     private:
     size_t              n_threads;
+    size_t              queue_amplification;
     Workload&           workload;
     ConQueue            queue;
     SpectrumTable       table;
@@ -78,7 +93,7 @@ class Spectrum: virtual public Protocol {
     friend class SpectrumExecutor;
 
     public:
-    Spectrum(Workload& workload, size_t n_threads, size_t table_partitions);
+    Spectrum(Workload& workload, size_t n_threads, size_t table_partitions, size_t queue_amplification);
     void Start() override;
     Statistics Stop() override;
     Statistics Report() override;
@@ -91,6 +106,7 @@ class SpectrumExecutor {
     private:
     Workload&               workload;
     ConQueue&               queue;
+    size_t                  queue_amplification;
     SpectrumTable&          table;
     Statistics&             statistics;
     std::atomic<size_t>&    last_execute;
@@ -99,7 +115,8 @@ class SpectrumExecutor {
 
     public:
     SpectrumExecutor(Spectrum& spectrum);
-    std::unique_ptr<T> Generate();
+    std::unique_ptr<T> Create();
+    void ReExecute(SpectrumTransaction& tx);
     void Run();
 
 };

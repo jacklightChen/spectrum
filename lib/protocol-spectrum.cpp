@@ -5,6 +5,7 @@
 #include <thread>
 #include <chrono>
 #include <glog/logging.h>
+#include <ranges>
 
 /*
     This is a implementation of "Spectrum: Speculative Deterministic Concurrency Control for Partially Replicated Transactional Data Stores" (Zhongmiao Li, Peter Van Roy and Paolo Romano). 
@@ -79,7 +80,6 @@ void SpectrumTable::Get(T* tx, const K& k, evmc::bytes32& v, size_t& version) {
 void SpectrumTable::Put(T* tx, const K& k, const evmc::bytes32& v) {
     CHECK(tx->id > 0) << "we reserve version(0) for default value";
     Table::Put(k, [&](V& _v) {
-        _v.tx = nullptr;
         auto guard = std::lock_guard{_v.mu};
         auto rit = _v.entries.rbegin();
         auto end = _v.entries.rend();
@@ -108,23 +108,6 @@ void SpectrumTable::Put(T* tx, const K& k, const evmc::bytes32& v) {
             .readers = std::unordered_set<T*>()
         });
     });
-}
-
-/// @brief lock an entry for later writting
-/// @param tx the transaction containing write operation
-/// @param k the key of written entry
-/// @return true if lock succeeds
-bool SpectrumTable::Lock(T* tx, const K& k) {
-    bool succeed = false;
-    Table::Put(k, [&](V& _v) {
-        auto guard = std::lock_guard{_v.mu};
-        succeed = !_v.tx || _v.tx->id >= tx->id;
-        if (_v.tx && _v.tx->id < tx->id) {
-            _v.tx->AddRerunKeys(k, tx->id);
-        }
-        if (succeed) { _v.tx = tx; }
-    });
-    return succeed;
 }
 
 /// @brief remove a read dependency from this entry
@@ -206,10 +189,11 @@ void SpectrumTable::ClearPut(T* tx, const K& k) {
 /// @brief spectrum initialization parameters
 /// @param workload the transaction generator
 /// @param table_partitions the number of parallel partitions to use in the hash table
-Spectrum::Spectrum(Workload& workload, size_t n_threads, size_t table_partitions):
+Spectrum::Spectrum(Workload& workload, size_t n_threads, size_t table_partitions, size_t queue_amplification):
     workload{workload},
     n_threads{n_threads},
-    table{table_partitions}
+    table{table_partitions},
+    queue_amplification{queue_amplification}
 {}
 
 /// @brief start spectrum protocol
@@ -247,11 +231,12 @@ SpectrumExecutor::SpectrumExecutor(Spectrum& spectrum):
     last_execute{spectrum.last_execute},
     stop_flag{spectrum.stop_flag},
     statistics{spectrum.statistics},
-    queue{spectrum.queue}
+    queue{spectrum.queue},
+    queue_amplification{spectrum.queue_amplification}
 {}
 
 /// @brief generate a transaction
-std::unique_ptr<T> SpectrumExecutor::Generate() {
+std::unique_ptr<T> SpectrumExecutor::Create() {
     auto tx = std::unique_ptr<T>(new T(std::move(workload.Next()), last_execute.fetch_add(1)));
     tx->UpdateSetStorageHandler([&](
         const evmc::address &addr, 
@@ -260,18 +245,16 @@ std::unique_ptr<T> SpectrumExecutor::Generate() {
     ) {
         auto _key   = std::make_tuple(addr, key);
         auto version = size_t{0};
-        while (!table.Lock(tx.get(), _key)) {
-            std::this_thread::yield(); 
-        }
         // when there exists some key, do this
         for (auto& tup: tx->tuples_put) {
-            if (std::get<0>(tup) == _key) {
-                std::get<1>(tup) = value;
+            if (tup.key == _key) {
+                tup.value = value;
                 return evmc_storage_status::EVMC_STORAGE_MODIFIED;
             }
         }
         // else just push back
-        tx->tuples_put.push_back(std::make_tuple(_key, value));
+        tx->tuples_put.push_back({.key = _key, .value = value});
+        if (tx->HasRerunKeys()) { tx->Break(); }
         return evmc_storage_status::EVMC_STORAGE_MODIFIED;
     });
     tx->UpdateGetStorageHandler([&](
@@ -281,60 +264,97 @@ std::unique_ptr<T> SpectrumExecutor::Generate() {
         auto _key   = std::make_tuple(addr, key);
         auto value  = evmc::bytes32{0};
         auto version = size_t{0};
-        // one key from one transaction will be commited once
-        for (auto& tup: tx->tuples_put) {
-            if (std::get<0>(tup) == _key) {
-                return std::get<1>(tup);
-            }
+        for (auto& tup: std::ranges::views::reverse(tx->tuples_put)) {
+            if (tup.key == _key) { return tup.value; }
         }
         for (auto& tup: tx->tuples_get) {
-            if (std::get<0>(tup) == _key) {
-                return std::get<1>(tup);
-            }
+            if (tup.key == _key) { return tup.value; }
         }
+        if (tx->HasRerunKeys()) { tx->Break(); return evmc::bytes32{0}; }
         table.Get(tx.get(), _key, value, version);
-        tx->tuples_get.push_back(std::make_tuple(_key, value, version));
+        size_t checkpoint_id = tx->MakeCheckpoint();
+        tx->tuples_get.push_back({
+            .key            = _key, 
+            .value          = value, 
+            .version        = version,
+            .tuples_put_len = tx->tuples_put.size(),
+            .checkpoint_id  = checkpoint_id
+        });
         return value;
     });
     tx->Execute();
+    statistics.JournalExecute();
     return tx;
+}
+
+/// @brief rollback transaction with given rollback signal
+/// @param tx the transaction to rollback
+void SpectrumExecutor::ReExecute(SpectrumTransaction& tx) {
+    // get current rerun keys
+    std::vector<K> rerun_keys{};
+    {
+        auto guard = std::lock_guard{tx.rerun_keys_mu}; 
+        std::swap(tx.rerun_keys, rerun_keys);
+    }
+    auto back_to = ~size_t{0};
+    // find checkpoint 
+    for (auto& key: rerun_keys) {
+        for (size_t i = 0; i < tx.tuples_get.size(); ++i) {
+            if (tx.tuples_get[i].key != key) { continue; }
+            back_to = std::min(i, back_to); break;
+        }
+    }
+    // good news: we don't have to rollback
+    if (back_to == ~size_t{0}) { return; }
+    // bad news: we have to rollback
+    auto& tup = tx.tuples_get[back_to];
+    tx.ApplyCheckpoint(tup.checkpoint_id);
+    for (size_t i = tup.tuples_put_len; i < tx.tuples_put.size(); ++i) {
+        table.RegretPut(&tx, tx.tuples_put[i].key);
+    }
+    for (size_t i = back_to; i < tx.tuples_put.size(); ++i) {
+        table.RegretGet(&tx, tx.tuples_get[i].key, tx.tuples_get[i].version);
+    }
+    tx.tuples_put.resize(tup.tuples_put_len);
+    tx.tuples_get.resize(back_to);
+    tx.Execute();
+    statistics.JournalExecute();
 }
 
 /// @brief start an executor
 void SpectrumExecutor::Run() {while (!stop_flag.load()) {
-    auto tx = Generate();
-    while (true) {
-        if (tx->HasRerunKeys()) {
-            // sweep all operations from previous execution
-            for (auto entry: tx->tuples_get) {
-                table.RegretGet(tx.get(), std::get<0>(entry), std::get<2>(entry));
-            }
-            for (auto entry: tx->tuples_put) {
-                table.RegretPut(tx.get(), std::get<0>(entry));
-            }
-            // execute and try to commit
-            statistics.JournalExecute();
-            tx->Execute();
-            if (tx->HasRerunKeys()) { continue; }
-            for (auto entry: tx->tuples_put) {
-                table.Put(tx.get(), std::get<0>(entry), std::get<1>(entry));
-            }
-        }
-        else if (last_finalized.load() + 1 == tx->id) {
-            // here no previous transaction will affect the result of this transaction. 
-            // therefore, we can determine inaccessible values and remove them. 
-            for (auto entry: tx->tuples_get) {
-                table.ClearGet(tx.get(), std::get<0>(entry), std::get<2>(entry));
-            }
-            for (auto entry: tx->tuples_put) {
-                table.ClearPut(tx.get(), std::get<0>(entry));
-            }
-            last_finalized.fetch_add(1);
-            break;
+    if (queue.size_approx() < this->queue_amplification) {
+        queue.enqueue(Create());
+    }
+    auto tx = std::unique_ptr<T>(nullptr);
+    if (!queue.try_dequeue(tx)) {
+        LOG(WARNING) << "queue is empty, performance may deteriorate. " << std::endl;
+        goto PASS;
+    }
+    if (tx->HasRerunKeys()) {
+        // sweep all operations from previous execution
+        ReExecute(*tx);
+        if (tx->HasRerunKeys()) { goto REQUEUE; }
+        // commit all results
+        for (auto entry: tx->tuples_put) {
+            table.Put(tx.get(), entry.key, entry.value);
+            if (tx->HasRerunKeys()) { goto REQUEUE; }
         }
     }
-    auto latency = duration_cast<microseconds>(steady_clock::now() - tx->start_time).count();
-    statistics.JournalCommit(latency);
+    if (last_finalized.load() + 1 == tx->id && !tx->HasRerunKeys()) {
+        last_finalized.fetch_add(1);
+        for (auto entry: tx->tuples_get) {
+            table.ClearGet(tx.get(), entry.key, entry.version);
+        }
+        for (auto entry: tx->tuples_put) {
+            table.ClearPut(tx.get(), entry.key);
+        }
+        auto latency = duration_cast<microseconds>(steady_clock::now() - tx->start_time).count();
+        statistics.JournalCommit(latency);
+        goto PASS;
+    }
+    REQUEUE: queue.enqueue(std::move(tx)); continue;
+    PASS:    continue;
 }}
 
 #undef T
