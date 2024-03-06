@@ -8,6 +8,8 @@
 #include <vector>
 #include <unordered_set>
 #include <thread>
+#include <thread_pool/BS_thread_pool.hpp>
+#include <thread_pool/BS_thread_pool_utils.hpp>
 
 namespace spectrum {
 
@@ -43,13 +45,13 @@ struct SparkleVersionList {
 struct SparkleTable: private Table<K, V, KeyHasher> {
 
     SparkleTable(size_t partitions);
-    void Get(T* tx, const K& k, evmc::bytes32& v, size_t& version);
-    void Put(T* tx, const K& k, const evmc::bytes32& v);
-    bool Lock(T* tx, const K& k);
-    void RegretGet(T* tx, const K& k, size_t version);
-    void RegretPut(T* tx, const K& k);
-    void ClearGet(T* tx, const K& k, size_t version);
-    void ClearPut(T* tx, const K& k);
+    void Get(T* tx, const K k, evmc::bytes32& v, size_t& version);
+    void Put(T* tx, const K k, const evmc::bytes32& v);
+    bool Lock(T* tx, const K k);
+    void RegretGet(T* tx, const K k, size_t version);
+    void RegretPut(T* tx, const K k);
+    void ClearGet(T* tx, const K k, size_t version);
+    void ClearPut(T* tx, const K k);
 
 };
 
@@ -65,8 +67,8 @@ class Sparkle: virtual public Protocol {
     volatile std::atomic<size_t> last_execute{1};
     volatile std::atomic<size_t> last_finalized{0};
     volatile std::atomic<bool>   stop_flag{false};
-    std::vector<SparkleExecutor>    executors{};
-    std::vector<std::thread>        threads{};
+    std::vector<std::unique_ptr<SparkleExecutor>>   executors{};
+    std::vector<std::thread>                        workers{};
     friend class SparkleExecutor;
 
     public:

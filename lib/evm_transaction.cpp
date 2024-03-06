@@ -135,7 +135,9 @@ Result::Result(evmc_result result):
 {}
 
 Result::~Result() {
-    this->release(this);
+    if (this->output_data) {
+        this->release(this);
+    }
 }
 
 } // namespace spectrum

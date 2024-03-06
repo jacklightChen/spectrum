@@ -44,8 +44,10 @@ SparkleTable::SparkleTable(size_t partitions):
 /// @param k the key of the read entry
 /// @param v (mutated to be) the value of read entry
 /// @param version (mutated to be) the version of read entry
-void SparkleTable::Get(T* tx, const K& k, evmc::bytes32& v, size_t& version) {
+void SparkleTable::Get(T* tx, const K k, evmc::bytes32& v, size_t& version) {
+    DLOG(INFO) << tx->id << " get";
     Table::Put(k, [&](V& _v) {
+        auto guard = std::lock_guard{_v.mu};
         auto rit = _v.entries.rbegin();
         auto end = _v.entries.rend();
         while (rit != end) {
@@ -57,6 +59,7 @@ void SparkleTable::Get(T* tx, const K& k, evmc::bytes32& v, size_t& version) {
             rit->readers.insert(tx);
             return;
         }
+        DLOG(INFO) << "default";
         version = 0;
         _v.readers_default.insert(tx);
     });
@@ -66,10 +69,11 @@ void SparkleTable::Get(T* tx, const K& k, evmc::bytes32& v, size_t& version) {
 /// @param tx the transaction that writes the value
 /// @param k the key of the written entry
 /// @param v the value to write
-void SparkleTable::Put(T* tx, const K& k, const evmc::bytes32& v) {
+void SparkleTable::Put(T* tx, const K k, const evmc::bytes32& v) {
     CHECK(tx->id > 0) << "we reserve version(0) for default value";
     DLOG(INFO) << "commit " << tx->id;
     Table::Put(k, [&](V& _v) {
+        auto guard = std::lock_guard{_v.mu};
         _v.tx = nullptr;
         auto rit = _v.entries.rbegin();
         auto end = _v.entries.rend();
@@ -106,10 +110,11 @@ void SparkleTable::Put(T* tx, const K& k, const evmc::bytes32& v) {
 /// @param tx the transaction containing write operation
 /// @param k the key of written entry
 /// @return true if lock succeeds
-bool SparkleTable::Lock(T* tx, const K& k) {
-    bool succeed = false;
+bool SparkleTable::Lock(T* tx, const K k) {
+    volatile bool succeed = false;
     Table::Put(k, [&](V& _v) {
-        succeed = !_v.tx || _v.tx->id >= tx->id;
+        auto guard = std::lock_guard{_v.mu};
+        succeed = _v.tx == nullptr || _v.tx->id >= tx->id;
         if (_v.tx && _v.tx->id < tx->id) {
             _v.tx->rerun_flag.store(true);
             DLOG(INFO) << tx->id << " abort " << _v.tx->id;
@@ -122,8 +127,10 @@ bool SparkleTable::Lock(T* tx, const K& k) {
 /// @brief remove a read dependency from this entry
 /// @param tx the transaction that previously read this entry
 /// @param k the key of read entry
-void SparkleTable::RegretGet(T* tx, const K& k, size_t version) {
+void SparkleTable::RegretGet(T* tx, const K k, size_t version) {
+    DLOG(INFO) << "regret get" << tx->id << std::endl;
     Table::Put(k, [&](V& _v) {
+        auto guard = std::lock_guard{_v.mu};
         auto vit = _v.entries.begin();
         auto end = _v.entries.end();
         while (vit != end) {
@@ -142,8 +149,10 @@ void SparkleTable::RegretGet(T* tx, const K& k, size_t version) {
 /// @brief undo a put operation and abort all dependent transactions
 /// @param tx the transaction that previously put into this entry
 /// @param k the key of this put entry
-void SparkleTable::RegretPut(T* tx, const K& k) {
+void SparkleTable::RegretPut(T* tx, const K k) {
+    DLOG(INFO) << "regret put" << tx->id << std::endl;
     Table::Put(k, [&](V& _v) {
+        auto guard = std::lock_guard{_v.mu};
         auto vit = _v.entries.begin();
         auto end = _v.entries.end();
         while (vit != end) {
@@ -157,7 +166,9 @@ void SparkleTable::RegretPut(T* tx, const K& k) {
             }
             break;
         }
-        _v.entries.erase(vit);
+        if (vit != end) {
+            _v.entries.erase(vit);
+        }
     });
 }
 
@@ -165,8 +176,10 @@ void SparkleTable::RegretPut(T* tx, const K& k) {
 /// @param tx the transaction that previously read this entry
 /// @param k the key of read entry
 /// @param version the version of read entry, which indicates the transaction that writes this value
-void SparkleTable::ClearGet(T* tx, const K& k, size_t version) {
+void SparkleTable::ClearGet(T* tx, const K k, size_t version) {
+    DLOG(INFO) << "clear get " << tx->id << std::endl;
     Table::Put(k, [&](V& _v) {
+        auto guard = std::lock_guard{_v.mu};
         auto vit = _v.entries.begin();
         auto end = _v.entries.end();
         while (vit != end) {
@@ -174,6 +187,7 @@ void SparkleTable::ClearGet(T* tx, const K& k, size_t version) {
                 vit->readers.erase(tx);
                 break;
             }
+            ++vit;
         }
         if (version == 0) {
             _v.readers_default.erase(tx);
@@ -184,8 +198,10 @@ void SparkleTable::ClearGet(T* tx, const K& k, size_t version) {
 /// @brief remove versions preceeding current transaction
 /// @param tx the transaction the previously wrote this entry
 /// @param k the key of written entry
-void SparkleTable::ClearPut(T* tx, const K& k) {
+void SparkleTable::ClearPut(T* tx, const K k) {
+    DLOG(INFO) << "regret put" << tx->id << std::endl;
     Table::Put(k, [&](V& _v) {
+        auto guard = std::lock_guard{_v.mu};
         while (_v.entries.size() && _v.entries.front().version < tx->id) {
             _v.entries.pop_front();
         }
@@ -206,8 +222,10 @@ Sparkle::Sparkle(Workload& workload, size_t n_threads, size_t table_partitions):
 void Sparkle::Start() {
     stop_flag.store(false);
     for (size_t i = 0; i != n_threads; ++i) {
-        executors.push_back(SparkleExecutor(*this));
-        threads.emplace_back(std::move(std::thread([&](){ executors.back().Run(); })));
+        executors.push_back(std::make_unique<SparkleExecutor>(*this));
+    }
+    for (size_t i = 0; i != n_threads; ++i) {
+        this->workers.push_back(std::thread([this, i] { executors[i]->Run(); }));
     }
 }
 
@@ -215,7 +233,7 @@ void Sparkle::Start() {
 /// @return statistics of this execution
 Statistics Sparkle::Stop() {
     stop_flag.store(true);
-    for (auto& worker: threads) {
+    for (auto& worker: workers) {
         worker.join();
     }
     return this->statistics;
@@ -240,89 +258,86 @@ SparkleExecutor::SparkleExecutor(Sparkle& sparkle):
 
 /// @brief start an executor
 void SparkleExecutor::Run() { while (!stop_flag.load()) {
-    auto tx = T(std::move(workload.Next()), last_execute.fetch_add(1));
+    auto tx = std::unique_ptr<T>(new T(std::move(workload.Next()), last_execute.fetch_add(1)));
     auto start = steady_clock::now();
-    tx.UpdateSetStorageHandler([&](
+    tx->UpdateSetStorageHandler([&](
         const evmc::address &addr, 
         const evmc::bytes32 &key, 
         const evmc::bytes32 &value
     ) {
-        DLOG(INFO) << tx.id << " set";
+        DLOG(INFO) << tx->id << " set";
         auto _key   = std::make_tuple(addr, key);
-        auto version = size_t{0};
-        while (!table.Lock(&tx, _key)) {
-            DLOG(INFO) << tx.id << " lock";
-        }
         // when there exists some key, do this
-        for (auto& tup: tx.tuples_put) {
+        for (auto& tup: tx->tuples_put) {
             if (std::get<0>(tup) == _key) {
                 std::get<1>(tup) = value;
                 return evmc_storage_status::EVMC_STORAGE_MODIFIED;
             }
         }
         // else just push back
-        tx.tuples_put.push_back(std::make_tuple(_key, value));
+        tx->tuples_put.push_back(std::make_tuple(_key, value));
         return evmc_storage_status::EVMC_STORAGE_MODIFIED;
     });
-    tx.UpdateGetStorageHandler([&](
+    tx->UpdateGetStorageHandler([&](
         const evmc::address &addr, 
         const evmc::bytes32 &key
     ) {
-        DLOG(INFO) << tx.id << " get";
+        DLOG(INFO) << tx->id << " get";
         auto _key   = std::make_tuple(addr, key);
         auto value  = evmc::bytes32{0};
         auto version = size_t{0};
         // one key from one transaction will be commited once
-        for (auto& tup: tx.tuples_put) {
+        for (auto& tup: tx->tuples_put) {
             if (std::get<0>(tup) == _key) {
                 return std::get<1>(tup);
             }
         }
-        for (auto& tup: tx.tuples_get) {
+        for (auto& tup: tx->tuples_get) {
             if (std::get<0>(tup) == _key) {
                 return std::get<1>(tup);
             }
         }
-        table.Get(&tx, _key, value, version);
-        tx.tuples_get.push_back(std::make_tuple(_key, value, version));
+        table.Get(tx.get(), _key, value, version);
+        tx->tuples_get.push_back(std::make_tuple(_key, value, version));
         return value;
     });
-    tx.rerun_flag.store(true);
+    tx->rerun_flag.store(true);
     while (true) {
-        DLOG(INFO) << "recycle " << tx.id << " finalized " << last_finalized.load();
-        if (tx.rerun_flag.load()) {
+        DLOG(INFO) << "recycle " << tx->id << " finalized " << last_finalized.load();
+        if (tx->rerun_flag.load()) {
             // sweep all operations from previous execution
-            for (auto entry: tx.tuples_get) {
-                table.RegretGet(&tx, std::get<0>(entry), std::get<2>(entry));
+            for (auto entry: tx->tuples_get) {
+                table.RegretGet(tx.get(), std::get<0>(entry), std::get<2>(entry));
             }
-            for (auto entry: tx.tuples_put) {
-                table.RegretPut(&tx, std::get<0>(entry));
+            for (auto entry: tx->tuples_put) {
+                table.RegretPut(tx.get(), std::get<0>(entry));
             }
-            tx.Reset();
+            tx->Reset();
             // execute and try to commit
-            DLOG(INFO) << "execute (in) " << tx.id;
+            DLOG(INFO) << "execute (in) " << tx->id;
             statistics.JournalExecute();
-            tx.Execute();
-            DLOG(INFO) << "execute (out) " << tx.id;
-            if (tx.rerun_flag.load()) { continue; }
-            for (auto entry: tx.tuples_put) {
-                table.Put(&tx, std::get<0>(entry), std::get<1>(entry));
+            tx->Execute();
+            DLOG(INFO) << "execute (out) " << tx->id;
+            if (tx->rerun_flag.load()) { continue; }
+            for (auto entry: tx->tuples_put) {
+                table.Put(tx.get(), std::get<0>(entry), std::get<1>(entry));
             }
         }
-        else if (last_finalized.load() + 1 == tx.id) {
+        else if (last_finalized.load() + 1 == tx->id) {
             // here no previous transaction will affect the result of this transaction. 
             // therefore, we can determine inaccessible values and remove them. 
-            for (auto entry: tx.tuples_get) {
-                table.ClearGet(&tx, std::get<0>(entry), std::get<2>(entry));
+            for (auto entry: tx->tuples_get) {
+                table.ClearGet(tx.get(), std::get<0>(entry), std::get<2>(entry));
             }
-            for (auto entry: tx.tuples_put) {
-                table.ClearPut(&tx, std::get<0>(entry));
+            for (auto entry: tx->tuples_put) {
+                table.ClearPut(tx.get(), std::get<0>(entry));
             }
             last_finalized.fetch_add(1);
             break;
         }
+        std::this_thread::yield();
     }
-    DLOG(INFO) << "commit " << tx.id;
+    DLOG(INFO) << "commit " << tx->id;
     auto latency = duration_cast<microseconds>(steady_clock::now() - start).count();
     statistics.JournalCommit(latency);
 }}

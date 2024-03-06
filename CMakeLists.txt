@@ -84,7 +84,7 @@ if(CMAKE_SYSTEM_PROCESSOR STREQUAL x86_64)
 endif()
 
 add_compile_options(
-    -O0 -ggdb
+    -O2 -ggdb
     -Wall -Wno-reorder -Wno-attributes
     -DNDEBUG
     -DPROJECT_VERSION="0.12.0-dev"

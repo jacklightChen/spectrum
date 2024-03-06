@@ -167,6 +167,7 @@ void SpectrumTable::ClearGet(T* tx, const K& k, size_t version) {
                 vit->readers.erase(tx);
                 break;
             }
+            ++vit;
         }
         if (version == 0) {
             _v.readers_default.erase(tx);
@@ -201,8 +202,10 @@ Spectrum::Spectrum(Workload& workload, size_t n_threads, size_t table_partitions
 void Spectrum::Start() {
     stop_flag.store(false);
     for (size_t i = 0; i != n_threads; ++i) {
-        executors.push_back(SpectrumExecutor(*this));
-        threads.emplace_back(std::move(std::thread([&](){ executors.back().Run(); })));
+        executors.push_back(std::make_unique<SpectrumExecutor>(*this));
+    }
+    for (size_t i = 0; i != n_threads; ++i) {
+        this->workers.push_back(std::thread([this, i] { executors[i]->Run(); }));
     }
 }
 
@@ -210,7 +213,7 @@ void Spectrum::Start() {
 /// @return statistics of this execution
 Statistics Spectrum::Stop() {
     stop_flag.store(true);
-    for (auto& worker: threads) {
+    for (auto& worker: workers) {
         worker.join();
     }
     return this->statistics;
@@ -281,7 +284,6 @@ std::unique_ptr<T> SpectrumExecutor::Create() {
         });
         return value;
     });
-    DLOG(INFO) << "here";
     DLOG(INFO) << "spectrum execute " << tx->id;
     tx->Execute();
     statistics.JournalExecute();
@@ -290,36 +292,36 @@ std::unique_ptr<T> SpectrumExecutor::Create() {
 
 /// @brief rollback transaction with given rollback signal
 /// @param tx the transaction to rollback
-void SpectrumExecutor::ReExecute(SpectrumTransaction& tx) {
-    DLOG(INFO) << "spectrum re-execute " << tx.id;
+void SpectrumExecutor::ReExecute(SpectrumTransaction* tx) {
+    DLOG(INFO) << "spectrum re-execute " << tx->id;
     // get current rerun keys
     std::vector<K> rerun_keys{};
     {
-        auto guard = std::lock_guard{tx.rerun_keys_mu}; 
-        std::swap(tx.rerun_keys, rerun_keys);
+        auto guard = std::lock_guard{tx->rerun_keys_mu}; 
+        std::swap(tx->rerun_keys, rerun_keys);
     }
     auto back_to = ~size_t{0};
     // find checkpoint 
     for (auto& key: rerun_keys) {
-        for (size_t i = 0; i < tx.tuples_get.size(); ++i) {
-            if (tx.tuples_get[i].key != key) { continue; }
+        for (size_t i = 0; i < tx->tuples_get.size(); ++i) {
+            if (tx->tuples_get[i].key != key) { continue; }
             back_to = std::min(i, back_to); break;
         }
     }
     // good news: we don't have to rollback
     if (back_to == ~size_t{0}) { return; }
     // bad news: we have to rollback
-    auto& tup = tx.tuples_get[back_to];
-    tx.ApplyCheckpoint(tup.checkpoint_id);
-    for (size_t i = tup.tuples_put_len; i < tx.tuples_put.size(); ++i) {
-        table.RegretPut(&tx, tx.tuples_put[i].key);
+    auto& tup = tx->tuples_get[back_to];
+    tx->ApplyCheckpoint(tup.checkpoint_id);
+    for (size_t i = tup.tuples_put_len; i < tx->tuples_put.size(); ++i) {
+        table.RegretPut(tx, tx->tuples_put[i].key);
     }
-    for (size_t i = back_to; i < tx.tuples_put.size(); ++i) {
-        table.RegretGet(&tx, tx.tuples_get[i].key, tx.tuples_get[i].version);
+    for (size_t i = back_to; i < tx->tuples_put.size(); ++i) {
+        table.RegretGet(tx, tx->tuples_get[i].key, tx->tuples_get[i].version);
     }
-    tx.tuples_put.resize(tup.tuples_put_len);
-    tx.tuples_get.resize(back_to);
-    tx.Execute();
+    tx->tuples_put.resize(tup.tuples_put_len);
+    tx->tuples_get.resize(back_to);
+    tx->Execute();
     statistics.JournalExecute();
 }
 
@@ -340,7 +342,7 @@ void SpectrumExecutor::Run() {while (!stop_flag.load()) {
     }
     if (tx->HasRerunKeys()) {
         // sweep all operations from previous execution
-        ReExecute(*tx);
+        ReExecute(tx.get());
         if (tx->HasRerunKeys()) { goto REQUEUE; }
         // commit all results
         for (auto entry: tx->tuples_put) {
