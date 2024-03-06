@@ -40,7 +40,7 @@ bool SpectrumTransaction::HasRerunKeys() {
 void SpectrumTransaction::AddRerunKeys(const K& key, size_t cause_id) {
     auto guard = std::lock_guard{rerun_keys_mu};
     rerun_keys.push_back(key);
-    should_wait = std::min(should_wait, cause_id);
+    should_wait = std::max(should_wait, cause_id);
 }
 
 /// @brief the multi-version table for spectrum
@@ -330,18 +330,17 @@ void SpectrumExecutor::ReExecute(SpectrumTransaction* tx) {
 /// @brief start an executor
 void SpectrumExecutor::Run() {while (!stop_flag.load()) {
     if (last_execute.load() - last_finalized.load() < this->queue_amplification) {
-        queue.enqueue(std::move(Create()));
+        queue.Push(std::move(Create()));
         continue;
     }
-    auto tx = std::unique_ptr<T>(nullptr);
-    queue.try_dequeue(tx);
+    auto tx = queue.Pop().value_or(std::unique_ptr<T>(nullptr));
     if (tx.get() == nullptr) {
         LOG(WARNING) << "queue is empty, performance may deteriorate. ";
         continue;
     }
     if (last_finalized.load() < tx->should_wait) {
         DLOG(INFO) << "requeue " << tx->id;
-        queue.enqueue(std::move(tx));
+        queue.Push(std::move(tx));
         continue;
     }
     while (true) {
@@ -369,7 +368,7 @@ void SpectrumExecutor::Run() {while (!stop_flag.load()) {
             break;
         }
         else {
-            queue.enqueue(std::move(tx));
+            queue.Push(std::move(tx));
             break;
         }
     }

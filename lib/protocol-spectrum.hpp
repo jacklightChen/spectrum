@@ -86,11 +86,11 @@ class LockQueue {
     public:
     void Push(X&& x) {
         auto guard = std::lock_guard{mu};
-        queue.push_back(std::move(x));
+        queue.push(std::move(x));
     }
     std::optional<X> Pop() {
         auto guard = std::lock_guard{mu};
-        if (queue.is_empty()) {
+        if (queue.size() == 0) {
             return std::nullopt;
         }
         else {
@@ -102,7 +102,7 @@ class LockQueue {
 
 };
 
-using ConQueue = ConcurrentQueue<std::unique_ptr<T>>;
+using ConQueue = LockQueue<std::unique_ptr<T>>;
 
 class Spectrum: virtual public Protocol {
 
