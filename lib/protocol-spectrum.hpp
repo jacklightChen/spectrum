@@ -8,6 +8,7 @@
 #include <vector>
 #include <unordered_set>
 #include <thread>
+#include <conqueue/concurrentqueue.h>
 
 namespace spectrum {
 
@@ -18,11 +19,16 @@ namespace spectrum {
 
 struct SpectrumTransaction: public Transaction {
     size_t      id;
+    size_t      should_wait;
+    bool        first_run{false};
+    std::chrono::time_point<std::chrono::steady_clock>  start_time;
     std::vector<std::tuple<K, evmc::bytes32, size_t>>   tuples_get{};
     std::vector<std::tuple<K, evmc::bytes32>>           tuples_put{};
-    std::atomic<bool>   rerun_flag{false};
+    std::mutex       rerun_keys_mu;
+    std::vector<K>   rerun_keys{false};
     SpectrumTransaction(Transaction&& inner, size_t id);
-    void Reset();
+    bool HasRerunKeys();
+    void AddRerunKeys(const K& key, size_t cause_id);
 };
 
 struct SpectrumEntry {
@@ -55,18 +61,21 @@ struct SpectrumTable: private Table<K, V, KeyHasher> {
 
 class SpectrumExecutor;
 
+using ConQueue = moodycamel::ConcurrentQueue<std::unique_ptr<T>>;
+
 class Spectrum: virtual public Protocol {
 
     private:
     size_t              n_threads;
     Workload&           workload;
+    ConQueue            queue;
     SpectrumTable       table;
     Statistics          statistics;
     std::atomic<size_t> last_execute{1};
     std::atomic<size_t> last_finalized{1};
     std::atomic<bool>   stop_flag{false};
-    std::vector<SpectrumExecutor>    executors{};
-    std::vector<std::thread>        threads{};
+    std::vector<SpectrumExecutor>       executors{};
+    std::vector<std::thread>            threads{};
     friend class SpectrumExecutor;
 
     public:
@@ -79,8 +88,10 @@ class Spectrum: virtual public Protocol {
 
 class SpectrumExecutor {
 
+
     private:
     Workload&               workload;
+    ConQueue&               queue;
     SpectrumTable&          table;
     Statistics&             statistics;
     std::atomic<size_t>&    last_execute;
