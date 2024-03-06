@@ -118,7 +118,7 @@ target_compile_features(
 )
 target_link_libraries(
     spectrum
-    PUBLIC evmc intx::intx
+    PUBLIC evmc intx::intx glog
     PRIVATE ethash::keccak fmt
 )
 

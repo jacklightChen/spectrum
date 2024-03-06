@@ -28,6 +28,7 @@ struct SparkleTransaction: public Transaction {
 struct SparkleEntry {
     evmc::bytes32   value;
     size_t          version;
+    // we store raw pointers here because when a transaction is destructed, it always removes itself from table. 
     std::unordered_set<T*>  readers;
 };
 
@@ -35,6 +36,8 @@ struct SparkleVersionList {
     std::mutex  mu;
     T*          tx = nullptr;
     std::list<SparkleEntry> entries;
+    // readers that read default value
+    std::unordered_set<T*>  readers_default;
 };
 
 struct SparkleTable: private Table<K, V, KeyHasher> {

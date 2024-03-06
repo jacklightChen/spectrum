@@ -4,6 +4,7 @@
 #include <functional>
 #include <thread>
 #include <chrono>
+#include <glog/logging.h>
 
 /*
     This is a implementation of "Aria: A Fast and Practical Deterministic OLTP Database" (Yi Lu, Xiangyao Yu, Lei Cao, Samuel Madden). 
@@ -58,6 +59,8 @@ void SparkleTable::Get(T* tx, const K& k, evmc::bytes32& v, size_t& version) {
             rit->readers.insert(tx);
             return;
         }
+        version = 0;
+        _v.readers_default.insert(tx);
     });
 }
 
@@ -66,13 +69,14 @@ void SparkleTable::Get(T* tx, const K& k, evmc::bytes32& v, size_t& version) {
 /// @param k the key of the written entry
 /// @param v the value to write
 void SparkleTable::Put(T* tx, const K& k, const evmc::bytes32& v) {
+    CHECK(tx->id > 0) << "we reserve version(0) for default value";
     Table::Put(k, [&](V& _v) {
         _v.tx = nullptr;
         auto guard = std::lock_guard{_v.mu};
         auto rit = _v.entries.rbegin();
         auto end = _v.entries.rend();
         // search from insertion position
-        while (rit != end && rit->version != tx->id) {
+        while (rit != end) {
             if (rit->version > tx->id) {
                 ++rit; continue;
             }
@@ -83,6 +87,11 @@ void SparkleTable::Put(T* tx, const K& k, const evmc::bytes32& v) {
                 }
             }
             break;
+        }
+        for (auto _tx: _v.readers_default) {
+            if (_tx->id > tx->id) {
+                _tx->rerun_flag.store(true);
+            }
         }
         // insert an entry
         _v.entries.insert(rit.base(), SparkleEntry {
@@ -125,6 +134,9 @@ void SparkleTable::RegretGet(T* tx, const K& k, size_t version) {
             vit->readers.erase(tx);
             break;
         }
+        if (version == 0) {
+            _v.readers_default.erase(tx);
+        }
     });
 }
 
@@ -164,6 +176,9 @@ void SparkleTable::ClearGet(T* tx, const K& k, size_t version) {
                 vit->readers.erase(tx);
                 break;
             }
+        }
+        if (version == 0) {
+            _v.readers_default.erase(tx);
         }
     });
 }
