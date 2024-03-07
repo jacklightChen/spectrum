@@ -54,6 +54,5 @@ If you clang is not 17 by default, use the following command for building with c
 CXX=clang++-17 CC=clang-17 cmake -S . -B build
 ```
 
-
 # Experiments
 
