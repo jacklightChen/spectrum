@@ -1,9 +1,10 @@
 # TODO
 
-- [ ] Zipf
+- [x] Zipf
+- [x] Aria w/o Reordering
 - [ ] Calvin
 - [ ] TPC-C
-- [ ] Test New Transaction Protocol on Serial
+- [ ] Serial
 
 # Instructions
 
@@ -56,3 +57,12 @@ CXX=clang++-17 CC=clang-17 cmake -S . -B build
 
 # Experiments
 
+Currently Aria, Sparkle and Spectrum all works properly. 
+
+```sh
+./build/bench Aria:8:32:32:TRUE   Smallbank:1000000:2.0 5000ms
+./build/bench Aria:8:32:32:FALSE  Smallbank:1000000:1.5 5000ms
+./build/bench Sparkle:8:32        Smallbank:1000000:0.5 5000ms
+./build/bench Spectrum:8:32:32:STRAWMAN       Smallbank:1000000:0.5 5000ms
+./build/bench Spectrum:8:32:32:COPYONWRITE    Smallbank:1000000:0.5 5000ms
+```

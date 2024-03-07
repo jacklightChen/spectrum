@@ -1,5 +1,14 @@
 cmake_minimum_required(VERSION 3.16...3.27)
 
+# -- Configure project compiler options
+project(spectrum LANGUAGES CXX C)
+set(CMAKE_CXX_STANDARD 20)
+set(CMAKE_CXX_STANDARD_REQUIRED ON)
+set(CMAKE_EXPORT_COMPILE_COMMANDS true)
+
+option(DEBUG OFF)
+option(EVM_PRINT_INSTRUCTIONS "print each evm instruction on instruction start" 0)
+
 # -- Manage External Dependencies
 include(FetchContent)
 FetchContent_Declare(
@@ -25,7 +34,7 @@ FetchContent_Declare(
 FetchContent_Declare(
     glog
     GIT_REPOSITORY      "https://github.com/google/glog"
-    GIT_TAG             "v0.7.0-rc1"
+    GIT_TAG             "v0.7.0"
 )
 FetchContent_Declare(
     ethash
@@ -44,15 +53,6 @@ FetchContent_Declare(
 )
 FetchContent_MakeAvailable(glog gtest ethash intx fmt evmc thread_pool conqueue)
 set(gtest_force_shared_crt ON CACHE BOOL "" FORCE)
-
-# -- Configure project compiler options
-project(spectrum LANGUAGES CXX C)
-set(CMAKE_CXX_STANDARD 20)
-set(CMAKE_CXX_STANDARD_REQUIRED ON)
-set(CMAKE_EXPORT_COMPILE_COMMANDS true)
-
-option(DEBUG OFF)
-option(EVM_PRINT_INSTRUCTIONS "print each evm instruction on instruction start" 0)
 
 # -- Determine Compile Definitions
 if(CMAKE_SYSTEM_PROCESSOR STREQUAL x86_64)
@@ -78,7 +78,7 @@ endif()
 
 if(DEBUG)
     add_compile_options(
-        -O2 -Wall -Wno-reorder -Wno-attributes
+        -O0 -ggdb -Wall -Wno-reorder -Wno-attributes
         -DPROJECT_VERSION="0.12.0-dev"
         -DEVMONE_X86_64_ARCH_LEVEL=${EVMONE_X86_64_ARCH_LEVEL}
         -DEVM_PRINT_INSTRUCTIONS=${EVM_PRINT_INSTRUCTIONS}
