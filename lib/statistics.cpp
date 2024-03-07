@@ -3,30 +3,35 @@
 #include <fmt/chrono.h>
 #include <fmt/format.h>
 #include <fmt/args.h>
+#include <iostream>
+#include <glog/logging.h>
 
 namespace spectrum {
 
 void Statistics::JournalCommit(size_t latency) {
-    count_commit.fetch_add(1);
+    auto guard = std::lock_guard{mu};
+    count_commit+= 1;
     if (latency <= 25) {
-        count_latency_25ms.fetch_add(1);
+        count_latency_25ms+= 1;
     }
     else if (latency <= 50) {
-        count_latency_50ms.fetch_add(1);
+        count_latency_50ms+= 1;
     }
     else if (latency <= 100) {
-        count_latency_100ms.fetch_add(1);
+        count_latency_100ms+= 1;
     }
     else {
-        count_latency_100ms_above.fetch_add(1);
+        count_latency_100ms_above+= 1;
     }
 }
 
 void Statistics::JournalExecute() {
-    count_execution.fetch_add(1);
+    auto guard = std::lock_guard{mu};
+    count_execution += 1;
 }
 
 void Statistics::Print() {
+    auto guard = std::lock_guard{mu};
     fmt::print(
         "@{}\n"
         "commit        {}\n"
@@ -36,16 +41,17 @@ void Statistics::Print() {
         "100ms         {}\n"
         ">100ms        {}\n",
         std::chrono::system_clock::now(),
-        count_commit.load(),
-        count_execution.load(),
-        count_latency_25ms.load(),
-        count_latency_50ms.load(),
-        count_latency_100ms.load(),
-        count_latency_100ms_above.load()
+        count_commit,
+        count_execution,
+        count_latency_25ms,
+        count_latency_50ms,
+        count_latency_100ms,
+        count_latency_100ms_above
     );
 }
 
 void Statistics::PrintWithDuration(std::chrono::milliseconds duration) {
+    auto guard = std::lock_guard{mu};
     #define AVG(X) ((double)(X) / (double)(duration.count()) * (double)(1000))
     fmt::print(
         "@{}\n"
@@ -58,12 +64,12 @@ void Statistics::PrintWithDuration(std::chrono::milliseconds duration) {
         ">100ms        {:.4f} tx/s\n",
         std::chrono::system_clock::now(),
         duration,
-        AVG(count_commit.load()),
-        AVG(count_execution.load()),
-        AVG(count_latency_25ms.load()),
-        AVG(count_latency_50ms.load()),
-        AVG(count_latency_100ms.load()),
-        AVG(count_latency_100ms_above.load())
+        AVG(count_commit),
+        AVG(count_execution),
+        AVG(count_latency_25ms),
+        AVG(count_latency_50ms),
+        AVG(count_latency_100ms),
+        AVG(count_latency_100ms_above)
     );
     #undef AVG
 }

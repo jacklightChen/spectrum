@@ -22,8 +22,13 @@ using namespace std::chrono;
 #define NUMARGS(X...)  NUMARGS_HELPER(X, 10, 9, 8, 7, 6, 5, 4, 3, 2, 1, 0)
 
 static auto split(std::basic_string_view<char> s) {
-    return s | std::ranges::views::split(':')
+    auto iter = s | std::ranges::views::split(':')
     | std::ranges::views::transform([](auto&& str) { return std::string_view(&*str.begin(), std::ranges::distance(str)); });
+    auto toks = std::vector<std::string>();
+    for (auto x: iter) {
+        toks.push_back(std::string{x});
+    }
+    return toks;
 }
 
 template<typename T>
@@ -62,11 +67,12 @@ int main(int argc, char* argv[]) {
     google::InitGoogleLogging(argv[0]);
     gflags::ParseCommandLineFlags(&argc, &argv, true);
     CHECK(argc == 4);
+    auto statistics = std::unique_ptr<Statistics>();
     #define INT     to<size_t>(*iter++)
     #define DOUBLE  to<double>(*iter++)
     #define BOOL    to<bool>(*iter++)
     #define EVMTYPE ParseEVMType(*iter++)
-    auto workload = [&](){
+    auto workload = [argv](){
         auto args = split(argv[2]);
         auto iter = args.begin();
         auto name = *iter++;
@@ -80,7 +86,6 @@ int main(int argc, char* argv[]) {
         throw std::runtime_error(std::string{fmt::format("unknown workload option ({})", std::string{name})});
         #undef OPT
     }();
-    auto statistics = std::unique_ptr<Statistics>();
     auto protocol = [&](){
         auto args = split(argv[1]);
         auto iter = args.begin();
@@ -89,7 +94,7 @@ int main(int argc, char* argv[]) {
             auto dist = (size_t) (std::distance(args.begin(), args.end()) - 1); \
             auto n = (size_t) NUMARGS(Y); \
             if (dist != n) throw std::runtime_error(std::string{fmt::format("protocol {} has {} args -- ({}), but we found only {} args", #X, n, #Y, dist)}); \
-            return std::unique_ptr<Protocol>(new X (*workload, *statistics, Y)); \
+            return std::unique_ptr<Protocol>(new X (*workload, *statistics.get(), Y)); \
         };
         OPT(Aria,     INT, INT, INT, BOOL)
         OPT(Sparkle,  INT, INT)
