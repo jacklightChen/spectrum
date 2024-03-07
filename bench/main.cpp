@@ -18,18 +18,21 @@ using namespace spectrum;
 using namespace std::chrono_literals;
 using namespace std::chrono;
 
+#define       NUMARGS(...)  (sizeof((size_t[]){0, ##__VA_ARGS__})/sizeof(size_t)-1)
+#define       SUM(...)  sum(NUMARGS(__VA_ARGS__), ##__VA_ARGS__)
+
 auto split(std::basic_string_view<char> s) {
     return s | std::ranges::views::split(':')
     | std::ranges::views::transform([](auto&& str) { return std::string_view(&*str.begin(), std::ranges::distance(str)); });
 }
 
-auto to_size_t(std::basic_string_view<char> s) {
+size_t to_size_t(std::basic_string_view<char> s) {
     std::stringstream sstream(std::string{s});
     size_t result; sstream >> result;
     return result;
 }
 
-auto to_bool(std::basic_string_view<char> s) {
+bool to_bool(std::basic_string_view<char> s) {
     if (s == "TRUE")    { return true; }
     if (s == "FALSE")   { return false; }
     throw std::runtime_error(std::string{fmt::format("cannot recognize ({}) as boolean should be either TRUE or FALSE", s)});
@@ -57,9 +60,9 @@ int main(int argc, char* argv[]) {
     CHECK(argc == 4);
     google::InitGoogleLogging(argv[0]);
     auto workload = [&](){
-        auto args = split(argv[2]);
-        auto name = *args.begin();
-        auto iter = args.begin();
+        // auto args = split(argv[2]);
+        // auto iter = args.begin();
+        // auto name = *iter++;
         return std::unique_ptr<Workload>(new Smallbank());
     }();
     auto protocol = [&](){
@@ -69,14 +72,14 @@ int main(int argc, char* argv[]) {
         #define INT     to_size_t(*iter++)
         #define BOOL    to_bool(*iter++)
         #define EVMTYPE ParseEVMType(*iter++)
-        #define OPT(X, N, Y) if (name == (X)) { \
-            auto dist = std::distance(args.begin(), args.end()); \
-            if (dist != N + 1) throw std::runtime_error(std::string{fmt::format("protocol ({}) has {} args, but we found {}", X, N, dist - 1)}); \
-            return std::unique_ptr<Protocol>(new Y); \
-        };
-        OPT("Aria",     4, Aria    (*workload, INT, INT, INT, BOOL))
-        OPT("Sparkle",  2, Sparkle (*workload, INT, INT))
-        OPT("Spectrum", 4, Spectrum(*workload, INT, INT, INT, EVMTYPE))
+        #define OPT(X, Y...) if (name == #X) { \
+            auto dist = (size_t) (std::distance(args.begin(), args.end()) - 1); \
+            auto n = (size_t) NUMARGS(Y); \
+            if (dist != n) throw std::runtime_error(std::string{fmt::format("protocol {} has {} args -- ({}), but we found only {} args", #X, n, #Y, dist)}); \
+            return std::unique_ptr<Protocol>(new X (*workload, Y)); };
+        OPT(Aria,     INT, INT, INT, BOOL)
+        OPT(Sparkle,  INT, INT)
+        OPT(Spectrum, INT, INT, INT, EVMTYPE)
         #undef INT
         #undef BOOL
         #undef EVMTYPE
