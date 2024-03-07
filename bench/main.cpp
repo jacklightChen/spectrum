@@ -67,7 +67,7 @@ int main(int argc, char* argv[]) {
     google::InitGoogleLogging(argv[0]);
     gflags::ParseCommandLineFlags(&argc, &argv, true);
     CHECK(argc == 4);
-    auto statistics = std::unique_ptr<Statistics>();
+    auto statistics = std::unique_ptr<Statistics>(new Statistics());
     #define INT     to<size_t>(*iter++)
     #define DOUBLE  to<double>(*iter++)
     #define BOOL    to<bool>(*iter++)
