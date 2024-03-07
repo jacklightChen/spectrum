@@ -36,5 +36,24 @@ The executable the we use is called bench. The basic usage is:
 ./build/bench [PROTOCOL] [WORKLOAD] [BENCH TIME]
 ```
 
+# Caution
+
+This project heavily used CXX 20 features. 
+
+Therefore, to compile this project, you either need clang >= 17 or gcc/g++ >= 12 . 
+
+If you have apt (Advanced Packaging Tool), you can use the following command to install clang 17. 
+
+```
+wget -qO- https://apt.llvm.org/llvm.sh | sudo bash -s 17
+```
+
+If you clang is not 17 by default, use the following command for building with clang. 
+
+```sh
+CXX=clang++-17 CC=clang-17 cmake -S . -B build
+```
+
+
 # Experiments
 
