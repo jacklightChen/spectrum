@@ -30,7 +30,7 @@ FetchContent_Declare(
 FetchContent_Declare(
     ethash
     GIT_REPOSITORY      "https://github.com/chfast/ethash"
-    GIT_TAG             "v1.0.0"
+    GIT_TAG             "v1.0.1"
 )
 FetchContent_Declare(
     intx

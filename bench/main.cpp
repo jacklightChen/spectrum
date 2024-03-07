@@ -66,29 +66,29 @@ int main(int argc, char* argv[]) {
     #define BOOL    to<bool>(*iter++)
     #define EVMTYPE ParseEVMType(*iter++)
     auto workload = [&](){
+        auto args = split(argv[2]);
+        auto iter = args.begin();
+        auto name = *iter++;
         #define OPT(X, Y...) if (name == #X) { \
             auto dist = (size_t) (std::distance(args.begin(), args.end()) - 1); \
             auto n = (size_t) NUMARGS(Y); \
             if (dist != n) throw std::runtime_error(std::string{fmt::format("protocol {} has {} args -- ({}), but we found only {} args", #X, n, #Y, dist)}); \
             return std::unique_ptr<Workload>(new X (Y)); \
         };
-        auto args = split(argv[2]);
-        auto iter = args.begin();
-        auto name = *iter++;
-        OPT(Smallbank, INT, DOUBLE);
-        throw std::runtime_error(std::string{fmt::format("unknown w option ({})", std::string{name})});
+        OPT(Smallbank, INT, DOUBLE)
+        throw std::runtime_error(std::string{fmt::format("unknown workload option ({})", std::string{name})});
         #undef OPT
     }();
     auto protocol = [&](){
+        auto args = split(argv[1]);
+        auto iter = args.begin();
+        auto name = *iter++;
         #define OPT(X, Y...) if (name == #X) { \
             auto dist = (size_t) (std::distance(args.begin(), args.end()) - 1); \
             auto n = (size_t) NUMARGS(Y); \
             if (dist != n) throw std::runtime_error(std::string{fmt::format("protocol {} has {} args -- ({}), but we found only {} args", #X, n, #Y, dist)}); \
             return std::unique_ptr<Protocol>(new X (*workload, Y)); \
         };
-        auto args = split(argv[1]);
-        auto iter = args.begin();
-        auto name = *iter++;
         OPT(Aria,     INT, INT, INT, BOOL)
         OPT(Sparkle,  INT, INT)
         OPT(Spectrum, INT, INT, INT, EVMTYPE)
