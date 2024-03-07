@@ -79,7 +79,7 @@ int main(int argc, char* argv[]) {
         #define OPT(X, Y...) if (name == #X) { \
             auto dist = (size_t) (std::distance(args.begin(), args.end()) - 1); \
             auto n = (size_t) NUMARGS(Y); \
-            if (dist != n) throw std::runtime_error(std::string{fmt::format("protocol {} has {} args -- ({}), but we found only {} args", #X, n, #Y, dist)}); \
+            if (dist != n) throw std::runtime_error(std::string{fmt::format("protocol {} has {} args -- ({}), but we found {} args", #X, n, #Y, dist)}); \
             return std::unique_ptr<Workload>(new X (Y)); \
         };
         OPT(Smallbank, INT, DOUBLE)
@@ -93,7 +93,7 @@ int main(int argc, char* argv[]) {
         #define OPT(X, Y...) if (name == #X) { \
             auto dist = (size_t) (std::distance(args.begin(), args.end()) - 1); \
             auto n = (size_t) NUMARGS(Y); \
-            if (dist != n) throw std::runtime_error(std::string{fmt::format("protocol {} has {} args -- ({}), but we found only {} args", #X, n, #Y, dist)}); \
+            if (dist != n) throw std::runtime_error(std::string{fmt::format("protocol {} has {} args -- ({}), but we found {} args", #X, n, #Y, dist)}); \
             return std::unique_ptr<Protocol>(new X (*workload, *statistics.get(), Y)); \
         };
         OPT(Aria,     INT, INT, INT, BOOL)
