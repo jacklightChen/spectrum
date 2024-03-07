@@ -20,11 +20,12 @@ using namespace std::chrono;
 /// @param n_threads the number of threads in thread pool
 /// @param table_partitions the number of partitions in table
 Aria::Aria(
-    Workload& workload, 
+    Workload& workload, Statistics& statistics,
     size_t n_threads, size_t table_partitions,
     size_t batch_size, bool enable_reordering
 ):
     workload{workload},
+    statistics{statistics},
     batch_size{batch_size},
     table_partitions{table_partitions},
     pool{(unsigned int) n_threads},
@@ -45,7 +46,8 @@ void Aria::ParallelEach(
             if (batch[i] == std::nullopt) {
                 batch[i].emplace(std::move(this->NextTransaction()));
             }
-            map(*batch[i].value());
+            auto tx = batch[i].value().get();
+            map(*tx);
         }
     ).wait();
 }
@@ -60,7 +62,7 @@ std::unique_ptr<T> Aria::NextTransaction() {
 /// @brief start aria protocol
 void Aria::Start() {
     DLOG(INFO) << "aria start";
-    auto batch_count = int{0};
+    auto batch_count = (int volatile){0};
     // this macro computes the latency of one transaction
     #define LATENCY duration_cast<microseconds>(steady_clock::now() - tx.start_time).count()
     pool.detach_task([&]() {while(!stop_flag.load()) {
@@ -112,18 +114,10 @@ void Aria::Start() {
 
 /// @brief stop aria protocol and return statistics
 /// @return statistics of current execution
-Statistics Aria::Stop() {
-    this->stop_flag.store(true);
-    this->pool.wait();
+void Aria::Stop() {
+    stop_flag.store(true);
+    pool.wait();
     DLOG(INFO) << "aria stop";
-    return this->statistics;
-}
-
-
-/// @brief report aria statistics
-/// @return current statistics of aria execution
-Statistics Aria::Report() {
-    return this->statistics;
 }
 
 /// @brief construct an empty aria transaction
@@ -174,8 +168,10 @@ void AriaTable::ReservePut(T* tx, const K& k) {
 bool AriaTable::CompareReservedGet(T* tx, const K& k) {
     bool eq = true;
     Table::Get(k, [&](auto entry) {
-        eq = entry.reserved_get_tx == nullptr || 
-             entry.reserved_get_tx->id >= tx->id;
+        eq = entry.batch_id_get == tx->batch_id && (
+            entry.reserved_get_tx == nullptr || 
+            entry.reserved_get_tx->id >= tx->id
+        );
     });
     return eq;
 }
@@ -187,8 +183,10 @@ bool AriaTable::CompareReservedGet(T* tx, const K& k) {
 bool AriaTable::CompareReservedPut(T* tx, const K& k) {
     bool eq = true;
     Table::Get(k, [&](auto entry) {
-        eq = entry.reserved_put_tx == nullptr || 
-             entry.reserved_put_tx->id >= tx->id;
+        eq = entry.batch_id_put == tx->batch_id && (
+            entry.reserved_put_tx == nullptr || 
+            entry.reserved_put_tx->id >= tx->id
+        );
     });
     return eq;
 }

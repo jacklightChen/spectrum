@@ -59,8 +59,9 @@ static auto to_duration(std::basic_string_view<char> s) {
 }
 
 int main(int argc, char* argv[]) {
-    CHECK(argc == 4);
     google::InitGoogleLogging(argv[0]);
+    gflags::ParseCommandLineFlags(&argc, &argv, true);
+    CHECK(argc == 4);
     #define INT     to<size_t>(*iter++)
     #define DOUBLE  to<double>(*iter++)
     #define BOOL    to<bool>(*iter++)
@@ -79,6 +80,7 @@ int main(int argc, char* argv[]) {
         throw std::runtime_error(std::string{fmt::format("unknown workload option ({})", std::string{name})});
         #undef OPT
     }();
+    auto statistics = std::unique_ptr<Statistics>();
     auto protocol = [&](){
         auto args = split(argv[1]);
         auto iter = args.begin();
@@ -87,7 +89,7 @@ int main(int argc, char* argv[]) {
             auto dist = (size_t) (std::distance(args.begin(), args.end()) - 1); \
             auto n = (size_t) NUMARGS(Y); \
             if (dist != n) throw std::runtime_error(std::string{fmt::format("protocol {} has {} args -- ({}), but we found only {} args", #X, n, #Y, dist)}); \
-            return std::unique_ptr<Protocol>(new X (*workload, Y)); \
+            return std::unique_ptr<Protocol>(new X (*workload, *statistics, Y)); \
         };
         OPT(Aria,     INT, INT, INT, BOOL)
         OPT(Sparkle,  INT, INT)
@@ -102,6 +104,6 @@ int main(int argc, char* argv[]) {
     auto start_time = steady_clock::now();
     protocol->Start();
     std::this_thread::sleep_for(to_duration(argv[3]));
-    auto statistics = protocol->Stop();
-    statistics.PrintWithDuration(duration_cast<milliseconds>(steady_clock::now() - start_time));
+    protocol->Stop();
+    statistics->PrintWithDuration(duration_cast<milliseconds>(steady_clock::now() - start_time));
 }

@@ -65,14 +65,14 @@ struct AriaLockTable: public Table<K, AriaLockEntry, KeyHasher> {
 class Aria: public Protocol {
 
     private:
-    Statistics          statistics;
+    Statistics&         statistics;
     Workload&           workload;
     size_t              batch_size;
     size_t              table_partitions;
     AriaTable           table;
     bool                enable_reordering;
-    std::atomic<bool>   stop_flag{false};
-    std::atomic<size_t> tx_counter{1};
+    volatile std::atomic<bool>      stop_flag{false};
+    volatile std::atomic<size_t>    tx_counter{1};
     BS::thread_pool     pool;
     void ParallelEach(
         std::function<void(T&)>             map, 
@@ -81,10 +81,9 @@ class Aria: public Protocol {
     std::unique_ptr<T> NextTransaction();
 
     public:
-    Aria(Workload& workload, size_t n_threads, size_t table_partitions, size_t batch_size, bool enable_reordering);
+    Aria(Workload& workload, Statistics& statistics, size_t n_threads, size_t table_partitions, size_t batch_size, bool enable_reordering);
     void Start() override;
-    Statistics Stop() override;
-    Statistics Report() override;
+    void Stop() override;
 
 };
 

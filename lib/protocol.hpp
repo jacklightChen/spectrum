@@ -6,7 +6,7 @@ namespace spectrum {
 class Protocol {
     public:
     virtual void Start() = 0;
-    virtual Statistics Stop() = 0;
+    virtual void Stop() = 0;
     virtual Statistics Report() = 0;
 };
 

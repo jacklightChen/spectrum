@@ -63,7 +63,7 @@ class Sparkle: public Protocol {
     size_t              n_threads;
     Workload&           workload;
     SparkleTable        table;
-    Statistics          statistics;
+    Statistics&         statistics;
     volatile std::atomic<size_t> last_execute{1};
     volatile std::atomic<size_t> last_finalized{0};
     volatile std::atomic<bool>   stop_flag{false};
@@ -72,10 +72,9 @@ class Sparkle: public Protocol {
     friend class SparkleExecutor;
 
     public:
-    Sparkle(Workload& workload, size_t n_threads, size_t table_partitions);
+    Sparkle(Workload& workload, Statistics& statistics, size_t n_threads, size_t table_partitions);
     void Start() override;
-    Statistics Stop() override;
-    Statistics Report() override;
+    void Stop() override;
 
 };
 

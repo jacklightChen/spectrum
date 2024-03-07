@@ -211,8 +211,9 @@ void SparkleTable::ClearPut(T* tx, const K k) {
 /// @brief sparkle initialization parameters
 /// @param workload the transaction generator
 /// @param table_partitions the number of parallel partitions to use in the hash table
-Sparkle::Sparkle(Workload& workload, size_t n_threads, size_t table_partitions):
+Sparkle::Sparkle(Workload& workload, Statistics& statistics, size_t n_threads, size_t table_partitions):
     workload{workload},
+    statistics{statistics},
     n_threads{n_threads},
     table{table_partitions}
 {}
@@ -231,18 +232,11 @@ void Sparkle::Start() {
 
 /// @brief stop sparkle protocol
 /// @return statistics of this execution
-Statistics Sparkle::Stop() {
+void Sparkle::Stop() {
     stop_flag.store(true);
     for (auto& worker: workers) {
         worker.join();
     }
-    return this->statistics;
-}
-
-/// @brief report sparkle statistics
-/// @return current statistics of sparkle execution
-Statistics Sparkle::Report() {
-    return this->statistics;
 }
 
 /// @brief sparkle executor

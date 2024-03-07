@@ -6,18 +6,20 @@ namespace
 {
 
 using namespace std::chrono_literals;
+using namespace spectrum;
 
 TEST(Aria, JustRunSmallbank) {
-    auto workload = spectrum::Smallbank(10000, 0.0);
-    auto protocol = spectrum::Aria(
-        workload, 128 /* batch */, 
+    auto statistics = Statistics();
+    auto workload = Smallbank(10000, 0.0);
+    auto protocol = Aria(
+        workload, statistics, 128 /* batch */, 
         8 /* threads */, 32 /* table partitions */,
         true /* enable reordering */
     );
     protocol.Start();
     std::this_thread::sleep_for(1000ms);
-    auto statistics = protocol.Stop();
-    statistics.Print();
+    protocol.Stop();
+    statistics.Print();   
 }
 
 } // namespace

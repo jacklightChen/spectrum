@@ -190,8 +190,9 @@ void SpectrumTable::ClearPut(T* tx, const K& k) {
 /// @brief spectrum initialization parameters
 /// @param workload the transaction generator
 /// @param table_partitions the number of parallel partitions to use in the hash table
-Spectrum::Spectrum(Workload& workload, size_t n_threads, size_t table_partitions, size_t queue_amplification, EVMType evm_type):
+Spectrum::Spectrum(Workload& workload, Statistics& statistics, size_t n_threads, size_t table_partitions, size_t queue_amplification, EVMType evm_type):
     workload{workload},
+    statistics{statistics},
     n_threads{n_threads},
     table{table_partitions},
     queue_amplification{queue_amplification},
@@ -212,18 +213,11 @@ void Spectrum::Start() {
 
 /// @brief stop spectrum protocol
 /// @return statistics of this execution
-Statistics Spectrum::Stop() {
+void Spectrum::Stop() {
     stop_flag.store(true);
     for (auto& worker: workers) {
         worker.join();
     }
-    return this->statistics;
-}
-
-/// @brief report spectrum statistics
-/// @return current statistics of spectrum execution
-Statistics Spectrum::Report() {
-    return this->statistics;
 }
 
 /// @brief spectrum executor
