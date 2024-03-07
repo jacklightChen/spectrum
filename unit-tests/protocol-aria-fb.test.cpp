@@ -11,7 +11,8 @@ TEST(Aria, JustRunSmallbank) {
     auto workload = spectrum::Smallbank();
     auto protocol = spectrum::Aria(
         workload, 128 /* batch */, 
-        8 /* threads */, 32 /* table partitions */
+        8 /* threads */, 32 /* table partitions */,
+        true /* enable reordering */
     );
     protocol.Start();
     std::this_thread::sleep_for(2000ms);

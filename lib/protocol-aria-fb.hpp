@@ -81,7 +81,7 @@ class Aria: virtual public Protocol {
     std::unique_ptr<T> NextTransaction();
 
     public:
-    Aria(Workload& workload, size_t batch_size, size_t n_threads, size_t table_partitions);
+    Aria(Workload& workload, size_t batch_size, size_t n_threads, size_t table_partitions, bool enable_reordering);
     void Start() override;
     Statistics Stop() override;
     Statistics Report() override;

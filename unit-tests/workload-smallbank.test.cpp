@@ -5,10 +5,13 @@
 #include <evmc/evmc.hpp>
 #include <glog/logging.h>
 #include <chrono>
+#include <thread>
+#include <spectrum/statistics.hpp>
 
 namespace {
 
-using std::chrono_literals;
+using namespace std::chrono_literals;
+using namespace std::chrono;
 
 class MockTable {
 
@@ -36,8 +39,10 @@ TEST(Smallbank, JustRunWorkload) {
     auto workload    = spectrum::Smallbank();
     auto table       = MockTable();
     auto stop_flag   = std::atomic<bool>{false};
+    auto statistics  = spectrum::Statistics();
     auto handle      = std::thread([&]() { while (!stop_flag.load()) {
         auto transaction = workload.Next();
+        auto start_time  = steady_clock::now();
         transaction.UpdateGetStorageHandler(
             [&](
                 const evmc::address& addr, 
@@ -57,10 +62,13 @@ TEST(Smallbank, JustRunWorkload) {
             }
         );
         transaction.Execute();
+        statistics.JournalExecute();
+        statistics.JournalCommit(duration_cast<milliseconds>(steady_clock::now() - start_time).count());
     }});
-    std::thread::this_thread::sleep(2000ms);
+    std::this_thread::sleep_for(2000ms);
     stop_flag.store(true);
     handle.join();
+    statistics.Print();
 }
 
 }

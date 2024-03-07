@@ -20,15 +20,15 @@ using namespace std::chrono;
 /// @param table_partitions the number of partitions in table
 Aria::Aria(
     Workload& workload, size_t batch_size, 
-    size_t n_threads, size_t table_partitions
-    bool enable_reordering = false
+    size_t n_threads, size_t table_partitions,
+    bool enable_reordering
 ):
     workload{workload},
     batch_size{batch_size},
     table_partitions{table_partitions},
     pool{(unsigned int) n_threads},
-    table(table_partitions)
-    enable_reordering(enable_reordering)
+    table{table_partitions},
+    enable_reordering{enable_reordering}
 {}
 
 /// @brief execute multiple transactions in parallel
