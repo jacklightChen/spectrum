@@ -21,12 +21,14 @@ using namespace std::chrono;
 Aria::Aria(
     Workload& workload, size_t batch_size, 
     size_t n_threads, size_t table_partitions
+    bool enable_reordering = false
 ):
     workload{workload},
     batch_size{batch_size},
     table_partitions{table_partitions},
     pool{(unsigned int) n_threads},
     table(table_partitions)
+    enable_reordering(enable_reordering)
 {}
 
 /// @brief execute multiple transactions in parallel
@@ -73,7 +75,7 @@ void Aria::Start() {
         // -- first commit stage
         auto has_conflict = std::atomic<bool>{false};
         ParallelEach([&](auto& tx) {
-            AriaExecutor::Verify(tx, table);
+            AriaExecutor::Verify(tx, table, enable_reordering);
             if (tx.flag_conflict) {
                 has_conflict.store(true);
                 return;
@@ -241,7 +243,7 @@ void AriaExecutor::Reserve(T& tx, AriaTable& table) {
 /// @brief verify transaction by checking dependencies
 /// @param tx the transaction, flag_conflict will be altered
 /// @param table the aria shared table
-void AriaExecutor::Verify(T& tx, AriaTable& table) {
+void AriaExecutor::Verify(T& tx, AriaTable& table, bool enable_reordering) {
     // conceptually, we take a snapshot on the database before we execute a batch
     //  , and all transactions are executed viewing the snapshot. 
     // however, we want the global state transitioned 
@@ -261,7 +263,12 @@ void AriaExecutor::Verify(T& tx, AriaTable& table) {
         // if some write happened after write
         waw |= !table.CompareReservedPut(&tx, std::get<0>(tup));
     }
-    tx.flag_conflict = waw || (raw && war);
+    if (enable_reordering) {
+        tx.flag_conflict = waw || (raw && war);
+    }
+    else {
+        tx.flag_conflict = waw || war;
+    }
 }
 
 /// @brief commit written values into table

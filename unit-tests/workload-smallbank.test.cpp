@@ -4,8 +4,11 @@
 #include <gtest/gtest.h>
 #include <evmc/evmc.hpp>
 #include <glog/logging.h>
+#include <chrono>
 
 namespace {
+
+using std::chrono_literals;
 
 class MockTable {
 
@@ -32,7 +35,8 @@ class MockTable {
 TEST(Smallbank, JustRunWorkload) {
     auto workload    = spectrum::Smallbank();
     auto table       = MockTable();
-    for (size_t i = 0; i < 100; ++i) {
+    auto stop_flag   = std::atomic<bool>{false};
+    auto handle      = std::thread([&]() { while (!stop_flag.load()) {
         auto transaction = workload.Next();
         transaction.UpdateGetStorageHandler(
             [&](
@@ -53,7 +57,10 @@ TEST(Smallbank, JustRunWorkload) {
             }
         );
         transaction.Execute();
-    }
+    }});
+    std::thread::this_thread::sleep(2000ms);
+    stop_flag.store(true);
+    handle.join();
 }
 
 }

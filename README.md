@@ -1,4 +1,6 @@
 # TODO
 
-- [ ] Migrate Tables
+- [ ] Zipf
+- [ ] Calvin
+- [ ] TPC-C
 - [ ] Test New Transaction Protocol on Serial

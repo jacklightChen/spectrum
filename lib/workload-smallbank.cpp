@@ -76,7 +76,7 @@ inline std::string to_string(uint32_t key) {
 }
 
 Transaction Smallbank::Next() {
-    #define X to_string(Random())
+    #define X to_string(Random() % 10)
     auto option = Random() % 5;
     auto input = spectrum::from_hex([&](){switch (option) {
         case 0: return std::string{"1e010439"} + X;

@@ -70,6 +70,7 @@ class Aria: virtual public Protocol {
     size_t              batch_size;
     size_t              table_partitions;
     AriaTable           table;
+    bool                enable_reordering;
     std::atomic<bool>   stop_flag{false};
     std::atomic<size_t> tx_counter{1};
     BS::thread_pool     pool;
@@ -91,7 +92,7 @@ class Aria: virtual public Protocol {
 struct AriaExecutor {
     static void Execute(T& tx, AriaTable& table);
     static void Reserve(T& tx, AriaTable& table);
-    static void Verify(T& tx, AriaTable& table);
+    static void Verify(T& tx, AriaTable& table, bool enable_reordering);
     static void Commit(T& tx, AriaTable& table);
     static void PrepareLockTable(T& tx, AriaLockTable& lock_table);
     static void Fallback(T& tx, AriaTable& table, AriaLockTable& lock_table);
