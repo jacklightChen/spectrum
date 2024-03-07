@@ -7,6 +7,7 @@ class Random {
 
     public:
     virtual size_t Next() = 0;
+    virtual ~Random() = default;
 
 };
 
@@ -19,6 +20,7 @@ class Unif : public Random {
 
     public:
     Unif(size_t num_elements);
+    ~Unif() override = default;
     size_t Next() override;
 
 };
@@ -36,6 +38,7 @@ class Zipf : public Random {
 
     public:
     Zipf(size_t num_elements, double exponent);
+    ~Zipf() override = default;
     size_t Next() override;
 
 };

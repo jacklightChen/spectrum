@@ -63,10 +63,18 @@ static auto to_duration(std::basic_string_view<char> s) {
 	return milliseconds{};
 }
 
+void PrefixFormatter(std::ostream& s, const google::LogMessage& m, void* data) {
+    s << std::setw(7) << std::setfill(' ') << google::GetLogSeverityName(m.severity()) 
+      << " | " 
+      << std::setw(26) << std::setfill(' ')  << fmt::format("{}:{}", m.basename(), m.line()) << " |";
+}
+
 int main(int argc, char* argv[]) {
+    google::InstallPrefixFormatter(PrefixFormatter);
     google::InitGoogleLogging(argv[0]);
     gflags::ParseCommandLineFlags(&argc, &argv, true);
     CHECK(argc == 4);
+    DLOG(WARNING) << "Debug Mode: don't expect good performance. " << std::endl;
     auto statistics = std::unique_ptr<Statistics>(new Statistics());
     #define INT     to<size_t>(*iter++)
     #define DOUBLE  to<double>(*iter++)
@@ -110,5 +118,6 @@ int main(int argc, char* argv[]) {
     protocol->Start();
     std::this_thread::sleep_for(to_duration(argv[3]));
     protocol->Stop();
+    DLOG(WARNING) << "Debug Mode: don't expect good performance. " << std::endl;
     statistics->PrintWithDuration(duration_cast<milliseconds>(steady_clock::now() - start_time));
 }
