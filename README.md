@@ -5,8 +5,6 @@
 - [ ] TPC-C
 - [ ] Test New Transaction Protocol on Serial
 
-# Spectrum: 
-
 # Instructions
 
 We use cmake as the building system.
