@@ -18,21 +18,23 @@ using namespace spectrum;
 using namespace std::chrono_literals;
 using namespace std::chrono;
 
-#define NUMARGS(X...)  (sizeof((size_t[]){0, ##X})/sizeof(size_t)-1)
-#define SUM    (X...)  (sum(NUMARGS(X), ##X))
+#define NUMARGS_HELPER(_1, _2, _3, _4, _5, _6, _7, _8, _9, _10, N, ...)    N
+#define NUMARGS(X...)  NUMARGS_HELPER(X, 10, 9, 8, 7, 6, 5, 4, 3, 2, 1, 0)
 
 static auto split(std::basic_string_view<char> s) {
     return s | std::ranges::views::split(':')
     | std::ranges::views::transform([](auto&& str) { return std::string_view(&*str.begin(), std::ranges::distance(str)); });
 }
 
-static size_t to_size_t(std::basic_string_view<char> s) {
+template<typename T>
+static T to(std::basic_string_view<char> s) {
     std::stringstream sstream(std::string{s});
-    size_t result; sstream >> result;
+    T result; sstream >> result;
     return result;
 }
 
-static bool to_bool(std::basic_string_view<char> s) {
+template<>
+bool to<bool>(std::basic_string_view<char> s) {
     if (s == "TRUE")    { return true; }
     if (s == "FALSE")   { return false; }
     throw std::runtime_error(std::string{fmt::format("cannot recognize ({}) as boolean should be either TRUE or FALSE", s)});
@@ -59,33 +61,44 @@ static auto to_duration(std::basic_string_view<char> s) {
 int main(int argc, char* argv[]) {
     CHECK(argc == 4);
     google::InitGoogleLogging(argv[0]);
+    #define INT     to<size_t>(*iter++)
+    #define DOUBLE  to<double>(*iter++)
+    #define BOOL    to<bool>(*iter++)
+    #define EVMTYPE ParseEVMType(*iter++)
     auto workload = [&](){
-        // auto args = split(argv[2]);
-        // auto iter = args.begin();
-        // auto name = *iter++;
-        return std::unique_ptr<Workload>(new Smallbank());
-    }();
-    auto protocol = [&](){
-        auto args = split(argv[1]);
-        auto iter = args.begin();
-        auto name = *iter++;
-        #define INT     to_size_t(*iter++)
-        #define BOOL    to_bool(*iter++)
-        #define EVMTYPE ParseEVMType(*iter++)
         #define OPT(X, Y...) if (name == #X) { \
             auto dist = (size_t) (std::distance(args.begin(), args.end()) - 1); \
             auto n = (size_t) NUMARGS(Y); \
             if (dist != n) throw std::runtime_error(std::string{fmt::format("protocol {} has {} args -- ({}), but we found only {} args", #X, n, #Y, dist)}); \
-            return std::unique_ptr<Protocol>(new X (*workload, Y)); };
+            return std::unique_ptr<Workload>(new X (Y)); \
+        };
+        auto args = split(argv[2]);
+        auto iter = args.begin();
+        auto name = *iter++;
+        OPT(Smallbank, INT, DOUBLE);
+        throw std::runtime_error(std::string{fmt::format("unknown w option ({})", std::string{name})});
+        #undef OPT
+    }();
+    auto protocol = [&](){
+        #define OPT(X, Y...) if (name == #X) { \
+            auto dist = (size_t) (std::distance(args.begin(), args.end()) - 1); \
+            auto n = (size_t) NUMARGS(Y); \
+            if (dist != n) throw std::runtime_error(std::string{fmt::format("protocol {} has {} args -- ({}), but we found only {} args", #X, n, #Y, dist)}); \
+            return std::unique_ptr<Protocol>(new X (*workload, Y)); \
+        };
+        auto args = split(argv[1]);
+        auto iter = args.begin();
+        auto name = *iter++;
         OPT(Aria,     INT, INT, INT, BOOL)
         OPT(Sparkle,  INT, INT)
         OPT(Spectrum, INT, INT, INT, EVMTYPE)
-        #undef INT
-        #undef BOOL
-        #undef EVMTYPE
-        #undef OPT
         throw std::runtime_error(std::string{fmt::format("unknown protocol option ({})", std::string{name})});
+        #undef OPT
     }();
+    #undef INT
+    #undef BOOL
+    #undef DOUBLE
+    #undef EVMTYPE
     auto start_time = steady_clock::now();
     protocol->Start();
     std::this_thread::sleep_for(to_duration(argv[3]));

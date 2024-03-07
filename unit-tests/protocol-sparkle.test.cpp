@@ -54,7 +54,7 @@ TEST(Sparkle, TableWriteAfterWrite) {
 }
 
 TEST(Sparkle, JustRunSmallbank) {
-    auto workload = Smallbank();
+    auto workload = Smallbank(10000, 0.0);
     auto protocol = Sparkle(workload, 8, 32);
     protocol.Start();
     std::this_thread::sleep_for(1000ms);

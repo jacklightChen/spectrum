@@ -12,12 +12,12 @@
 namespace spectrum {
 
 Unif::Unif(size_t num_elements):
-    num_elements{num_elements}
+    distribution(0, num_elements)
 {}
 
 size_t Unif::Next() {
     auto guard = std::lock_guard{mu};
-    return std::generate_canonical<size_t>(rng);
+    return distribution(rng);
 }
 
 double h(double x, double exponent) {

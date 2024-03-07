@@ -15,7 +15,7 @@ class Unif : public Random {
     private:
     std::mutex      mu;
     std::mt19937    rng;
-    size_t          num_elements;
+    std::uniform_int_distribution<size_t>   distribution;
 
     public:
     Unif(size_t num_elements);

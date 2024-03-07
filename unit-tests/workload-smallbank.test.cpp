@@ -36,7 +36,7 @@ class MockTable {
 };
 
 TEST(Smallbank, JustRunWorkload) {
-    auto workload    = spectrum::Smallbank();
+    auto workload    = spectrum::Smallbank(10000, 0.0);
     auto table       = MockTable();
     auto stop_flag   = std::atomic<bool>{false};
     auto statistics  = spectrum::Statistics();

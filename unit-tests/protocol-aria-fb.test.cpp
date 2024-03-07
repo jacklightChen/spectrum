@@ -8,7 +8,7 @@ namespace
 using namespace std::chrono_literals;
 
 TEST(Aria, JustRunSmallbank) {
-    auto workload = spectrum::Smallbank();
+    auto workload = spectrum::Smallbank(10000, 0.0);
     auto protocol = spectrum::Aria(
         workload, 128 /* batch */, 
         8 /* threads */, 32 /* table partitions */,

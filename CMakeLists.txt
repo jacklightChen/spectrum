@@ -1,15 +1,4 @@
-# evmone: Ethereum Virtual Machine
-# Copyright 2019 The evmone Authors.
-# SPDX-License-Identifier: Apache-2.0
-
 cmake_minimum_required(VERSION 3.16...3.27)
-
-project(spectrum LANGUAGES CXX C)
-set(CMAKE_CXX_STANDARD 20)
-set(CMAKE_CXX_STANDARD_REQUIRED ON)
-set(CMAKE_EXPORT_COMPILE_COMMANDS true)
-
-option(EVM_PRINT_INSTRUCTIONS "print each evm instruction on instruction start" 0)
 
 # -- Manage External Dependencies
 include(FetchContent)
@@ -41,7 +30,7 @@ FetchContent_Declare(
 FetchContent_Declare(
     ethash
     GIT_REPOSITORY      "https://github.com/chfast/ethash"
-    GIT_TAG             "v1.0.1"
+    GIT_TAG             "v1.0.0"
 )
 FetchContent_Declare(
     intx
@@ -55,6 +44,15 @@ FetchContent_Declare(
 )
 FetchContent_MakeAvailable(glog gtest ethash intx fmt evmc thread_pool conqueue)
 set(gtest_force_shared_crt ON CACHE BOOL "" FORCE)
+
+# -- Configure project compiler options
+project(spectrum LANGUAGES CXX C)
+set(CMAKE_CXX_STANDARD 20)
+set(CMAKE_CXX_STANDARD_REQUIRED ON)
+set(CMAKE_EXPORT_COMPILE_COMMANDS true)
+
+option(DEBUG OFF)
+option(EVM_PRINT_INSTRUCTIONS "print each evm instruction on instruction start" 0)
 
 # -- Determine Compile Definitions
 if(CMAKE_SYSTEM_PROCESSOR STREQUAL x86_64)
@@ -77,8 +75,6 @@ if(CMAKE_SYSTEM_PROCESSOR STREQUAL x86_64)
         message(FATAL_ERROR "Invalid EVMONE_X86_64_ARCH_LEVEL: ${EVMONE_X86_64_ARCH_LEVEL}")
     endif()
 endif()
-
-option(DEBUG OFF)
 
 if(DEBUG)
     add_compile_options(
