@@ -65,7 +65,7 @@ TEST(Smallbank, JustRunWorkload) {
         statistics.JournalExecute();
         statistics.JournalCommit(duration_cast<milliseconds>(steady_clock::now() - start_time).count());
     }});
-    std::this_thread::sleep_for(2000ms);
+    std::this_thread::sleep_for(1000ms);
     stop_flag.store(true);
     handle.join();
     statistics.Print();

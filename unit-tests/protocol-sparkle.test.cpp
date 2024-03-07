@@ -57,7 +57,7 @@ TEST(Sparkle, JustRunSmallbank) {
     auto workload = Smallbank();
     auto protocol = Sparkle(workload, 8, 32);
     protocol.Start();
-    std::this_thread::sleep_for(2000ms);
+    std::this_thread::sleep_for(1000ms);
     auto statistics = protocol.Stop();
     statistics.Print();   
 }
