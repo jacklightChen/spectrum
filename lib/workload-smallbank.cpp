@@ -5,10 +5,15 @@
 
 namespace spectrum {
 
-Smallbank::Smallbank(): 
+Smallbank::Smallbank(size_t n_keys, float64_t zipf_exponent): 
     evm_type{EVMType::BASIC},
+    zipf_exponent{zipf_exponent},
+    n_keys{n_keys},
     random_state{43}
 {
+    if (zip_exponent > 0.0) {
+        this->zipf_state = Zipf(n_keys, zipf_exponent);
+    }
     this->code = spectrum::from_hex(std::string{
         "608060405234801561001057600080fd5b506004361061007d5760003560e01c806397"
         "b632121161005b57806397b63212146100ea578063a5843f0814610106578063ad0f98"
@@ -60,6 +65,7 @@ void Smallbank::SetEVMType(EVMType ty) {
 }
 
 uint32_t Smallbank::Random() {
+
     auto guard = std::lock_guard<std::mutex>{random_mu};
     uint32_t x = this->random_state;
     x ^= x << 13;

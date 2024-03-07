@@ -11,6 +11,15 @@
 
 namespace spectrum {
 
+Unif::Unif(size_t num_elements):
+    num_elements{num_elements}
+{}
+
+size_t Unif::Next() {
+    auto guard = std::lock_guard{mu};
+    return std::generate_canonical<size_t>(rng);
+}
+
 double h(double x, double exponent) {
     return exp(-exponent * log(x));
 }
@@ -59,7 +68,8 @@ Zipf::Zipf(size_t num_elements, double exponent):
     s = 2 - h_integral_inv(h_integral(2.5, exponent) - h(2, exponent), exponent);
 }
 
-size_t Zipf::Next(std::mt19937& rng) {
+size_t Zipf::Next() {
+    auto guard = std::lock_guard{mu};
     double hnum = h_integral_num_elements;
     while (true) {
         double u = hnum + std::generate_canonical<double, std::numeric_limits<double>::digits>(rng) * (h_integral_x1 - hnum);
