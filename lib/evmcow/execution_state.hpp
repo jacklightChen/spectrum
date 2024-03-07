@@ -98,9 +98,6 @@ public:
         if (old_slice != nullptr) {
             memcpy(new_slice, old_slice, 64 * sizeof(uint256));
         }
-        else {
-            memset(new_slice, 0, 64 * sizeof(uint256));
-        }
     }
     /// push an item onto current stack top
     inline void push(const uint256& item) {

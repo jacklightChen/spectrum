@@ -10,8 +10,16 @@
 #include <iostream>
 #include <span>
 #include <glog/logging.h>
+#include <fmt/core.h>
 
 namespace spectrum {
+
+EVMType ParseEVMType(std::string s) {
+    if (s == "BASIC")       { return EVMType::BASIC; }
+    if (s == "STRAWMAN")    { return EVMType::STRAWMAN; }
+    if (s == "COPYONWRITE") { return EVMType::COPYONWRITE; }
+    throw fmt::format("unknown evmtype {}", s);
+}
 
 // constructor for transaction object
 Transaction::Transaction(

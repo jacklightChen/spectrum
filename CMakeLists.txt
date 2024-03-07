@@ -157,6 +157,6 @@ unset(SRC)
 file(GLOB_RECURSE SRC bench/*.cpp)
 
 add_executable(bench ${SRC})
-target_link_libraries(bench PRIVATE spectrum)
+target_link_libraries(bench PRIVATE spectrum glog::glog fmt)
 
 unset(SRC)

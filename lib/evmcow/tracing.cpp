@@ -105,7 +105,7 @@ class InstructionTracer : public Tracer
     void output_stack(const StackTop& stack_top, int stack_height)
     {
         m_out << R"(,"stack":[)";
-        for (auto i = 0; i < stack_top.height; ++i)
+        for (size_t i = 0; i < stack_top.height; ++i)
         {
             m_out << R"("0x)" << to_string(stack_top[i], 16) << '"';
         }

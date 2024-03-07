@@ -1,5 +1,6 @@
-#include<cstddef>
-#include<evmc/evmc.hpp>
+#pragma once
+#include <cstddef>
+#include <evmc/evmc.hpp>
 
 namespace spectrum {
 
