@@ -83,14 +83,24 @@ if(CMAKE_SYSTEM_PROCESSOR STREQUAL x86_64)
     endif()
 endif()
 
-add_compile_options(
-    -O2 -ggdb
-    -Wall -Wno-reorder -Wno-attributes
-    -DNDEBUG
-    -DPROJECT_VERSION="0.12.0-dev"
-    -DEVMONE_X86_64_ARCH_LEVEL=${EVMONE_X86_64_ARCH_LEVEL}
-    -DEVM_PRINT_INSTRUCTIONS=${EVM_PRINT_INSTRUCTIONS}
-)
+option(DEBUG OFF)
+
+if(DEBUG)
+    add_compile_options(
+        -O2 -Wall -Wno-reorder -Wno-attributes
+        -DPROJECT_VERSION="0.12.0-dev"
+        -DEVMONE_X86_64_ARCH_LEVEL=${EVMONE_X86_64_ARCH_LEVEL}
+        -DEVM_PRINT_INSTRUCTIONS=${EVM_PRINT_INSTRUCTIONS}
+    )
+else()
+    add_compile_options(
+        -O2 -Wall -Wno-reorder -Wno-attributes
+        -DNDEBUG
+        -DPROJECT_VERSION="0.12.0-dev"
+        -DEVMONE_X86_64_ARCH_LEVEL=${EVMONE_X86_64_ARCH_LEVEL}
+        -DEVM_PRINT_INSTRUCTIONS=${EVM_PRINT_INSTRUCTIONS}
+    )
+endif()
 
 # -- handle header-only dependencies
 file(GLOB INC ${CMAKE_BINARY_DIR}/_deps/thread_pool-src/include/*.hpp ${CMAKE_BINARY_DIR}/_deps/thread_pool-src/include/*.h)

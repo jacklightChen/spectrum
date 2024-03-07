@@ -19,7 +19,7 @@ enum EVMType {
     COPYONWRITE
 };
 
-EVMType ParseEVMType(std::string s);
+EVMType ParseEVMType(std::basic_string_view<char> s);
 
 struct Result: public evmc_result {
 

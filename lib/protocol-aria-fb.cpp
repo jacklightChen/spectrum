@@ -1,4 +1,5 @@
 #include "./protocol-aria-fb.hpp"
+#include <fmt/core.h>
 
 /*
     This is a implementation of "Aria: A Fast and Practical Deterministic OLTP Database" (Yi Lu, Xiangyao Yu, Lei Cao, Samuel Madden). 
@@ -19,9 +20,9 @@ using namespace std::chrono;
 /// @param n_threads the number of threads in thread pool
 /// @param table_partitions the number of partitions in table
 Aria::Aria(
-    Workload& workload, size_t batch_size, 
+    Workload& workload, 
     size_t n_threads, size_t table_partitions,
-    bool enable_reordering
+    size_t batch_size, bool enable_reordering
 ):
     workload{workload},
     batch_size{batch_size},
@@ -58,6 +59,8 @@ std::unique_ptr<T> Aria::NextTransaction() {
 
 /// @brief start aria protocol
 void Aria::Start() {
+    DLOG(INFO) << "aria start";
+    auto batch_count = int{0};
     // this macro computes the latency of one transaction
     #define LATENCY duration_cast<microseconds>(steady_clock::now() - tx.start_time).count()
     pool.detach_task([&]() {while(!stop_flag.load()) {
@@ -66,12 +69,14 @@ void Aria::Start() {
         for (size_t i = 0; i < batch_size; ++i) {
             batch.push_back(std::nullopt);
         }
+        DLOG(INFO) << fmt::format("aria generate batch-{}", batch_count) << std::endl;
         // -- execution stage
         ParallelEach([&](auto& tx) {
             AriaExecutor::Execute(tx, table);
             AriaExecutor::Reserve(tx, table);
             statistics.JournalExecute();
         }, batch);
+        DLOG(INFO) << fmt::format("aria execute batch-{}", batch_count) << std::endl;
         // -- first commit stage
         auto has_conflict = std::atomic<bool>{false};
         ParallelEach([&](auto& tx) {
@@ -83,6 +88,7 @@ void Aria::Start() {
             AriaExecutor::Commit(tx, table);
             statistics.JournalCommit(LATENCY);
         }, batch);
+        DLOG(INFO) << fmt::format("aria verify and commit batch-{}", batch_count) << std::endl;
         // -- prepare fallback, analyze dependencies
         if (!has_conflict.load()) { continue; }
         auto lock_table = AriaLockTable(batch_size);
@@ -90,6 +96,7 @@ void Aria::Start() {
             if (!tx.flag_conflict) { return; }
             AriaExecutor::PrepareLockTable(tx, lock_table);
         }, batch);
+        DLOG(INFO) << fmt::format("aria prepare fallback batch-{}", batch_count) << std::endl;
         // -- run fallback strategy
         ParallelEach([&](auto& tx) {
             if (!tx.flag_conflict) { return; }
@@ -97,6 +104,8 @@ void Aria::Start() {
             statistics.JournalExecute();
             statistics.JournalCommit(LATENCY);
         }, batch);
+        DLOG(INFO) << fmt::format("aria execute fallback batch-{}", batch_count) << std::endl;
+        ++batch_count;
     }});
     #undef LATENCY
 }
@@ -105,6 +114,8 @@ void Aria::Start() {
 /// @return statistics of current execution
 Statistics Aria::Stop() {
     this->stop_flag.store(true);
+    this->pool.wait();
+    DLOG(INFO) << "aria stop";
     return this->statistics;
 }
 

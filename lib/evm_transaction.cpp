@@ -11,14 +11,15 @@
 #include <span>
 #include <glog/logging.h>
 #include <fmt/core.h>
+#include <stdexcept>
 
 namespace spectrum {
 
-EVMType ParseEVMType(std::string s) {
+EVMType ParseEVMType(std::basic_string_view<char> s) {
     if (s == "BASIC")       { return EVMType::BASIC; }
     if (s == "STRAWMAN")    { return EVMType::STRAWMAN; }
     if (s == "COPYONWRITE") { return EVMType::COPYONWRITE; }
-    throw fmt::format("unknown evmtype {}", s);
+    throw std::runtime_error(std::string{fmt::format("unknown evmtype {}", s)});
 }
 
 // constructor for transaction object

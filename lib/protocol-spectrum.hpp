@@ -104,7 +104,7 @@ class LockQueue {
 
 using ConQueue = LockQueue<std::unique_ptr<T>>;
 
-class Spectrum: virtual public Protocol {
+class Spectrum: public Protocol {
 
     private:
     size_t              n_threads;

@@ -57,7 +57,7 @@ struct SparkleTable: private Table<K, V, KeyHasher> {
 
 class SparkleExecutor;
 
-class Sparkle: virtual public Protocol {
+class Sparkle: public Protocol {
 
     private:
     size_t              n_threads;

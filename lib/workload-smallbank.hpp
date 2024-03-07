@@ -2,7 +2,7 @@
 
 namespace spectrum {
 
-class Smallbank: virtual public Workload {
+class Smallbank: public Workload {
 
     private:
     std::basic_string<uint8_t> code;
