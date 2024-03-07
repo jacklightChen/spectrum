@@ -21,24 +21,24 @@ using namespace std::chrono;
 #define       NUMARGS(...)  (sizeof((size_t[]){0, ##__VA_ARGS__})/sizeof(size_t)-1)
 #define       SUM(...)  sum(NUMARGS(__VA_ARGS__), ##__VA_ARGS__)
 
-auto split(std::basic_string_view<char> s) {
+static auto split(std::basic_string_view<char> s) {
     return s | std::ranges::views::split(':')
     | std::ranges::views::transform([](auto&& str) { return std::string_view(&*str.begin(), std::ranges::distance(str)); });
 }
 
-size_t to_size_t(std::basic_string_view<char> s) {
+static size_t to_size_t(std::basic_string_view<char> s) {
     std::stringstream sstream(std::string{s});
     size_t result; sstream >> result;
     return result;
 }
 
-bool to_bool(std::basic_string_view<char> s) {
+static bool to_bool(std::basic_string_view<char> s) {
     if (s == "TRUE")    { return true; }
     if (s == "FALSE")   { return false; }
     throw std::runtime_error(std::string{fmt::format("cannot recognize ({}) as boolean should be either TRUE or FALSE", s)});
 }
 
-auto to_duration(std::basic_string_view<char> s) {
+static auto to_duration(std::basic_string_view<char> s) {
     std::stringstream is(std::string{s});
 	static const std::unordered_map<std::string, milliseconds> suffix {
         {"ms", 1ms}, {"s", 1s}, {"m", 1min}, {"h", 1h}};
