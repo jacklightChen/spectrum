@@ -18,8 +18,8 @@ using namespace spectrum;
 using namespace std::chrono_literals;
 using namespace std::chrono;
 
-#define       NUMARGS(...)  (sizeof((size_t[]){0, ##__VA_ARGS__})/sizeof(size_t)-1)
-#define       SUM(...)  sum(NUMARGS(__VA_ARGS__), ##__VA_ARGS__)
+#define NUMARGS(...)  (sizeof((size_t[]){0, ##__VA_ARGS__})/sizeof(size_t)-1)
+#define SUM    (...)  (sum(NUMARGS(__VA_ARGS__), ##__VA_ARGS__))
 
 static auto split(std::basic_string_view<char> s) {
     return s | std::ranges::views::split(':')
