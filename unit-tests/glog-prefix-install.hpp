@@ -1,3 +1,4 @@
+#include <fmt/core.h>
 #define GLOG_PREFIX                                                                                \
     google::InstallPrefixFormatter([](std::ostream& s, const google::LogMessage& m, void* data) {  \
         auto color = [&m](){                                                                       \
@@ -12,5 +13,4 @@
                 << google::GetLogSeverityName(m.severity()) << "\e[0;30m"                          \
           << std::setfill(' ') << std::setw(16) << m.thread_id() << ' '                            \
           << std::setfill(' ') << std::setw(30) << fmt::format("{}:{}", m.basename(), m.line());   \
-    });                                                                                            \
-
+    });                                                                                            

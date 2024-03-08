@@ -42,7 +42,8 @@ Transaction::Transaction(
         .block_gas_limit = 10000000000,
     }},
     host{Host(this->tx_context)},
-    code{code}
+    code{code},
+    mu{std::make_unique<std::mutex>()}
 {
     this->message = evmc_message{
         .kind = EVMC_CALL,
@@ -58,15 +59,18 @@ Transaction::Transaction(
 
 // update set_storage handler
 void Transaction::UpdateSetStorageHandler(spectrum::SetStorage&& handler) {
+    auto guard = std::lock_guard{*mu};
     host.set_storage_inner = handler;
 }
 
 // update get_storage handler
 void Transaction::UpdateGetStorageHandler(spectrum::GetStorage&& handler) {
+    auto guard = std::lock_guard{*mu};
     host.get_storage_inner = handler;
 }
 
 size_t Transaction::MakeCheckpoint() {
+    // can only be called inside execution
     if (evm_type == EVMType::BASIC) {
         return 0;
     }
@@ -84,6 +88,7 @@ size_t Transaction::MakeCheckpoint() {
 }
 
 void Transaction::ApplyCheckpoint(size_t checkpoint_id) {
+    auto guard = std::lock_guard{*mu};
     if (evm_type == EVMType::BASIC) {
         return;
     }
@@ -102,6 +107,7 @@ void Transaction::ApplyCheckpoint(size_t checkpoint_id) {
 }
 
 void Transaction::Break() {
+    // can only be called inside execution
     if (evm_type == EVMType::BASIC || evm_type == EVMType::STRAWMAN) {
         auto& _vm = std::get<evmone::VM>(vm);
         _vm.state->get()->will_break = true;
@@ -113,6 +119,7 @@ void Transaction::Break() {
 }
 
 Result Transaction::Execute() {
+    auto guard = std::lock_guard{*mu};
     if (evm_type == EVMType::BASIC || evm_type == EVMType::STRAWMAN) {
         auto& _vm = std::get<evmone::VM>(vm);
         auto host_interface = &host.get_interface();

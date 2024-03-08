@@ -19,6 +19,7 @@ TEST(Spectrum, JustRunSmallbank) {
     auto protocol = Spectrum(workload, statistics, 8, 32, 16, EVMType::COPYONWRITE);
     protocol.Start();
     std::this_thread::sleep_for(1000ms);
+    protocol.Stop();
     statistics.Print();
 }
 

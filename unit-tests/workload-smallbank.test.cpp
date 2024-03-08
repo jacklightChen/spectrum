@@ -39,7 +39,7 @@ class MockTable {
 
 TEST(Smallbank, JustRunWorkload) {
     GLOG_PREFIX;
-    auto workload    = spectrum::Smallbank(10000, 0.0);
+    auto workload    = spectrum::Smallbank(100000, 10.0);
     auto table       = MockTable();
     auto stop_flag   = std::atomic<bool>{false};
     auto statistics  = spectrum::Statistics();
@@ -68,10 +68,10 @@ TEST(Smallbank, JustRunWorkload) {
         statistics.JournalExecute();
         statistics.JournalCommit(duration_cast<milliseconds>(steady_clock::now() - start_time).count());
     }});
-    std::this_thread::sleep_for(1000ms);
+    std::this_thread::sleep_for(10000ms);
     stop_flag.store(true);
     handle.join();
-    statistics.Print();
+    std::cerr << statistics.Print() << std::endl;
 }
 
 }

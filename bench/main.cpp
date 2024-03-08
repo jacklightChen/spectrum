@@ -3,6 +3,7 @@
 #include <spectrum/protocol-spectrum.hpp>
 #include <spectrum/protocol-sparkle.hpp>
 #include <spectrum/protocol-aria-fb.hpp>
+#include <spectrum/protocol-serial.hpp>
 #include <spectrum/workload-smallbank.hpp>
 #include <spectrum/workload.hpp>
 #include <glog/logging.h>
@@ -126,6 +127,7 @@ int main(int argc, char* argv[]) {
         OPT(Aria,     INT, INT, INT, BOOL)
         OPT(Sparkle,  INT, INT)
         OPT(Spectrum, INT, INT, INT, EVMTYPE)
+        OPT(Serial,   EVMTYPE)
         #undef OPT
         // fallback to an error
         THROW("unknown protocol option ({})", std::string{name});

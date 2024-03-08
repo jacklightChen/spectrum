@@ -27,7 +27,8 @@ struct Result : public evmc_result {
 
 class Transaction {
 
-  private:
+    private:
+    std::unique_ptr<std::mutex>          mu;
     std::variant<evmone::VM, evmcow::VM> vm;
     spectrum::Host host;
     spectrum::EVMType evm_type;
@@ -37,7 +38,7 @@ class Transaction {
     std::vector<uint8_t> input;
     evmc_message message;
 
-  public:
+    public:
     Transaction(EVMType evm_type, evmc::address from, evmc::address to,
                 std::span<uint8_t> code, std::span<uint8_t> input);
     void UpdateSetStorageHandler(spectrum::SetStorage &&handler);
@@ -46,6 +47,7 @@ class Transaction {
     void Break();
     void ApplyCheckpoint(size_t checkpoint_id);
     size_t MakeCheckpoint();
+
 };
 
 } // namespace spectrum
