@@ -57,6 +57,7 @@ void Aria::ParallelEach(
 /// @return the wrapped transactions
 std::unique_ptr<T> Aria::NextTransaction() {
     auto id = tx_counter.fetch_add(1);
+    DLOG(INFO) << "generate transaction " << id << std::endl;
     return std::make_unique<T>(std::move(workload.Next()), id, id / batch_size);
 }
 
@@ -65,50 +66,51 @@ void Aria::Start() {
     DLOG(INFO) << "aria start";
     // this macro computes the latency of one transaction
     #define LATENCY duration_cast<microseconds>(steady_clock::now() - tx->start_time).count()
-    pool.detach_task([&]() {while(!stop_flag.load()) {
-        // -- construct an empty batch
-        auto batch = std::vector<std::unique_ptr<T>>();
-        for (size_t i = 0; i < batch_size; ++i) {
-            batch.push_back(nullptr);
-        }
-        DLOG(INFO) << "aria generate batch-" << batch_count << std::endl;
-        // -- execution stage
-        ParallelEach([this](auto tx) {
-            AriaExecutor::Execute(tx, table);
-            AriaExecutor::Reserve(tx, table);
-            statistics.JournalExecute();
-        }, batch);
-        DLOG(INFO) << "aria execute batch-" << batch_count << std::endl;
-        // -- first commit stage
-        auto has_conflict = std::atomic<bool>{false};
-        ParallelEach([this, &has_conflict](auto tx) {
-            AriaExecutor::Verify(tx, table, enable_reordering);
-            if (tx->flag_conflict) {
-                has_conflict.store(true);
-                return;
+    pool.detach_task([&]() {
+        while(!stop_flag.load()) {
+            // -- construct an empty batch
+            auto batch = std::vector<std::unique_ptr<T>>();
+            for (size_t i = 0; i < batch_size; ++i) {
+                batch.push_back(nullptr);
             }
-            AriaExecutor::Commit(tx, table);
-            statistics.JournalCommit(LATENCY);
-        }, batch);
-        DLOG(INFO) << "aria verify and commit batch-" << batch_count << std::endl;
-        // -- prepare fallback, analyze dependencies
-        if (!has_conflict.load()) { continue; }
-        auto lock_table = AriaLockTable(batch_size);
-        ParallelEach([this, &lock_table](auto tx) {
-            if (!tx->flag_conflict) { return; }
-            AriaExecutor::PrepareLockTable(tx, lock_table);
-        }, batch);
-        DLOG(INFO) << "aria prepare fallback batch-" << batch_count << std::endl;
-        // -- run fallback strategy
-        ParallelEach([this, &lock_table](auto tx) {
-            if (!tx->flag_conflict) { return; }
-            AriaExecutor::Fallback(tx, table, lock_table);
-            statistics.JournalExecute();
-            statistics.JournalCommit(LATENCY);
-        }, batch);
-        DLOG(INFO) << "aria execute fallback batch-" << batch_count << std::endl;
-        ++batch_count;
-    }});
+            DLOG(INFO) << "generate batch" << std::endl;
+            // -- execution stage
+            ParallelEach([this](auto tx) {
+                AriaExecutor::Execute(tx, table);
+                AriaExecutor::Reserve(tx, table);
+                statistics.JournalExecute();
+            }, batch);
+            DLOG(INFO) << "execute batch" << std::endl;
+            // -- first commit stage
+            auto has_conflict = std::atomic<bool>{false};
+            ParallelEach([this, &has_conflict](auto tx) {
+                AriaExecutor::Verify(tx, table, enable_reordering);
+                if (tx->flag_conflict) {
+                    has_conflict.store(true);
+                    return;
+                }
+                AriaExecutor::Commit(tx, table);
+                statistics.JournalCommit(LATENCY);
+            }, batch);
+            DLOG(INFO) << "verify and commit batch" << std::endl;
+            // -- prepare fallback, analyze dependencies
+            if (!has_conflict.load()) { continue; }
+            auto lock_table = AriaLockTable(batch_size);
+            ParallelEach([this, &lock_table](auto tx) {
+                if (!tx->flag_conflict) { return; }
+                AriaExecutor::PrepareLockTable(tx, lock_table);
+            }, batch);
+            DLOG(INFO) << "prepare fallback batch" << std::endl;
+            // -- run fallback strategy
+            ParallelEach([this, &lock_table](auto tx) {
+                if (!tx->flag_conflict) { return; }
+                AriaExecutor::Fallback(tx, table, lock_table);
+                statistics.JournalExecute();
+                statistics.JournalCommit(LATENCY);
+            }, batch);
+            DLOG(INFO) << "execute fallback batch" << std::endl;
+        }
+    });
     #undef LATENCY
 }
 
@@ -136,12 +138,14 @@ AriaTransaction::AriaTransaction(
 /// @param k the reserved key
 void AriaTable::ReserveGet(T* tx, const K& k) {
     Table::Put(k, [&](AriaEntry& entry) {
+        DLOG(INFO) << tx->id << " reserve get" << std::endl;
         if (entry.batch_id_get != tx->batch_id) {
             entry.reserved_get_tx = nullptr;
             entry.batch_id_get = tx->batch_id;
         }
         if (entry.reserved_get_tx == nullptr || entry.reserved_get_tx->id < tx->id) {
             entry.reserved_get_tx = tx;
+            DLOG(INFO) << tx->batch_id << ":" << tx->id << " reserve get ok" << std::endl;
         }
     });
 }
@@ -151,12 +155,14 @@ void AriaTable::ReserveGet(T* tx, const K& k) {
 /// @param k the reserved key
 void AriaTable::ReservePut(T* tx, const K& k) {
     Table::Put(k, [&](AriaEntry& entry) {
+        DLOG(INFO) << tx->id << " reserve put" << std::endl; 
         if (entry.batch_id_put != tx->batch_id) {
             entry.reserved_put_tx = nullptr;
             entry.batch_id_put = tx->batch_id;
         }
         if (entry.reserved_put_tx == nullptr || entry.reserved_put_tx->id < tx->id) {
             entry.reserved_put_tx = tx;
+            DLOG(INFO) << tx->batch_id << ":" << tx->id << " reserve put ok" << std::endl; 
         }
     });
 }
@@ -277,6 +283,9 @@ void AriaExecutor::Verify(T* tx, AriaTable& table, bool enable_reordering) {
     }
     else {
         tx->flag_conflict = waw || war;
+    }
+    if (waw || war) {
+        DLOG(INFO) << "abort" << std::endl;
     }
 }
 

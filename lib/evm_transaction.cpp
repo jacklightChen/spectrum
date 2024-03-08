@@ -43,8 +43,7 @@ Transaction::Transaction(
         .block_gas_limit = 10000000000,
     }},
     host{Host(this->tx_context)},
-    code{code},
-    mu{std::make_unique<std::mutex>()}
+    code{code}
 {
     this->message = evmc_message{
         .kind = EVMC_CALL,
@@ -60,13 +59,11 @@ Transaction::Transaction(
 
 // update set_storage handler
 void Transaction::UpdateSetStorageHandler(spectrum::SetStorage&& handler) {
-    auto guard = std::lock_guard{*mu};
     host.set_storage_inner = handler;
 }
 
 // update get_storage handler
 void Transaction::UpdateGetStorageHandler(spectrum::GetStorage&& handler) {
-    auto guard = std::lock_guard{*mu};
     host.get_storage_inner = handler;
 }
 
@@ -89,7 +86,6 @@ size_t Transaction::MakeCheckpoint() {
 }
 
 void Transaction::ApplyCheckpoint(size_t checkpoint_id) {
-    auto guard = std::lock_guard{*mu};
     if (evm_type == EVMType::BASIC) {
         return;
     }
@@ -119,8 +115,8 @@ void Transaction::Break() {
     }
 }
 
+__attribute__((always_inline))
 void Transaction::Execute() {
-    auto guard = std::lock_guard{*mu};
     if (evm_type == EVMType::BASIC || evm_type == EVMType::STRAWMAN) {
         auto& _vm = std::get<evmone::VM>(vm);
         auto host_interface = &host.get_interface();
@@ -137,7 +133,6 @@ void Transaction::Execute() {
             result.release(&result);
         }
         return;
-        // return Result(result);
     }
     if (evm_type == EVMType::COPYONWRITE) {
         auto& _vm = std::get<evmcow::VM>(vm);
@@ -155,7 +150,6 @@ void Transaction::Execute() {
             result.release(&result);
         }
         return;
-        // return Result(result);
     }
     LOG(FATAL) << "not possible";
 }

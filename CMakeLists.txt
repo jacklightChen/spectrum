@@ -9,9 +9,6 @@ set(CMAKE_EXPORT_COMPILE_COMMANDS true)
 option(DEBUG OFF)
 option(EVM_PRINT_INSTRUCTIONS "print each evm instruction on instruction start" 0)
 
-add_compile_options(-fsanitize=address)
-add_link_options(-fsanitize=address)
-
 # -- Manage External Dependencies
 include(FetchContent)
 FetchContent_Declare(
@@ -80,19 +77,20 @@ if(CMAKE_SYSTEM_PROCESSOR STREQUAL x86_64)
 endif()
 
 if(DEBUG)
+    add_compile_options(-fsanitize=address)
+    add_link_options(-fsanitize=address)
     add_compile_options(
-        -O0 -ggdb -Wall -Wno-reorder -Wno-attributes -fsanitize=address
+        -O0 -ggdb -Wall -Wno-reorder -Wno-attributes
         -DPROJECT_VERSION="0.12.0-dev"
         -DEVMONE_X86_64_ARCH_LEVEL=${EVMONE_X86_64_ARCH_LEVEL}
         -DEVM_PRINT_INSTRUCTIONS=${EVM_PRINT_INSTRUCTIONS}
     )
 else()
     add_compile_options(
-        -flto -O2 -Wall -Wno-reorder -Wno-attributes
-        -DNDEBUG -fsanitize=address
+        -O3 -flto -Wall -Wno-reorder -Wno-attributes
+        -DNDEBUG -ggdb
         -DPROJECT_VERSION="0.12.0-dev"
         -DEVMONE_X86_64_ARCH_LEVEL=${EVMONE_X86_64_ARCH_LEVEL}
-        -DEVM_PRINT_INSTRUCTIONS=${EVM_PRINT_INSTRUCTIONS}
     )
 endif()
 

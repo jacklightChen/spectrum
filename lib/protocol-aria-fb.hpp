@@ -68,7 +68,6 @@ class Aria: public Protocol {
     Statistics&         statistics;
     Workload&           workload;
     size_t              batch_size;
-    size_t              batch_count{0};
     size_t              table_partitions;
     AriaTable           table;
     bool                enable_reordering;
