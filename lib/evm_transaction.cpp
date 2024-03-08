@@ -4,6 +4,7 @@
 #include "evmone/baseline.hpp"
 #include "evmcow/vm.hpp"
 #include "evmone/vm.hpp"
+#include "hex.hpp"
 #include <evmc/evmc.h>
 #include <evmc/evmc.hpp>
 #include <variant>
@@ -42,8 +43,7 @@ Transaction::Transaction(
         .block_gas_limit = 10000000000,
     }},
     host{Host(this->tx_context)},
-    code{code},
-    mu{std::make_unique<std::mutex>()}
+    code{code}
 {
     this->message = evmc_message{
         .kind = EVMC_CALL,
@@ -59,13 +59,11 @@ Transaction::Transaction(
 
 // update set_storage handler
 void Transaction::UpdateSetStorageHandler(spectrum::SetStorage&& handler) {
-    auto guard = std::lock_guard{*mu};
     host.set_storage_inner = handler;
 }
 
 // update get_storage handler
 void Transaction::UpdateGetStorageHandler(spectrum::GetStorage&& handler) {
-    auto guard = std::lock_guard{*mu};
     host.get_storage_inner = handler;
 }
 
@@ -88,7 +86,6 @@ size_t Transaction::MakeCheckpoint() {
 }
 
 void Transaction::ApplyCheckpoint(size_t checkpoint_id) {
-    auto guard = std::lock_guard{*mu};
     if (evm_type == EVMType::BASIC) {
         return;
     }
@@ -118,27 +115,30 @@ void Transaction::Break() {
     }
 }
 
-Result Transaction::Execute() {
-    auto guard = std::lock_guard{*mu};
+__attribute__((always_inline))
+void Transaction::Execute() {
     if (evm_type == EVMType::BASIC || evm_type == EVMType::STRAWMAN) {
         auto& _vm = std::get<evmone::VM>(vm);
         auto host_interface = &host.get_interface();
         auto host_context   = host.to_context();
-        auto result = evmone::baseline::execute(
+        const auto result = evmone::baseline::execute(
             _vm, host_interface, host_context, 
             EVMC_SHANGHAI, &message,
             &code[0], code.size() - 1
         );
         if (result.status_code != evmc_status_code::EVMC_SUCCESS) {
-            DLOG(ERROR) << "transaction status: " << result.status_code << std::endl;
+            DLOG(ERROR) << "function hash: " << to_hex(std::span{&input[0], 4}) <<  " transaction status: " << result.status_code << std::endl;
         }
-        return Result(result);
+        if (result.output_data) {
+            result.release(&result);
+        }
+        return;
     }
     if (evm_type == EVMType::COPYONWRITE) {
         auto& _vm = std::get<evmcow::VM>(vm);
         auto host_interface = &host.get_interface();
         auto host_context   = host.to_context();
-        auto result = evmcow::baseline::execute(
+        const auto result = evmcow::baseline::execute(
             _vm, host_interface, host_context,
             EVMC_SHANGHAI, &message,
             &code[0], code.size() - 1
@@ -146,7 +146,10 @@ Result Transaction::Execute() {
         if (result.status_code != evmc_status_code::EVMC_SUCCESS) {
             DLOG(ERROR) << "transaction status: " << result.status_code << std::endl;
         }
-        return Result(result);
+        if (result.output_data) {
+            result.release(&result);
+        }
+        return;
     }
     LOG(FATAL) << "not possible";
 }

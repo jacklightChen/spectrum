@@ -28,7 +28,6 @@ struct Result : public evmc_result {
 class Transaction {
 
     private:
-    std::unique_ptr<std::mutex>          mu;
     std::variant<evmone::VM, evmcow::VM> vm;
     spectrum::Host host;
     spectrum::EVMType evm_type;
@@ -43,7 +42,7 @@ class Transaction {
                 std::span<uint8_t> code, std::span<uint8_t> input);
     void UpdateSetStorageHandler(spectrum::SetStorage &&handler);
     void UpdateGetStorageHandler(spectrum::GetStorage &&handler);
-    Result Execute();
+    void Execute();
     void Break();
     void ApplyCheckpoint(size_t checkpoint_id);
     size_t MakeCheckpoint();

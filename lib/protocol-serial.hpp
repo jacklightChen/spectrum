@@ -21,6 +21,7 @@ class SerialTable {
 class Serial: public Protocol {
 
     private:
+    size_t              repeat;
     EVMType             evm_type;
     SerialTable         table;
     std::thread*        thread{nullptr};
@@ -29,7 +30,7 @@ class Serial: public Protocol {
     Statistics&         statistics;
 
     public:
-    Serial(Workload& workload, Statistics& statistics, EVMType evm_type);
+    Serial(Workload& workload, Statistics& statistics, EVMType evm_type, size_t repeat);
     void Start() override;
     void Stop()  override;
 

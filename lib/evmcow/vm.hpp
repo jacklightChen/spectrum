@@ -5,9 +5,11 @@
 
 #include "./execution_state.hpp"
 #include "./tracing.hpp"
+#include "./baseline.hpp"
 #include <evmc/evmc.h>
 #include <optional>
 #include <vector>
+#include <memory>
 
 #if defined(_MSC_VER) && !defined(__clang__)
 #define EVMONE_CGOTO_SUPPORTED 0
@@ -21,8 +23,9 @@ namespace evmcow
 class VM : public evmc_vm
 {
 public:
-    std::optional<std::unique_ptr<evmcow::ExecutionState>> state{std::nullopt};
-    std::vector<evmcow::Checkpoint> checkpoints{};
+    std::optional<std::unique_ptr<evmcow::ExecutionState>>  state{std::nullopt};
+    std::vector<evmcow::Checkpoint>                         checkpoints{};
+    std::unique_ptr<evmcow::baseline::CodeAnalysis>         analysis{nullptr};
     bool cgoto = EVMONE_CGOTO_SUPPORTED;
     bool validate_eof = false;
 

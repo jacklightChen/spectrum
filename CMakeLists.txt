@@ -77,6 +77,8 @@ if(CMAKE_SYSTEM_PROCESSOR STREQUAL x86_64)
 endif()
 
 if(DEBUG)
+    add_compile_options(-fsanitize=address)
+    add_link_options(-fsanitize=address)
     add_compile_options(
         -O0 -ggdb -Wall -Wno-reorder -Wno-attributes
         -DPROJECT_VERSION="0.12.0-dev"
@@ -85,11 +87,10 @@ if(DEBUG)
     )
 else()
     add_compile_options(
-        -flto -O2 -Wall -Wno-reorder -Wno-attributes
-        -DNDEBUG
+        -O3 -flto -Wall -Wno-reorder -Wno-attributes
+        -DNDEBUG -ggdb
         -DPROJECT_VERSION="0.12.0-dev"
         -DEVMONE_X86_64_ARCH_LEVEL=${EVMONE_X86_64_ARCH_LEVEL}
-        -DEVM_PRINT_INSTRUCTIONS=${EVM_PRINT_INSTRUCTIONS}
     )
 endif()
 

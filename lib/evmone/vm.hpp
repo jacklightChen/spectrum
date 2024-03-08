@@ -5,6 +5,7 @@
 
 #include "./execution_state.hpp"
 #include "./tracing.hpp"
+#include "./baseline.hpp"
 #include <evmc/evmc.h>
 #include <optional>
 #include <vector>
@@ -21,8 +22,9 @@ namespace evmone
 class VM : public evmc_vm
 {
 public:
-    std::optional<std::unique_ptr<evmone::ExecutionState>> state{std::nullopt};
-    std::vector<std::unique_ptr<evmone::ExecutionState>> checkpoints{};
+    std::optional<std::unique_ptr<evmone::ExecutionState>>  state{std::nullopt};
+    std::vector<std::unique_ptr<evmone::ExecutionState>>    checkpoints{};
+    std::unique_ptr<evmone::baseline::CodeAnalysis>         analysis{nullptr};
     bool cgoto = EVMONE_CGOTO_SUPPORTED;
     bool validate_eof = false;
     size_t op_count = 0;

@@ -306,19 +306,18 @@ int64_t dispatch(const CostTable& cost_table, ExecutionState& state, int64_t gas
     intx::unreachable();
 }
 
-evmc_result execute(
-    VM& vm, int64_t gas, ExecutionState& state, const CodeAnalysis& analysis) noexcept
+evmc_result execute(VM& vm, int64_t gas, ExecutionState& state) noexcept
 {
-    state.analysis.baseline = &analysis;  // Assign code analysis for instruction implementations.
+    state.analysis.baseline = vm.analysis.get();  // Assign code analysis for instruction implementations.
 
-    const auto code = analysis.executable_code;
+    const auto code = vm.analysis->executable_code;
 
-    const auto& cost_table = get_baseline_cost_table(state.rev, analysis.eof_header.version);
+    const auto& cost_table = get_baseline_cost_table(state.rev, vm.analysis->eof_header.version);
 
     auto* tracer = vm.get_tracer();
     if (INTX_UNLIKELY(tracer != nullptr))
     {
-        tracer->notify_execution_start(state.rev, *state.msg, analysis.executable_code);
+        tracer->notify_execution_start(state.rev, *state.msg, vm.analysis->executable_code);
         gas = dispatch<true>(cost_table, state, gas, code.data(), tracer);
     }
     else
@@ -349,16 +348,17 @@ evmc_result execute(VM& vm, const evmc_host_interface* host, evmc_host_context* 
         if (validate_eof(rev, container) != EOFValidationError::success)
             return evmc_make_result(EVMC_CONTRACT_VALIDATION_FAILURE, 0, 0, nullptr, 0);
     }
-
-    const auto code_analysis = analyze(rev, container);
-    const auto data = code_analysis.eof_header.get_data(container);
+    if (vm.analysis.get() == nullptr) {
+        vm.analysis = std::make_unique<CodeAnalysis>(std::move(analyze(rev, container)));
+    }
+    const auto data = vm.analysis->eof_header.get_data(container);
     ExecutionState& state = *([&](){
         if (vm.state == std::nullopt) {
             vm.state.emplace(std::move(std::make_unique<ExecutionState>(*msg, rev, *host, ctx, container, data)));
         }
         return vm.state.value().get();
     })();
-    return execute(vm, msg->gas, state, code_analysis);
+    return execute(vm, msg->gas, state);
 }
 
 

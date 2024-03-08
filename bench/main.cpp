@@ -14,6 +14,8 @@
 #include <stdexcept>
 #include <chrono>
 #include <glog/logging.h>
+#include <glog/flags.h>
+#include <string.h>
 
 using namespace spectrum;
 using namespace std::chrono_literals;
@@ -77,12 +79,19 @@ int main(int argc, char* argv[]) {
                 default: return "\e[0;30m";
             }
         }();
-        s << color << std::setfill(' ') << std::setw(8)  << std::setiosflags(std::ios::left)
-                << google::GetLogSeverityName(m.severity()) << "\e[0;30m" 
-          << std::setfill(' ') << std::setw(16) << m.thread_id() << ' '
-          << std::setfill(' ') << std::setw(30) << fmt::format("{}:{}", m.basename(), m.line());
+        auto align = [&](std::ostream& s , bool left, size_t x, std::string str) {
+            s << std::setfill(' ');
+            if (left) s << std::setiosflags(std::ios::left);
+            s << std::setw((str.size() + x - 1) / x * x) << str;
+        };
+        align(s << color, true, 8, google::GetLogSeverityName(m.severity()));
+        s << "\e[0;30m" << " | ";
+        s << std::setw(15) << m.thread_id() << " | ";
+        align(s, true, 16, fmt::format("{}:{}", m.basename(), m.line()));
+        s << " |";
     });
     google::InitGoogleLogging(argv[0]);
+    FLAGS_stderrthreshold = 1;
     gflags::ParseCommandLineFlags(&argc, &argv, true);
     // check if the rest arguments have the correct number
     CHECK(argc == 4) << "Except google logging flags, we only expect 3 flags. ";
@@ -127,7 +136,7 @@ int main(int argc, char* argv[]) {
         OPT(Aria,     INT, INT, INT, BOOL)
         OPT(Sparkle,  INT, INT)
         OPT(Spectrum, INT, INT, INT, EVMTYPE)
-        OPT(Serial,   EVMTYPE)
+        OPT(Serial,   EVMTYPE, INT)
         #undef OPT
         // fallback to an error
         THROW("unknown protocol option ({})", std::string{name});

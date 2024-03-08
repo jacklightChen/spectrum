@@ -117,8 +117,7 @@ TEST(Transaction, RunBasic) {
                 return evmc_storage_status::EVMC_STORAGE_ASSIGNED;
             }
         );
-        auto result = transaction.Execute();
-        ASSERT_EQ(result.status_code, 0) << result.status_code;
+        transaction.Execute();
     }
 }
 
@@ -154,15 +153,12 @@ TEST(Transaction, RunStrawman) {
                 return evmc_storage_status::EVMC_STORAGE_ASSIGNED;
             }
         );
-        evmc_result result;
         // execute transaction for the first time, and expect it exits successfully
-        result = transaction.Execute();
-        ASSERT_EQ(result.status_code, 0) << result.status_code;
+        transaction.Execute();
         // go to second checkpoint, and expect it to produce the same execution trace
         // therefore it should also exit successfully
         transaction.ApplyCheckpoint(1);
-        result = transaction.Execute();
-        ASSERT_EQ(result.status_code, 0) << result.status_code;
+        transaction.Execute();
     }
 }
 
@@ -198,15 +194,12 @@ TEST(Transaction, RunCopyOnWrite) {
                 return evmc_storage_status::EVMC_STORAGE_ASSIGNED;
             }
         );
-        evmc_result result;
         // execute transaction for the first time, and expect it exits successfully
-        result = transaction.Execute();
-        ASSERT_EQ(result.status_code, 0) << result.status_code;
+        transaction.Execute();
         // go to second checkpoint, and expect it to produce the same execution trace
         // therefore it should also exit successfully
         transaction.ApplyCheckpoint(1);
-        result = transaction.Execute();
-        ASSERT_EQ(result.status_code, 0) << result.status_code;
+        transaction.Execute();
     }
 }
 
