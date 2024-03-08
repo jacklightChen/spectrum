@@ -68,11 +68,12 @@ class Aria: public Protocol {
     Statistics&         statistics;
     Workload&           workload;
     size_t              batch_size;
+    size_t              batch_count{0};
     size_t              table_partitions;
     AriaTable           table;
     bool                enable_reordering;
     volatile std::atomic<bool>      stop_flag{false};
-    volatile std::atomic<size_t>    tx_counter{1};
+    volatile std::atomic<size_t>    tx_counter{0};
     BS::thread_pool     pool;
     void ParallelEach(
         std::function<void(T*)>             map, 

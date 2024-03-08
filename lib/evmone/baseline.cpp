@@ -317,7 +317,7 @@ evmc_result execute(VM& vm, int64_t gas, ExecutionState& state) noexcept
     auto* tracer = vm.get_tracer();
     if (INTX_UNLIKELY(tracer != nullptr))
     {
-        tracer->notify_execution_start(state.rev, *state.msg, analysis.executable_code);
+        tracer->notify_execution_start(state.rev, *state.msg, vm.analysis->executable_code);
         gas = dispatch<true>(cost_table, state, gas, code.data(), tracer);
     }
     else
