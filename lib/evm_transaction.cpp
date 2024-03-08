@@ -122,6 +122,9 @@ Result Transaction::Execute() {
             EVMC_SHANGHAI, &message,
             &code[0], code.size() - 1
         );
+        if (result.status_code != evmc_status_code::EVMC_SUCCESS) {
+            DLOG(ERROR) << "transaction status: " << result.status_code << std::endl;
+        }
         return Result(result);
     }
     if (evm_type == EVMType::COPYONWRITE) {
@@ -133,9 +136,12 @@ Result Transaction::Execute() {
             EVMC_SHANGHAI, &message,
             &code[0], code.size() - 1
         );
+        if (result.status_code != evmc_status_code::EVMC_SUCCESS) {
+            DLOG(ERROR) << "transaction status: " << result.status_code << std::endl;
+        }
         return Result(result);
     }
-    DLOG(INFO) << "not possible";
+    DLOG(FATAL) << "not possible";
     std::terminate();
 }
 

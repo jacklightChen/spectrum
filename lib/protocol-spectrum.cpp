@@ -244,7 +244,6 @@ std::unique_ptr<T> SpectrumExecutor::Create() {
         const evmc::bytes32 &value
     ) {
         auto _key   = std::make_tuple(addr, key);
-        // push back
         tx->tuples_put.push_back({.key = _key, .value = value});
         if (tx->HasRerunKeys()) { tx->Break(); }
         return evmc_storage_status::EVMC_STORAGE_MODIFIED;
@@ -342,7 +341,7 @@ void SpectrumExecutor::Run() {while (!stop_flag.load()) {
                 if (tx->HasRerunKeys()) { continue; }
             }
         }
-        else if (last_finalized.load() + 1 == tx->id) {
+        else if (last_finalized.load() + 1 == tx->id && !tx->HasRerunKeys()) {
             DLOG(INFO) << "spectrum finalize " << tx->id;
             last_finalized.fetch_add(1);
             for (auto entry: tx->tuples_get) {

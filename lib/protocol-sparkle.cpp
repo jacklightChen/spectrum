@@ -128,7 +128,7 @@ bool SparkleTable::Lock(T* tx, const K k) {
 /// @param tx the transaction that previously read this entry
 /// @param k the key of read entry
 void SparkleTable::RegretGet(T* tx, const K k, size_t version) {
-    DLOG(INFO) << "regret get" << tx->id << std::endl;
+    DLOG(INFO) << "regret get " << tx->id << std::endl;
     Table::Put(k, [&](V& _v) {
         auto guard = std::lock_guard{_v.mu};
         auto vit = _v.entries.begin();
@@ -261,7 +261,6 @@ void SparkleExecutor::Run() { while (!stop_flag.load()) {
     ) {
         DLOG(INFO) << tx->id << " set";
         auto _key   = std::make_tuple(addr, key);
-        table.Lock(tx.get(), _key);
         // when there exists some key, do this
         for (auto& tup: tx->tuples_put) {
             if (std::get<0>(tup) == _key) {

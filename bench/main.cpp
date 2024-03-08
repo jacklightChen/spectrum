@@ -45,7 +45,8 @@ bool to<bool>(std::basic_string_view<char> s) {
     throw std::runtime_error(std::string{fmt::format("cannot recognize ({}) as boolean should be either TRUE or FALSE", s)});
 }
 
-static auto to_duration(std::basic_string_view<char> s) {
+template<>
+milliseconds to<milliseconds>(std::basic_string_view<char> s) {
     std::stringstream is(std::string{s});
 	static const std::unordered_map<std::string, milliseconds> suffix {
         {"ms", 1ms}, {"s", 1s}, {"m", 1min}, {"h", 1h}};
@@ -64,9 +65,16 @@ static auto to_duration(std::basic_string_view<char> s) {
 }
 
 void PrefixFormatter(std::ostream& s, const google::LogMessage& m, void* data) {
-    s << std::setw(7) << std::setfill(' ') << google::GetLogSeverityName(m.severity()) 
-      << " | " 
-      << std::setw(26) << std::setfill(' ')  << fmt::format("{}:{}", m.basename(), m.line()) << " |";
+    auto color = [&m](){
+        switch (m.severity()) {
+            case 0: return "\e[1;36m";
+            case 1: return "\e[1;33m";
+            case 2: return "\e[1;31m";
+            default: return "\e[0;30m";
+        }
+    }();
+    s << color <<  std::setfill(' ') << std::setw(8)  << std::setiosflags(std::ios::left) << google::GetLogSeverityName(m.severity()) << "\e[0;30m"
+      << std::setfill(' ') << std::setw(30) << fmt::format("{}:{}", m.basename(), m.line());
 }
 
 int main(int argc, char* argv[]) {
@@ -116,7 +124,7 @@ int main(int argc, char* argv[]) {
     #undef EVMTYPE
     auto start_time = steady_clock::now();
     protocol->Start();
-    std::this_thread::sleep_for(to_duration(argv[3]));
+    std::this_thread::sleep_for(to<milliseconds>(argv[3]));
     protocol->Stop();
     DLOG(WARNING) << "Debug Mode: don't expect good performance. " << std::endl;
     statistics->PrintWithDuration(duration_cast<milliseconds>(steady_clock::now() - start_time));
