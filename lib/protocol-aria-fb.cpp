@@ -152,7 +152,7 @@ void AriaTable::ReserveGet(T* tx, const K& k) {
 /// @param k the reserved key
 void AriaTable::ReservePut(T* tx, const K& k) {
     Table::Put(k, [&](AriaEntry& entry) {
-        if (entry.batch_id_get != tx->batch_id) {
+        if (entry.batch_id_put != tx->batch_id) {
             entry.reserved_put_tx = nullptr;
             entry.batch_id_put = tx->batch_id;
         }

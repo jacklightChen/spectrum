@@ -5,10 +5,11 @@ namespace spectrum {
 
 using namespace std::chrono;
 
-Serial::Serial(Workload& workload, Statistics& statistics, EVMType evm_type):
+Serial::Serial(Workload& workload, Statistics& statistics, EVMType evm_type, size_t repeat):
     workload{workload},
     statistics{statistics},
-    evm_type{evm_type}
+    evm_type{evm_type},
+    repeat{repeat}
 {
     workload.SetEVMType(evm_type);
 }
@@ -35,9 +36,11 @@ void Serial::Start() {
                 return evmc_storage_status::EVMC_STORAGE_ASSIGNED;
             }
         );
-        transaction.Execute();
-        statistics.JournalExecute();
-        statistics.JournalCommit(duration_cast<milliseconds>(steady_clock::now() - start_time).count());
+        for (size_t i = 0; i < repeat; ++i) {
+            transaction.Execute();
+            statistics.JournalExecute();
+            statistics.JournalCommit(duration_cast<milliseconds>(steady_clock::now() - start_time).count());
+        }
     }});
 }
 

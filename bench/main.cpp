@@ -127,7 +127,7 @@ int main(int argc, char* argv[]) {
         OPT(Aria,     INT, INT, INT, BOOL)
         OPT(Sparkle,  INT, INT)
         OPT(Spectrum, INT, INT, INT, EVMTYPE)
-        OPT(Serial,   EVMTYPE)
+        OPT(Serial,   EVMTYPE, INT)
         #undef OPT
         // fallback to an error
         THROW("unknown protocol option ({})", std::string{name});
