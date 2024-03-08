@@ -4,6 +4,7 @@
 #include "evmone/baseline.hpp"
 #include "evmcow/vm.hpp"
 #include "evmone/vm.hpp"
+#include "hex.hpp"
 #include <evmc/evmc.h>
 #include <evmc/evmc.hpp>
 #include <variant>
@@ -124,13 +125,16 @@ void Transaction::Execute() {
         auto& _vm = std::get<evmone::VM>(vm);
         auto host_interface = &host.get_interface();
         auto host_context   = host.to_context();
-        auto result = evmone::baseline::execute(
+        const auto result = evmone::baseline::execute(
             _vm, host_interface, host_context, 
             EVMC_SHANGHAI, &message,
             &code[0], code.size() - 1
         );
         if (result.status_code != evmc_status_code::EVMC_SUCCESS) {
-            DLOG(ERROR) << "transaction status: " << result.status_code << std::endl;
+            DLOG(ERROR) << "function hash: " << to_hex(std::span{&input[0], 4}) <<  " transaction status: " << result.status_code << std::endl;
+        }
+        if (result.output_data) {
+            result.release(&result);
         }
         return;
         // return Result(result);
@@ -139,13 +143,16 @@ void Transaction::Execute() {
         auto& _vm = std::get<evmcow::VM>(vm);
         auto host_interface = &host.get_interface();
         auto host_context   = host.to_context();
-        auto result = evmcow::baseline::execute(
+        const auto result = evmcow::baseline::execute(
             _vm, host_interface, host_context,
             EVMC_SHANGHAI, &message,
             &code[0], code.size() - 1
         );
         if (result.status_code != evmc_status_code::EVMC_SUCCESS) {
             DLOG(ERROR) << "transaction status: " << result.status_code << std::endl;
+        }
+        if (result.output_data) {
+            result.release(&result);
         }
         return;
         // return Result(result);
