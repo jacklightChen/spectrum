@@ -30,9 +30,9 @@ void Statistics::JournalExecute() {
     count_execution += 1;
 }
 
-void Statistics::Print() {
+std::string Statistics::Print() {
     auto guard = std::lock_guard{mu};
-    fmt::print(
+    return std::string(fmt::format(
         "@{}\n"
         "commit        {}\n"
         "execution     {}\n"
@@ -47,13 +47,13 @@ void Statistics::Print() {
         count_latency_50ms,
         count_latency_100ms,
         count_latency_100ms_above
-    );
+    ));
 }
 
-void Statistics::PrintWithDuration(std::chrono::milliseconds duration) {
+std::string Statistics::PrintWithDuration(std::chrono::milliseconds duration) {
     auto guard = std::lock_guard{mu};
     #define AVG(X) ((double)(X) / (double)(duration.count()) * (double)(1000))
-    fmt::print(
+    return std::string(fmt::format(
         "@{}\n"
         "duration      {}\n"
         "commit        {:.4f} tx/s\n"
@@ -70,7 +70,7 @@ void Statistics::PrintWithDuration(std::chrono::milliseconds duration) {
         AVG(count_latency_50ms),
         AVG(count_latency_100ms),
         AVG(count_latency_100ms_above)
-    );
+    ));
     #undef AVG
 }
 

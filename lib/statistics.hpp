@@ -18,8 +18,8 @@ class Statistics {
     Statistics(const Statistics& statistics) = delete;
     void JournalCommit(size_t latency);
     void JournalExecute();
-    void Print();
-    void PrintWithDuration(std::chrono::milliseconds duration);
+    std::string Print();
+    std::string PrintWithDuration(std::chrono::milliseconds duration);
 };
 
 } // namespace spectrum

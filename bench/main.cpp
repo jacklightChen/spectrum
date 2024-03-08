@@ -144,5 +144,5 @@ int main(int argc, char* argv[]) {
     protocol->Stop();
     // stop running and print statistics
     DLOG(WARNING) << "Debug Mode: don't expect good performance. " << std::endl;
-    LOG(INFO) << "\n" << statistics->PrintWithDuration(duration_cast<milliseconds>(steady_clock::now() - start_time));
+    std::cerr << statistics->PrintWithDuration(duration_cast<milliseconds>(steady_clock::now() - start_time));
 }
