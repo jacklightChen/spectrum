@@ -5,6 +5,7 @@
 #include <thread>
 #include <chrono>
 #include <glog/logging.h>
+#include <fmt/core.h>
 
 /*
     This is a implementation of "Sparkle: Speculative Deterministic Concurrency Control for Partially Replicated Transactional Data Stores" (Zhongmiao Li, Peter Van Roy and Paolo Romano). 
@@ -216,7 +217,9 @@ Sparkle::Sparkle(Workload& workload, Statistics& statistics, size_t n_threads, s
     statistics{statistics},
     n_threads{n_threads},
     table{table_partitions}
-{}
+{
+    LOG(INFO) << fmt::format("Sparkle({}, {})", n_threads, table_partitions);
+}
 
 /// @brief start sparkle protocol
 /// @param n_threads the number of threads to start
@@ -252,7 +255,7 @@ SparkleExecutor::SparkleExecutor(Sparkle& sparkle):
 
 /// @brief start an executor
 void SparkleExecutor::Run() { while (!stop_flag.load()) {
-    auto tx = std::unique_ptr<T>(new T(std::move(workload.Next()), last_execute.fetch_add(1)));
+    auto tx = std::make_unique<T>(std::move(workload.Next()), last_execute.fetch_add(1));
     auto start = steady_clock::now();
     tx->UpdateSetStorageHandler([&](
         const evmc::address &addr, 

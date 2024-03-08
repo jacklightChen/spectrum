@@ -85,7 +85,7 @@ if(DEBUG)
     )
 else()
     add_compile_options(
-        -O2 -Wall -Wno-reorder -Wno-attributes
+        -flto -O2 -Wall -Wno-reorder -Wno-attributes
         -DNDEBUG
         -DPROJECT_VERSION="0.12.0-dev"
         -DEVMONE_X86_64_ARCH_LEVEL=${EVMONE_X86_64_ARCH_LEVEL}
@@ -133,8 +133,8 @@ target_compile_features(
 )
 target_link_libraries(
     spectrum
-    PUBLIC evmc intx::intx
-    PRIVATE ethash::keccak fmt glog::glog
+    PUBLIC evmc intx::intx fmt
+    PRIVATE ethash::keccak glog::glog
 )
 
 unset(SRC)

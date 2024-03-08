@@ -12,6 +12,7 @@
 #include <optional>
 #include <iostream>
 #include <glog/logging.h>
+#include <iomanip>
 
 #ifdef NDEBUG
 #define release_inline gnu::always_inline, msvc::forceinline
@@ -261,9 +262,10 @@ int64_t dispatch(const CostTable& cost_table, ExecutionState& state, int64_t gas
 
         #if EVM_PRINT_INSTRUCTIONS
         switch (op) {
-            #define ON_OPCODE(OPCODE)                                                                                     \
-            case OPCODE:                                                                                                  \
-                DLOG(INFO) << #OPCODE << "\t\t" << static_cast<uint32_t>(position.code_it - code);            \
+            #define ON_OPCODE(OPCODE)                                                                          \
+            case OPCODE:                                                                                       \
+                DLOG(INFO) << std::setw(15) << std::setfill(' ') << std::setiosflags(std::ios::left)           \
+                           << #OPCODE << static_cast<uint32_t>(position.code_it - code);                       \
                 break;
             MAP_OPCODES
             #undef ON_OPCODE

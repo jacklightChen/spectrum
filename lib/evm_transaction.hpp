@@ -10,13 +10,15 @@
 #include <variant>
 #include <vector>
 #include <span>
+#include <stdexcept>
+#include <fmt/core.h>
 
 namespace spectrum {
 
 enum EVMType {
-    BASIC,
-    STRAWMAN,
-    COPYONWRITE
+    BASIC       = 0,
+    STRAWMAN    = 1,
+    COPYONWRITE = 2
 };
 
 EVMType ParseEVMType(std::basic_string_view<char> s);
@@ -58,3 +60,19 @@ class Transaction {
 };
 
 } // namespace spectrum
+
+template<>
+struct fmt::formatter<spectrum::EVMType>
+{
+  template<typename ParseContext>
+  constexpr auto parse(ParseContext& ctx) {
+    return ctx.begin();
+  }
+
+  template<typename FormatContext>
+  auto format(spectrum::EVMType const& value, FormatContext& ctx) const {
+    #define OPT(X) case spectrum::EVMType::X: return fmt::format_to(ctx.out(), "{}", #X);
+    switch (value) {OPT(BASIC) OPT(STRAWMAN) OPT(COPYONWRITE)}
+    #undef  OPT
+  }
+};

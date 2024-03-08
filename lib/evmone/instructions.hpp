@@ -163,12 +163,12 @@ inline constexpr auto invalid = stop_impl<EVMC_INVALID_INSTRUCTION>;
 
 inline void add(StackTop stack) noexcept
 {
-    stack.top() += stack.pop();
+    stack[0] += stack.pop();
 }
 
 inline void mul(StackTop stack) noexcept
 {
-    stack.top() *= stack.pop();
+    stack[0] *= stack.pop();
 }
 
 inline void sub(StackTop stack) noexcept
@@ -205,7 +205,7 @@ inline void addmod(StackTop stack) noexcept
 {
     const auto& x = stack.pop();
     const auto& y = stack.pop();
-    auto& m = stack.top();
+    auto& m = stack[0];
     m = m != 0 ? intx::addmod(x, y, m) : 0;
 }
 
@@ -220,7 +220,7 @@ inline void mulmod(StackTop stack) noexcept
 inline Result exp(StackTop stack, int64_t gas_left, ExecutionState& state) noexcept
 {
     const auto& base = stack.pop();
-    auto& exponent = stack.top();
+    auto& exponent = stack[0];
 
     const auto exponent_significant_bytes =
         static_cast<int>(intx::count_significant_bytes(exponent));
@@ -236,7 +236,7 @@ inline Result exp(StackTop stack, int64_t gas_left, ExecutionState& state) noexc
 inline void signextend(StackTop stack) noexcept
 {
     const auto& ext = stack.pop();
-    auto& x = stack.top();
+    auto& x = stack[0];
 
     if (ext < 31)  // For 31 we also don't need to do anything.
     {
@@ -298,33 +298,33 @@ inline void eq(StackTop stack) noexcept
 
 inline void iszero(StackTop stack) noexcept
 {
-    stack.top() = stack.top() == 0;
+    stack[0] = stack[0] == 0;
 }
 
 inline void and_(StackTop stack) noexcept
 {
-    stack.top() &= stack.pop();
+    stack[0] &= stack.pop();
 }
 
 inline void or_(StackTop stack) noexcept
 {
-    stack.top() |= stack.pop();
+    stack[0] |= stack.pop();
 }
 
 inline void xor_(StackTop stack) noexcept
 {
-    stack.top() ^= stack.pop();
+    stack[0] ^= stack.pop();
 }
 
 inline void not_(StackTop stack) noexcept
 {
-    stack.top() = ~stack.top();
+    stack[0] = ~stack[0];
 }
 
 inline void byte(StackTop stack) noexcept
 {
     const auto& n = stack.pop();
-    auto& x = stack.top();
+    auto& x = stack[0];
 
     const bool n_valid = n < 32;
     const uint64_t byte_mask = (n_valid ? 0xff : 0);
@@ -338,18 +338,18 @@ inline void byte(StackTop stack) noexcept
 
 inline void shl(StackTop stack) noexcept
 {
-    stack.top() <<= stack.pop();
+    stack[0] <<= stack.pop();
 }
 
 inline void shr(StackTop stack) noexcept
 {
-    stack.top() >>= stack.pop();
+    stack[0] >>= stack.pop();
 }
 
 inline void sar(StackTop stack) noexcept
 {
     const auto& y = stack.pop();
-    auto& x = stack.top();
+    auto& x = stack[0];
 
     const bool is_neg = static_cast<int64_t>(x[3]) < 0;  // Inspect the top bit (words are LE).
     const auto sign_mask = is_neg ? ~uint256{} : uint256{};
@@ -361,7 +361,7 @@ inline void sar(StackTop stack) noexcept
 inline Result keccak256(StackTop stack, int64_t gas_left, ExecutionState& state) noexcept
 {
     const auto& index = stack.pop();
-    auto& size = stack.top();
+    auto& size = stack[0];
 
     if (!check_memory(gas_left, state.memory, index, size))
         return {EVMC_OUT_OF_GAS, gas_left};
@@ -386,7 +386,7 @@ inline void address(StackTop stack, ExecutionState& state) noexcept
 
 inline Result balance(StackTop stack, int64_t gas_left, ExecutionState& state) noexcept
 {
-    auto& x = stack.top();
+    auto& x = stack[0];
     const auto addr = intx::be::trunc<evmc::address>(x);
 
     if (state.rev >= EVMC_BERLIN && state.host.access_account(addr) == EVMC_ACCESS_COLD)
@@ -416,7 +416,7 @@ inline void callvalue(StackTop stack, ExecutionState& state) noexcept
 
 inline void calldataload(StackTop stack, ExecutionState& state) noexcept
 {
-    auto& index = stack.top();
+    auto& index = stack[0];
 
     if (state.msg->input_size < index)
         index = 0;
@@ -513,7 +513,7 @@ inline void basefee(StackTop stack, ExecutionState& state) noexcept
 
 inline void blobhash(StackTop stack, ExecutionState& state) noexcept
 {
-    auto& index = stack.top();
+    auto& index = stack[0];
     const auto& tx = state.get_tx_context();
 
     index = (index < tx.blob_hashes_count) ?
@@ -528,7 +528,7 @@ inline void blobbasefee(StackTop stack, ExecutionState& state) noexcept
 
 inline Result extcodesize(StackTop stack, int64_t gas_left, ExecutionState& state) noexcept
 {
-    auto& x = stack.top();
+    auto& x = stack[0];
     const auto addr = intx::be::trunc<evmc::address>(x);
 
     if (state.rev >= EVMC_BERLIN && state.host.access_account(addr) == EVMC_ACCESS_COLD)
@@ -576,7 +576,7 @@ inline Result extcodecopy(StackTop stack, int64_t gas_left, ExecutionState& stat
 
 inline Result returndataload(StackTop stack, int64_t gas_left, ExecutionState& state) noexcept
 {
-    auto& index = stack.top();
+    auto& index = stack[0];
 
     if (state.return_data.size() < index)
         return {EVMC_INVALID_MEMORY_ACCESS, gas_left};
@@ -631,7 +631,7 @@ inline Result returndatacopy(StackTop stack, int64_t gas_left, ExecutionState& s
 
 inline Result extcodehash(StackTop stack, int64_t gas_left, ExecutionState& state) noexcept
 {
-    auto& x = stack.top();
+    auto& x = stack[0];
     const auto addr = intx::be::trunc<evmc::address>(x);
 
     if (state.rev >= EVMC_BERLIN && state.host.access_account(addr) == EVMC_ACCESS_COLD)
@@ -647,7 +647,7 @@ inline Result extcodehash(StackTop stack, int64_t gas_left, ExecutionState& stat
 
 inline void blockhash(StackTop stack, ExecutionState& state) noexcept
 {
-    auto& number = stack.top();
+    auto& number = stack[0];
 
     const auto upper_bound = state.get_tx_context().block_number;
     const auto lower_bound = std::max(upper_bound - 256, decltype(upper_bound){0});
@@ -697,7 +697,7 @@ inline void selfbalance(StackTop stack, ExecutionState& state) noexcept
 
 inline Result mload(StackTop stack, int64_t gas_left, ExecutionState& state) noexcept
 {
-    auto& index = stack.top();
+    auto& index = stack[0];
 
     if (!check_memory(gas_left, state.memory, index, 32))
         return {EVMC_OUT_OF_GAS, gas_left};
@@ -814,7 +814,7 @@ inline Result gas(StackTop stack, int64_t gas_left, ExecutionState& /*state*/) n
 
 inline void tload(StackTop stack, ExecutionState& state) noexcept
 {
-    auto& x = stack.top();
+    auto& x = stack[0];
     const auto key = intx::be::store<evmc::bytes32>(x);
     const auto value = state.host.get_transient_storage(state.msg->recipient, key);
     x = intx::be::load<uint256>(value);
@@ -883,7 +883,7 @@ inline code_iterator push(StackTop stack, ExecutionState& /*state*/, code_iterat
     auto data = pos + 1;
 
     stack.push(0);
-    auto& r = stack.top();
+    auto& r = stack[0];
 
     // Load top partial word.
     if constexpr (num_partial_bytes != 0)
@@ -919,17 +919,24 @@ inline void swap(StackTop stack) noexcept
 {
     static_assert(N >= 1 && N <= 16);
 
-    // The simple std::swap(stack.top(), stack[N]) is not used to workaround
+    // The simple std::swap(stack[0], stack[N]) is not used to workaround
     // clang missed optimization: https://github.com/llvm/llvm-project/issues/59116
     // TODO(clang): Check if #59116 bug fix has been released.
 
     auto& a = stack[N];
-    auto& t = stack.top();
+    auto& t = stack[0];
     auto t0 = t[0];
     auto t1 = t[1];
     auto t2 = t[2];
     auto t3 = t[3];
-    t = a;
+    auto a0 = a[0];
+    auto a1 = a[1];
+    auto a2 = a[2];
+    auto a3 = a[3];
+    t[0] = a0;
+    t[1] = a1;
+    t[2] = a2;
+    t[3] = a3;
     a[0] = t0;
     a[1] = t1;
     a[2] = t2;
@@ -945,7 +952,7 @@ inline code_iterator dupn(StackTop stack, code_iterator pos) noexcept
 inline code_iterator swapn(StackTop stack, code_iterator pos) noexcept
 {
     // TODO: This may not be optimal, see instr::core::swap().
-    std::swap(stack.top(), stack[pos[1] + 1]);
+    std::swap(stack[0], stack[pos[1] + 1]);
     return pos + 2;
 }
 
@@ -973,7 +980,7 @@ inline Result mcopy(StackTop stack, int64_t gas_left, ExecutionState& state) noe
 
 inline void dataload(StackTop stack, ExecutionState& state) noexcept
 {
-    auto& index = stack.top();
+    auto& index = stack[0];
 
     if (state.data.size() < index)
         index = 0;
@@ -1078,7 +1085,7 @@ inline code_iterator callf(StackTop stack, ExecutionState& state, code_iterator 
 {
     const auto index = read_uint16_be(&pos[1]);
     const auto& header = state.analysis.baseline->eof_header;
-    const auto stack_size = &stack.top() - state.stack_space.bottom();
+    const auto stack_size = &stack[0] - state.stack_space.bottom();
 
     const auto callee_required_stack_size =
         header.types[index].max_stack_height - header.types[index].inputs;
@@ -1112,7 +1119,7 @@ inline code_iterator jumpf(StackTop stack, ExecutionState& state, code_iterator 
 {
     const auto index = read_uint16_be(&pos[1]);
     const auto& header = state.analysis.baseline->eof_header;
-    const auto stack_size = &stack.top() - state.stack_space.bottom();
+    const auto stack_size = &stack[0] - state.stack_space.bottom();
 
     const auto callee_required_stack_size =
         header.types[index].max_stack_height - header.types[index].inputs;

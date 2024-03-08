@@ -2,6 +2,7 @@
 #include "./hex.hpp"
 #include <optional>
 #include <glog/logging.h>
+#include <fmt/core.h>
 
 namespace spectrum {
 
@@ -12,6 +13,7 @@ Smallbank::Smallbank(size_t num_elements, double zipf_exponent):
         std::unique_ptr<Random>(new Unif(num_elements))
     )}
 {
+    LOG(INFO) << fmt::format("Smallbank({}, {})", num_elements, zipf_exponent);
     this->code = spectrum::from_hex(std::string{
         "608060405234801561001057600080fd5b506004361061007d5760003560e01c806397"
         "b632121161005b57806397b63212146100ea578063a5843f0814610106578063ad0f98"

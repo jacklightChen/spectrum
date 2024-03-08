@@ -20,6 +20,7 @@ using namespace std::chrono;
 
 #define NUMARGS_HELPER(_1, _2, _3, _4, _5, _6, _7, _8, _9, _10, N, ...)    N
 #define NUMARGS(X...)  NUMARGS_HELPER(X, 10, 9, 8, 7, 6, 5, 4, 3, 2, 1, 0)
+#define THROW(X...)   throw std::runtime_error(std::string{fmt::format(X)})
 
 static auto split(std::basic_string_view<char> s) {
     auto iter = s | std::ranges::views::split(':')
@@ -42,7 +43,7 @@ template<>
 bool to<bool>(std::basic_string_view<char> s) {
     if (s == "TRUE")    { return true; }
     if (s == "FALSE")   { return false; }
-    throw std::runtime_error(std::string{fmt::format("cannot recognize ({}) as boolean should be either TRUE or FALSE", s)});
+    THROW("cannot recognize ({}) as boolean should be either TRUE or FALSE", s);
 }
 
 template<>
@@ -88,47 +89,48 @@ int main(int argc, char* argv[]) {
     CHECK(argc == 4) << "Except google logging flags, we only expect 3 flags. ";
     DLOG(WARNING) << "Debug Mode: don't expect good performance. " << std::endl;
     // declare a statistics collector
-    auto statistics = std::unique_ptr<Statistics>(new Statistics());
+    auto statistics = std::make_unique<Statistics>();
     // declare some helper macros for argument parser (by default, we name the token iterator by 'iter')
-    #define INT     to<size_t>(*iter++)
-    #define DOUBLE  to<double>(*iter++)
-    #define BOOL    to<bool>(*iter++)
-    #define EVMTYPE ParseEVMType(*iter++)
+    #define INT     to<size_t>  (*(iter++))
+    #define DOUBLE  to<double>  (*(iter++))
+    #define BOOL    to<bool>    (*(iter++))
+    #define EVMTYPE ParseEVMType(*(iter++))
     // parse workload parameters
     auto workload = [argv](){
         auto args = split(argv[2]);
-        auto iter = args.begin();
-        auto name = *iter++;
+        auto name = *args.begin();
+        auto dist = (size_t) (std::distance(args.begin(), args.end()) - 1);
+        auto iter = args.rbegin();
         // map each option to an argparser
         #define OPT(X, Y...) if (name == #X) { \
-            auto dist = (size_t) (std::distance(args.begin(), args.end()) - 1); \
-            auto n = (size_t) NUMARGS(Y); \
-            if (dist != n) throw std::runtime_error(std::string{fmt::format("protocol {} has {} args -- ({}), but we found {} args", #X, n, #Y, dist)}); \
-            return std::unique_ptr<Workload>(new X (Y)); \
+            auto n = (size_t) NUMARGS(Y);      \
+            DLOG(INFO) << #Y << std::endl;     \
+            if (dist != n) THROW("workload {} has {} args -- ({}), but we found {} args", #X, n, #Y, dist); \
+            return static_cast<std::unique_ptr<Workload>>(std::make_unique<X>(Y)); \
         };
         OPT(Smallbank, INT, DOUBLE)
         #undef OPT
         // fallback to an error
-        throw std::runtime_error(std::string{fmt::format("unknown workload option ({})", std::string{name})});
+        THROW("unknown workload option ({})", std::string{name});
     }();
     // parse protocol parameters
     auto protocol = [&](){
         auto args = split(argv[1]);
-        auto iter = args.begin();
-        auto name = *iter++;
+        auto name = *args.begin();
+        auto dist = (size_t) (std::distance(args.begin(), args.end()) - 1);
+        auto iter = args.rbegin();
         // map each option to an argparser
         #define OPT(X, Y...) if (name == #X) { \
-            auto dist = (size_t) (std::distance(args.begin(), args.end()) - 1); \
-            auto n = (size_t) NUMARGS(Y); \
-            if (dist != n) throw std::runtime_error(std::string{fmt::format("protocol {} has {} args -- ({}), but we found {} args", #X, n, #Y, dist)}); \
-            return std::unique_ptr<Protocol>(new X (*workload, *statistics.get(), Y)); \
+            auto n = (size_t) NUMARGS(Y);      \
+            if (dist != n) THROW("protocol {} has {} args -- ({}), but we found {} args", #X, n, #Y, dist); \
+            return static_cast<std::unique_ptr<Protocol>>(std::make_unique<X>(*workload, *statistics, Y));  \
         };
         OPT(Aria,     INT, INT, INT, BOOL)
         OPT(Sparkle,  INT, INT)
         OPT(Spectrum, INT, INT, INT, EVMTYPE)
         #undef OPT
         // fallback to an error
-        throw std::runtime_error(std::string{fmt::format("unknown protocol option ({})", std::string{name})});
+        THROW("unknown protocol option ({})", std::string{name});
     }();
     // parse test duration parameter
     auto duration = to<milliseconds>(argv[3]);
@@ -146,3 +148,5 @@ int main(int argc, char* argv[]) {
     DLOG(WARNING) << "Debug Mode: don't expect good performance. " << std::endl;
     std::cerr << statistics->PrintWithDuration(duration_cast<milliseconds>(steady_clock::now() - start_time));
 }
+
+#undef THROW

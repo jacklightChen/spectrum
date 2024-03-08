@@ -6,6 +6,7 @@
 #include <chrono>
 #include <glog/logging.h>
 #include <ranges>
+#include <fmt/core.h>
 
 /*
     This is a implementation of "Spectrum: Speculative Deterministic Concurrency Control for Partially Replicated Transactional Data Stores" (Zhongmiao Li, Peter Van Roy and Paolo Romano). 
@@ -197,7 +198,9 @@ Spectrum::Spectrum(Workload& workload, Statistics& statistics, size_t n_threads,
     table{table_partitions},
     queue_amplification{queue_amplification},
     evm_type{evm_type}
-{}
+{
+    LOG(INFO) << fmt::format("Spectrum({}, {}, {}, {})", n_threads, table_partitions, queue_amplification, evm_type);
+}
 
 /// @brief start spectrum protocol
 /// @param n_threads the number of threads to start
@@ -237,7 +240,7 @@ SpectrumExecutor::SpectrumExecutor(Spectrum& spectrum):
 
 /// @brief generate a transaction and execute it
 std::unique_ptr<T> SpectrumExecutor::Create() {
-    auto tx = std::unique_ptr<T>(new T(std::move(workload.Next()), last_execute.fetch_add(1)));
+    auto tx = std::make_unique<T>(std::move(workload.Next()), last_execute.fetch_add(1));
     tx->UpdateSetStorageHandler([&](
         const evmc::address &addr, 
         const evmc::bytes32 &key, 
