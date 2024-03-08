@@ -11,6 +11,7 @@ class Workload {
     public:
     virtual Transaction Next() = 0;
     virtual void SetEVMType(EVMType ty) = 0;
+    virtual ~Workload() = default;
 
 };
 
