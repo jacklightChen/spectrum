@@ -75,7 +75,7 @@ class Aria: public Protocol {
     volatile std::atomic<size_t>    tx_counter{1};
     BS::thread_pool     pool;
     void ParallelEach(
-        std::function<void(T&)>             map, 
+        std::function<void(T*)>             map, 
         std::vector<std::unique_ptr<T>>&    batch
     );
     std::unique_ptr<T> NextTransaction();
@@ -89,12 +89,12 @@ class Aria: public Protocol {
 
 /// @brief routines to be executed in various execution stages
 struct AriaExecutor {
-    static void Execute(T& tx, AriaTable& table);
-    static void Reserve(T& tx, AriaTable& table);
-    static void Verify(T& tx, AriaTable& table, bool enable_reordering);
-    static void Commit(T& tx, AriaTable& table);
-    static void PrepareLockTable(T& tx, AriaLockTable& lock_table);
-    static void Fallback(T& tx, AriaTable& table, AriaLockTable& lock_table);
+    static void Execute(T* tx, AriaTable& table);
+    static void Reserve(T* tx, AriaTable& table);
+    static void Verify(T* tx, AriaTable& table, bool enable_reordering);
+    static void Commit(T* tx, AriaTable& table);
+    static void PrepareLockTable(T* tx, AriaLockTable& lock_table);
+    static void Fallback(T* tx, AriaTable& table, AriaLockTable& lock_table);
 };
 
 #undef K

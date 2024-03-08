@@ -118,7 +118,7 @@ void Transaction::Break() {
     }
 }
 
-Result Transaction::Execute() {
+void Transaction::Execute() {
     auto guard = std::lock_guard{*mu};
     if (evm_type == EVMType::BASIC || evm_type == EVMType::STRAWMAN) {
         auto& _vm = std::get<evmone::VM>(vm);
@@ -132,7 +132,8 @@ Result Transaction::Execute() {
         if (result.status_code != evmc_status_code::EVMC_SUCCESS) {
             DLOG(ERROR) << "transaction status: " << result.status_code << std::endl;
         }
-        return Result(result);
+        return;
+        // return Result(result);
     }
     if (evm_type == EVMType::COPYONWRITE) {
         auto& _vm = std::get<evmcow::VM>(vm);
@@ -146,7 +147,8 @@ Result Transaction::Execute() {
         if (result.status_code != evmc_status_code::EVMC_SUCCESS) {
             DLOG(ERROR) << "transaction status: " << result.status_code << std::endl;
         }
-        return Result(result);
+        return;
+        // return Result(result);
     }
     LOG(FATAL) << "not possible";
 }
