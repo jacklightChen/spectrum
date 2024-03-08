@@ -4,7 +4,7 @@
 - [x] Aria w/o Reordering
 - [ ] Calvin
 - [ ] TPC-C
-- [ ] Serial
+- [x] Serial
 
 # Instructions
 
