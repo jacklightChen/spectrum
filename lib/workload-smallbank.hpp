@@ -9,6 +9,7 @@ class Smallbank: public Workload {
     std::basic_string<uint8_t>  code;
     EVMType                     evm_type;
     std::unique_ptr<Random>     rng;
+    std::mutex                  mu;
 
     public:
     Smallbank(size_t num_elements, double zipf_exponent);

@@ -39,17 +39,16 @@ Aria::Aria(
 /// @param map the function to execute
 /// @param batch the current aria batch to work on
 void Aria::ParallelEach(
-    std::function<void(T&)>                                 map, 
-    std::vector<std::optional<std::unique_ptr<T>>>&         batch
+    std::function<void(T&)>             map, 
+    std::vector<std::unique_ptr<T>>&    batch
 ) {
     pool.submit_loop(
         size_t{0}, batch.size(), 
         [&](size_t i) {
-            if (batch[i] == std::nullopt) {
-                batch[i].emplace(std::move(this->NextTransaction()));
+            if (batch[i] == nullptr) {
+                batch[i] = this->NextTransaction();
             }
-            auto tx = batch[i].value().get();
-            map(*tx);
+            map(*batch[i]);
         }
     ).wait();
 }
@@ -58,7 +57,7 @@ void Aria::ParallelEach(
 /// @return the wrapped transactions
 std::unique_ptr<T> Aria::NextTransaction() {
     auto id = tx_counter.fetch_add(1);
-    return std::unique_ptr<T>(new T(std::move(workload.Next()), id, id / batch_size));
+    return std::make_unique<T>(std::move(workload.Next()), id, id / batch_size);
 }
 
 /// @brief start aria protocol
@@ -69,9 +68,9 @@ void Aria::Start() {
     #define LATENCY duration_cast<microseconds>(steady_clock::now() - tx.start_time).count()
     pool.detach_task([&]() {while(!stop_flag.load()) {
         // -- construct an empty batch
-        auto batch = std::vector<std::optional<std::unique_ptr<T>>>();
+        auto batch = std::vector<std::unique_ptr<T>>();
         for (size_t i = 0; i < batch_size; ++i) {
-            batch.push_back(std::nullopt);
+            batch.push_back(nullptr);
         }
         DLOG(INFO) << fmt::format("aria generate batch-{}", batch_count) << std::endl;
         // -- execution stage

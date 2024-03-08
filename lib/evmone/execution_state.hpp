@@ -26,7 +26,7 @@ class StackSpace
 {
 public:
     /// The maximum number of EVM stack items.
-    static constexpr auto limit = 1024;
+    static constexpr auto limit = 4096;
 
     /// Returns the pointer to the "bottom", i.e. below the stack space.
     [[nodiscard, clang::no_sanitize("bounds")]] uint256* bottom() const noexcept

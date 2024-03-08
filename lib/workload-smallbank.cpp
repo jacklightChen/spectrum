@@ -7,7 +7,7 @@
 namespace spectrum {
 
 Smallbank::Smallbank(size_t num_elements, double zipf_exponent): 
-    evm_type{EVMType::BASIC},
+    evm_type{EVMType::COPYONWRITE},
     rng{(zipf_exponent > 0.0 ? 
         std::unique_ptr<Random>(new Zipf(num_elements, zipf_exponent)) : 
         std::unique_ptr<Random>(new Unif(num_elements))
@@ -72,8 +72,9 @@ inline std::string to_string(uint32_t key) {
 
 Transaction Smallbank::Next() {
     DLOG(INFO) << "smallbank next" << std::endl;
+    auto guard  = std::lock_guard{mu};
+    auto option = rng->Next() % 6;
     #define X to_string(rng->Next())
-    auto option = rng->Next() % 5;
     auto input = spectrum::from_hex([&](){switch (option) {
         case 0: return std::string{"1e010439"} + X;
         case 1: return std::string{"bb27eb2c"} + X + X;

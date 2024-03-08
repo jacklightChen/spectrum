@@ -76,7 +76,7 @@ class Aria: public Protocol {
     BS::thread_pool     pool;
     void ParallelEach(
         std::function<void(T&)>             map, 
-        std::vector<std::optional<std::unique_ptr<T>>>&      batch
+        std::vector<std::unique_ptr<T>>&    batch
     );
     std::unique_ptr<T> NextTransaction();
 

@@ -30,7 +30,7 @@ class StackSpace
 {
 public:
     /// The maximum number of EVM stack items.
-    static constexpr auto limit = 1024;
+    static constexpr auto limit = 4096;
 
     /// Returns the pointer to the "bottom", i.e. below the stack space.
     [[nodiscard, clang::no_sanitize("bounds")]] uint256* bottom() const noexcept
@@ -92,8 +92,7 @@ public:
         ownership[slice_index] = true;
         base += 64;
         if (base > limit) {
-            DLOG(INFO) << "exceed stack height limit";
-            std::terminate();
+            LOG(FATAL) << "exceed stack height limit";
         }
         if (old_slice != nullptr) {
             memcpy(new_slice, old_slice, 64 * sizeof(uint256));

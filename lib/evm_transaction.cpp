@@ -141,8 +141,7 @@ Result Transaction::Execute() {
         }
         return Result(result);
     }
-    DLOG(FATAL) << "not possible";
-    std::terminate();
+    LOG(FATAL) << "not possible";
 }
 
 Result::Result(evmc_result result):

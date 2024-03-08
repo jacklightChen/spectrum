@@ -218,7 +218,12 @@ template <Opcode Op>
     }
     const auto old_height = state.stack_top.height;
     const auto new_pos = invoke(instr::core::impl<Op>, pos, gas, state);
-    state.stack_top.height = old_height + instr::traits[Op].stack_height_change;
+    if (instr::traits[Op].stack_height_change > 0) {
+        state.stack_top.height = old_height + instr::traits[Op].stack_height_change;
+    }
+    else {
+        state.stack_top.height = old_height - (-instr::traits[Op].stack_height_change);
+    }
     return {new_pos};
 }
 
@@ -293,7 +298,6 @@ int64_t dispatch(const CostTable& cost_table, ExecutionState& state, int64_t gas
                 {                                                                                     \
                     /* Update current position only when no error,                                    \
                        this improves compiler optimization. */                                        \
-                    if (next.code_it == position.code_it) { std::terminate(); }                       \
                     position = next;                                                                  \
                                                                                                       \
                 }                                                                                     \

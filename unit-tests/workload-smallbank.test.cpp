@@ -7,6 +7,8 @@
 #include <chrono>
 #include <thread>
 #include <spectrum/statistics.hpp>
+#include "glog-prefix-install.hpp"
+
 
 namespace {
 
@@ -36,6 +38,7 @@ class MockTable {
 };
 
 TEST(Smallbank, JustRunWorkload) {
+    GLOG_PREFIX;
     auto workload    = spectrum::Smallbank(10000, 0.0);
     auto table       = MockTable();
     auto stop_flag   = std::atomic<bool>{false};

@@ -7,32 +7,27 @@
 #include "evmone/vm.hpp"
 #include <evmc/evmc.h>
 #include <evmc/evmc.hpp>
-#include <variant>
-#include <vector>
+#include <fmt/core.h>
 #include <span>
 #include <stdexcept>
-#include <fmt/core.h>
+#include <variant>
+#include <vector>
 
 namespace spectrum {
 
-enum EVMType {
-    BASIC       = 0,
-    STRAWMAN    = 1,
-    COPYONWRITE = 2
-};
+enum EVMType { BASIC = 0, STRAWMAN = 1, COPYONWRITE = 2 };
 
 EVMType ParseEVMType(std::basic_string_view<char> s);
 
-struct Result: public evmc_result {
+struct Result : public evmc_result {
 
     Result(evmc_result result);
     ~Result();
-
 };
 
 class Transaction {
 
-    private:
+  private:
     std::variant<evmone::VM, evmcow::VM> vm;
     spectrum::Host host;
     spectrum::EVMType evm_type;
@@ -42,37 +37,29 @@ class Transaction {
     std::vector<uint8_t> input;
     evmc_message message;
 
-    public:
-    Transaction(
-        EVMType evm_type, 
-        evmc::address from, 
-        evmc::address to,
-        std::span<uint8_t> code,
-        std::span<uint8_t> input
-    );
-    void UpdateSetStorageHandler(spectrum::SetStorage&& handler);
-    void UpdateGetStorageHandler(spectrum::GetStorage&& handler);
+  public:
+    Transaction(EVMType evm_type, evmc::address from, evmc::address to,
+                std::span<uint8_t> code, std::span<uint8_t> input);
+    void UpdateSetStorageHandler(spectrum::SetStorage &&handler);
+    void UpdateGetStorageHandler(spectrum::GetStorage &&handler);
     Result Execute();
     void Break();
     void ApplyCheckpoint(size_t checkpoint_id);
     size_t MakeCheckpoint();
-
 };
 
 } // namespace spectrum
 
-template<>
-struct fmt::formatter<spectrum::EVMType>
-{
-  template<typename ParseContext>
-  constexpr auto parse(ParseContext& ctx) {
-    return ctx.begin();
-  }
+template <> struct fmt::formatter<spectrum::EVMType> {
+    template <typename ParseContext> constexpr auto parse(ParseContext &ctx) {
+        return ctx.begin();
+    }
 
-  template<typename FormatContext>
-  auto format(spectrum::EVMType const& value, FormatContext& ctx) const {
-    #define OPT(X) case spectrum::EVMType::X: return fmt::format_to(ctx.out(), "{}", #X);
-    switch (value) {OPT(BASIC) OPT(STRAWMAN) OPT(COPYONWRITE)}
-    #undef  OPT
-  }
+    template <typename FormatContext>
+    auto format(spectrum::EVMType const &value, FormatContext &ctx) const {
+        #define OPT(X) case spectrum::EVMType::X: return fmt::format_to(ctx.out(), "{}", #X);
+        switch (value) { OPT(BASIC) OPT(STRAWMAN) OPT(COPYONWRITE) }
+        #undef OPT
+        throw std::runtime_error("unreachable");
+    }
 };

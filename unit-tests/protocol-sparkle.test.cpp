@@ -3,6 +3,7 @@
 #include <spectrum/evm_transaction.hpp>
 #include <spectrum/workload-smallbank.hpp>
 #include <span>
+#include "glog-prefix-install.hpp"
 
 namespace {
 
@@ -12,6 +13,7 @@ using namespace spectrum;
 using namespace std::chrono_literals;
 
 TEST(Sparkle, TableWriteAfterRead) {
+    GLOG_PREFIX;
     auto code   = std::array<uint8_t, 2>();
     auto input  = std::array<uint8_t, 2>();
     auto table  = SparkleTable(8);
@@ -33,6 +35,7 @@ TEST(Sparkle, TableWriteAfterRead) {
 }
 
 TEST(Sparkle, TableWriteAfterWrite) {
+    GLOG_PREFIX;
     auto code   = std::array<uint8_t, 2>();
     auto input  = std::array<uint8_t, 2>();
     auto table  = SparkleTable(8);
@@ -54,6 +57,7 @@ TEST(Sparkle, TableWriteAfterWrite) {
 }
 
 TEST(Sparkle, JustRunSmallbank) {
+    GLOG_PREFIX;
     auto statistics = Statistics();
     auto workload = Smallbank(10000, 0.0);
     auto protocol = Sparkle(workload, statistics, 8, 32);
