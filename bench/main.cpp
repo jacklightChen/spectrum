@@ -73,25 +73,33 @@ void PrefixFormatter(std::ostream& s, const google::LogMessage& m, void* data) {
             default: return "\e[0;30m";
         }
     }();
-    s << color <<  std::setfill(' ') << std::setw(8)  << std::setiosflags(std::ios::left) << google::GetLogSeverityName(m.severity()) << "\e[0;30m"
-      << std::setfill(' ') << std::setw(30) << fmt::format("{}:{}", m.basename(), m.line());
+    s << color << std::setfill(' ') << std::setw(8)  << std::setiosflags(std::ios::left)
+            << google::GetLogSeverityName(m.severity()) 
+      << "\e[0;30m" << std::setfill(' ') << std::setw(30) 
+            << fmt::format("{}:{}", m.basename(), m.line());
 }
 
 int main(int argc, char* argv[]) {
+    // configure prefix formatting and eat google logging command line arguments
     google::InstallPrefixFormatter(PrefixFormatter);
     google::InitGoogleLogging(argv[0]);
     gflags::ParseCommandLineFlags(&argc, &argv, true);
-    CHECK(argc == 4);
+    // check if the rest arguments have the correct number
+    CHECK(argc == 4) << "Except google logging flags, we only expect 3 flags. ";
     DLOG(WARNING) << "Debug Mode: don't expect good performance. " << std::endl;
+    // declare a statistics collector
     auto statistics = std::unique_ptr<Statistics>(new Statistics());
+    // declare some helper macros for argument parser (by default, we name the token iterator by 'iter')
     #define INT     to<size_t>(*iter++)
     #define DOUBLE  to<double>(*iter++)
     #define BOOL    to<bool>(*iter++)
     #define EVMTYPE ParseEVMType(*iter++)
+    // parse workload parameters
     auto workload = [argv](){
         auto args = split(argv[2]);
         auto iter = args.begin();
         auto name = *iter++;
+        // map each option to an argparser
         #define OPT(X, Y...) if (name == #X) { \
             auto dist = (size_t) (std::distance(args.begin(), args.end()) - 1); \
             auto n = (size_t) NUMARGS(Y); \
@@ -99,13 +107,16 @@ int main(int argc, char* argv[]) {
             return std::unique_ptr<Workload>(new X (Y)); \
         };
         OPT(Smallbank, INT, DOUBLE)
-        throw std::runtime_error(std::string{fmt::format("unknown workload option ({})", std::string{name})});
         #undef OPT
+        // fallback to an error
+        throw std::runtime_error(std::string{fmt::format("unknown workload option ({})", std::string{name})});
     }();
+    // parse protocol parameters
     auto protocol = [&](){
         auto args = split(argv[1]);
         auto iter = args.begin();
         auto name = *iter++;
+        // map each option to an argparser
         #define OPT(X, Y...) if (name == #X) { \
             auto dist = (size_t) (std::distance(args.begin(), args.end()) - 1); \
             auto n = (size_t) NUMARGS(Y); \
@@ -115,17 +126,23 @@ int main(int argc, char* argv[]) {
         OPT(Aria,     INT, INT, INT, BOOL)
         OPT(Sparkle,  INT, INT)
         OPT(Spectrum, INT, INT, INT, EVMTYPE)
-        throw std::runtime_error(std::string{fmt::format("unknown protocol option ({})", std::string{name})});
         #undef OPT
+        // fallback to an error
+        throw std::runtime_error(std::string{fmt::format("unknown protocol option ({})", std::string{name})});
     }();
+    // parse test duration parameter
+    auto duration = to<milliseconds>(argv[3]);
+    // remove helper macros
     #undef INT
     #undef BOOL
     #undef DOUBLE
     #undef EVMTYPE
+    // start running !!
     auto start_time = steady_clock::now();
     protocol->Start();
-    std::this_thread::sleep_for(to<milliseconds>(argv[3]));
+    std::this_thread::sleep_for(duration);
     protocol->Stop();
+    // stop running and print statistics
     DLOG(WARNING) << "Debug Mode: don't expect good performance. " << std::endl;
-    statistics->PrintWithDuration(duration_cast<milliseconds>(steady_clock::now() - start_time));
+    LOG(INFO) << "\n" << statistics->PrintWithDuration(duration_cast<milliseconds>(steady_clock::now() - start_time));
 }
