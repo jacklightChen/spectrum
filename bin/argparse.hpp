@@ -11,14 +11,20 @@
 #define NUMARGS(X...)  NUMARGS_HELPER(X, 10, 9, 8, 7, 6, 5, 4, 3, 2, 1, 0)
 #define THROW(X...)   throw std::runtime_error(std::string{fmt::format(X)})
 // declare some helper macros for argument parser (by default, we name the token iterator by 'iter')
-#define INT     to<size_t>  (*(iter++))
-#define DOUBLE  to<double>  (*(iter++))
-#define BOOL    to<bool>    (*(iter++))
-#define EVMTYPE ParseEVMType(*(iter++))
+#define INT     to<size_t>  (*(reverse() ? --iter:++iter))
+#define DOUBLE  to<double>  (*(reverse() ? --iter:++iter))
+#define BOOL    to<bool>    (*(reverse() ? --iter:++iter))
+#define EVMTYPE ParseEVMType(*(reverse() ? --iter:++iter))
 
 using namespace spectrum;
 using namespace std::chrono_literals;
 using namespace std::chrono;
+
+bool reverse() {
+    auto i = int(0);
+    auto x = std::make_tuple(++i, ++i);
+    return std::get<0>(x) == 1;
+}
 
 static auto split(std::basic_string_view<char> s) {
     auto iter = s | std::ranges::views::split(':')
@@ -67,7 +73,7 @@ std::unique_ptr<Workload> ParseWorkload(const char* arg) {
     auto args = split(arg);
     auto name = *args.begin();
     auto dist = (size_t) (std::distance(args.begin(), args.end()) - 1);
-    auto iter = args.rbegin();
+    auto iter = reverse() ? args.end(): args.begin();
     // map each option to an argparser
     #define OPT(X, Y...) if (name == #X) { \
         auto n = (size_t) NUMARGS(Y);      \
@@ -85,7 +91,7 @@ std::unique_ptr<Protocol> ParseProtocol(const char* arg, Workload& workload, Sta
     auto args = split(arg);
     auto name = *args.begin();
     auto dist = (size_t) (std::distance(args.begin(), args.end()) - 1);
-    auto iter = args.rbegin();
+    auto iter = reverse() ? args.end(): args.begin();
     // map each option to an argparser
     #define OPT(X, Y...) if (name == #X) { \
         auto n = (size_t) NUMARGS(Y);      \

@@ -140,7 +140,7 @@ target_compile_features(
 target_link_libraries(
     spectrum
     PUBLIC evmc intx::intx fmt gflags
-    PRIVATE ethash::keccak glog::glog
+    PRIVATE ethash::keccak glog
 )
 
 unset(SRC)
