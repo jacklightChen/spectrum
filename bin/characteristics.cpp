@@ -11,9 +11,10 @@
 #include <glog/logging.h>
 #include <glog/flags.h>
 #include <string.h>
-#include "argparse.hpp"
 #include <evmc/evmc.h>
 #include <evmc/evmc.hpp>
+#include "argparse.hpp"
+#include "glog-prefix.hpp"
 
 #define K std::tuple<evmc::address, evmc::bytes32>
 
@@ -22,7 +23,7 @@ class MockTable {
 
     private:
     std::unordered_map<K, evmc::bytes32, spectrum::KeyHasher> inner;
-    std::unordered_map<K, std::vector<std::tuple<size_t, const char*>>, spectrum::KeyHasher> histogram;
+    std::unordered_map<K, std::vector<std::tuple<size_t, char>>, spectrum::KeyHasher> histogram;
 
     public:
     evmc::bytes32 GetStorage(
@@ -32,7 +33,10 @@ class MockTable {
     ) {
         auto& entry = histogram[std::make_tuple(addr, key)];
         if (!entry.size() || std::get<0>(entry[entry.size() - 1]) != id) {
-            entry.push_back({id, "get"});
+            entry.push_back({id, 'g'});
+        }
+        else if (std::get<1>(entry[entry.size() - 1]) != 'd') {
+            std::get<1>(entry[entry.size() - 1]) = 'd';
         }
         return inner[std::make_tuple(addr, key)];
     }
@@ -45,7 +49,10 @@ class MockTable {
     ) {
         auto& entry = histogram[std::make_tuple(addr, key)];
         if (!entry.size() || std::get<0>(entry[entry.size() - 1]) != id) {
-            entry.push_back({id, "put"});
+            entry.push_back({id, 'p'});
+        }
+        else if (std::get<1>(entry[entry.size() - 1]) != 'p') {
+            std::get<1>(entry[entry.size() - 1]) = 'd';
         }
         inner[std::make_tuple(addr, key)] = value;
     }
@@ -59,7 +66,8 @@ class MockTable {
             auto collector = std::string();
             for (size_t i = 0; i != tx_count; i += 1) {
                 if (j < v.size() && std::get<0>(v[j]) == i) {
-                    collector.push_back(std::get<1>(v[j]) == std::string("get") ? '?' : '!');
+                    auto op = std::get<1>(v[j]);
+                    collector.push_back(op == 'g' ? '?' : (op == 'p' ? '!' : 'x'));
                     j += 1;
                 }
                 else {
@@ -76,6 +84,10 @@ class MockTable {
 using namespace spectrum;
 
 int main(int argc, char* argv[]) {
+    google::InstallPrefixFormatter(PrefixFormatter);
+    google::InitGoogleLogging(argv[0]);
+    FLAGS_stderrthreshold = 1;
+    gflags::ParseCommandLineFlags(&argc, &argv, true);
     CHECK(argc == 3) << "We only expect 2 flags. ";
     auto mock_table = MockTable();
     auto statistics = std::make_unique<Statistics>();
@@ -104,7 +116,7 @@ int main(int argc, char* argv[]) {
     // wait for a given duration, stop running, and print statistics
     std::this_thread::sleep_for(duration);
     stop_flag.store(true); handle.join();
-    std::cerr << "'?' represents get, '!' represents put, '-' represents no-operation" << std::endl;
+    std::cerr << "'?' represents get, '!' represents put, 'x' represents both, '-' represents no-operation" << std::endl;
     std::cerr << statistics->PrintWithDuration(duration_cast<milliseconds>(steady_clock::now() - start_time));
     for (auto& entry: mock_table.Report(tx_count)) {
         auto& addr  = std::get<0>(std::get<0>(entry));
