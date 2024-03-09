@@ -9,6 +9,7 @@ set(CMAKE_EXPORT_COMPILE_COMMANDS true)
 option(DEBUG OFF)
 option(EVM_PRINT_INSTRUCTIONS "print each evm instruction on instruction start" 0)
 
+
 # -- Manage External Dependencies
 include(FetchContent)
 FetchContent_Declare(
@@ -58,28 +59,7 @@ FetchContent_Declare(
 )
 FetchContent_MakeAvailable(gflags glog gtest ethash intx fmt evmc thread_pool conqueue)
 set(gtest_force_shared_crt ON CACHE BOOL "" FORCE)
-
-# -- Determine Compile Definitions
-if(CMAKE_SYSTEM_PROCESSOR STREQUAL x86_64)
-    # Setup options for x86_64 micro-architecture levels.
-    # https://clang.llvm.org/docs/UsersManual.html#x86
-
-    set(EVMONE_X86_64_ARCH_LEVEL_INIT 2)
-    if(APPLE)
-        # On macos with Apple Silicon CPU (arm64) the x86 is emulated and SSE4.2 is not available.
-        set(EVMONE_X86_64_ARCH_LEVEL_INIT 1)
-    endif()
-
-    set(EVMONE_X86_64_ARCH_LEVEL ${EVMONE_X86_64_ARCH_LEVEL_INIT} CACHE STRING "The x86_64 micro-architecture level")
-    if(EVMONE_X86_64_ARCH_LEVEL GREATER_EQUAL 1 AND EVMONE_X86_64_ARCH_LEVEL LESS_EQUAL 4)
-        message(STATUS "x86_64 micro-architecture level: ${EVMONE_X86_64_ARCH_LEVEL}")
-        if(EVMONE_X86_64_ARCH_LEVEL GREATER_EQUAL 2)
-            add_compile_options(-march=x86-64-v${EVMONE_X86_64_ARCH_LEVEL})
-        endif()
-    else()
-        message(FATAL_ERROR "Invalid EVMONE_X86_64_ARCH_LEVEL: ${EVMONE_X86_64_ARCH_LEVEL}")
-    endif()
-endif()
+find_package(Threads REQUIRED)
 
 if(DEBUG)
     add_compile_options(-fsanitize=address)
@@ -87,7 +67,7 @@ if(DEBUG)
     add_compile_options(
         -O0 -ggdb -Wall -Wno-reorder -Wno-attributes
         -DPROJECT_VERSION="0.12.0-dev"
-        -DEVMONE_X86_64_ARCH_LEVEL=${EVMONE_X86_64_ARCH_LEVEL}
+        -DEVMONE_X86_64_ARCH_LEVEL=2
         -DEVM_PRINT_INSTRUCTIONS=${EVM_PRINT_INSTRUCTIONS}
     )
 else()
@@ -95,7 +75,7 @@ else()
         -O3 -Wall -Wno-reorder -Wno-attributes
         -DNDEBUG -ggdb
         -DPROJECT_VERSION="0.12.0-dev"
-        -DEVMONE_X86_64_ARCH_LEVEL=${EVMONE_X86_64_ARCH_LEVEL}
+        -DEVMONE_X86_64_ARCH_LEVEL=2
     )
 endif()
 
@@ -140,7 +120,7 @@ target_compile_features(
 target_link_libraries(
     spectrum
     PUBLIC evmc intx::intx fmt gflags
-    PRIVATE ethash::keccak glog
+    PRIVATE ethash::keccak glog Threads::Threads
 )
 
 unset(SRC)
@@ -154,7 +134,7 @@ foreach(F ${SRC})
     file(RELATIVE_PATH REL ${CMAKE_CURRENT_SOURCE_DIR}/unit-tests ${F})
     string(REPLACE ".test.cpp" "" REL ${REL})
     add_executable(unit-test-${REL} ${F})
-    target_link_libraries(unit-test-${REL} PRIVATE gtest_main spectrum glog::glog)
+    target_link_libraries(unit-test-${REL} PRIVATE gtest_main spectrum glog::glog Threads::Threads)
 endforeach()
 
 unset(SRC)
@@ -168,7 +148,7 @@ foreach(F ${SRC})
     file(RELATIVE_PATH REL ${CMAKE_CURRENT_SOURCE_DIR}/bin ${F})
     string(REPLACE ".cpp" "" REL ${REL})
     add_executable(${REL} ${F})
-    target_link_libraries(${REL} PRIVATE spectrum glog::glog fmt)
+    target_link_libraries(${REL} PRIVATE spectrum glog::glog fmt Threads::Threads)
 endforeach()
 
 unset(SRC)
