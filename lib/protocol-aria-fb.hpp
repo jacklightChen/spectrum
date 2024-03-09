@@ -68,7 +68,7 @@ class Aria: public Protocol {
     Statistics&         statistics;
     Workload&           workload;
     size_t              batch_size;
-    size_t              table_partitions;
+    // size_t              table_partitions;
     AriaTable           table;
     bool                enable_reordering;
     volatile std::atomic<bool>      stop_flag{false};

@@ -22,7 +22,7 @@ class Serial: public Protocol {
 
     private:
     size_t              repeat;
-    EVMType             evm_type;
+    // EVMType             evm_type;
     SerialTable         table;
     std::thread*        thread{nullptr};
     std::atomic<bool>   stop_flag{false};

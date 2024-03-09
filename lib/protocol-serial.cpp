@@ -8,7 +8,7 @@ using namespace std::chrono;
 Serial::Serial(Workload& workload, Statistics& statistics, EVMType evm_type, size_t repeat):
     workload{workload},
     statistics{statistics},
-    evm_type{evm_type},
+    // evm_type{evm_type},
     repeat{repeat}
 {
     workload.SetEVMType(evm_type);

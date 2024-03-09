@@ -17,9 +17,9 @@ TEST(Sparkle, TableWriteAfterRead) {
     auto code   = std::array<uint8_t, 2>();
     auto input  = std::array<uint8_t, 2>();
     auto table  = SparkleTable(8);
-    auto t0 = SparkleTransaction(std::move(TX(code, input)), 1);
-    auto t1 = SparkleTransaction(std::move(TX(code, input)), 2);
-    auto t2 = SparkleTransaction(std::move(TX(code, input)), 3);
+    auto t0 = SparkleTransaction(TX(code, input), 1);
+    auto t1 = SparkleTransaction(TX(code, input), 2);
+    auto t2 = SparkleTransaction(TX(code, input), 3);
     auto k0 = std::make_tuple(evmc::address{0}, evmc::bytes32{0});
     auto v0 = evmc::bytes32{0};
     auto v1 = evmc::bytes32{1};
@@ -39,9 +39,9 @@ TEST(Sparkle, TableWriteAfterWrite) {
     auto code   = std::array<uint8_t, 2>();
     auto input  = std::array<uint8_t, 2>();
     auto table  = SparkleTable(8);
-    auto t0 = SparkleTransaction(std::move(TX(code, input)), 1);
-    auto t1 = SparkleTransaction(std::move(TX(code, input)), 2);
-    auto t2 = SparkleTransaction(std::move(TX(code, input)), 3);
+    auto t0 = SparkleTransaction(TX(code, input), 1);
+    auto t1 = SparkleTransaction(TX(code, input), 2);
+    auto t2 = SparkleTransaction(TX(code, input), 3);
     auto k0 = std::make_tuple(evmc::address{0}, evmc::bytes32{0});
     auto v0 = evmc::bytes32{0};
     auto v1 = evmc::bytes32{1};

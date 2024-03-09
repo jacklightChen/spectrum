@@ -32,7 +32,6 @@ class Transaction {
     spectrum::Host host;
     spectrum::EVMType evm_type;
     evmc_tx_context tx_context;
-    bool partial;
     std::span<uint8_t> code;
     std::vector<uint8_t> input;
     evmc_message message;

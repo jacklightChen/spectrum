@@ -53,9 +53,6 @@ class Memory
     /// The "virtual" size of the memory.
     size_t m_size = 0;
 
-    /// The size of allocated memory. The initialization value is the initial capacity.
-    size_t m_capacity = page_size;
-
     /// Actual allocated memory.
     std::vector<uint8_t> m_data;
 

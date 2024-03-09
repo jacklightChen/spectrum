@@ -240,7 +240,7 @@ SpectrumExecutor::SpectrumExecutor(Spectrum& spectrum):
 
 /// @brief generate a transaction and execute it
 std::unique_ptr<T> SpectrumExecutor::Create() {
-    auto tx = std::make_unique<T>(std::move(workload.Next()), last_execute.fetch_add(1));
+    auto tx = std::make_unique<T>(workload.Next(), last_execute.fetch_add(1));
     tx->UpdateSetStorageHandler([&](
         const evmc::address &addr, 
         const evmc::bytes32 &key, 
@@ -320,7 +320,7 @@ void SpectrumExecutor::ReExecute(SpectrumTransaction* tx) {
 /// @brief start an executor
 void SpectrumExecutor::Run() {while (!stop_flag.load()) {
     if (last_execute.load() - last_finalized.load() < this->queue_amplification) {
-        queue.Push(std::move(Create()));
+        queue.Push(Create());
         continue;
     }
     auto tx = queue.Pop().value_or(std::unique_ptr<T>(nullptr));

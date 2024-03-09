@@ -27,7 +27,7 @@ Aria::Aria(
     workload{workload},
     statistics{statistics},
     batch_size{batch_size},
-    table_partitions{table_partitions},
+    // table_partitions{table_partitions},
     pool{(unsigned int) n_threads},
     table{table_partitions},
     enable_reordering{enable_reordering}
@@ -58,7 +58,7 @@ void Aria::ParallelEach(
 std::unique_ptr<T> Aria::NextTransaction() {
     auto id = tx_counter.fetch_add(1);
     DLOG(INFO) << "generate transaction " << id << std::endl;
-    return std::make_unique<T>(std::move(workload.Next()), id, id / batch_size);
+    return std::make_unique<T>(workload.Next(), id, id / batch_size);
 }
 
 /// @brief start aria protocol
@@ -96,7 +96,7 @@ void Aria::Start() {
             // -- prepare fallback, analyze dependencies
             if (!has_conflict.load()) { continue; }
             auto lock_table = AriaLockTable(batch_size);
-            ParallelEach([this, &lock_table](auto tx) {
+            ParallelEach([&lock_table](auto tx) {
                 if (!tx->flag_conflict) { return; }
                 AriaExecutor::PrepareLockTable(tx, lock_table);
             }, batch);

@@ -349,12 +349,12 @@ evmc_result execute(VM& vm, const evmc_host_interface* host, evmc_host_context* 
             return evmc_make_result(EVMC_CONTRACT_VALIDATION_FAILURE, 0, 0, nullptr, 0);
     }
     if (vm.analysis.get() == nullptr) {
-        vm.analysis = std::make_unique<CodeAnalysis>(std::move(analyze(rev, container)));
+        vm.analysis = std::make_unique<CodeAnalysis>(analyze(rev, container));
     }
     const auto data = vm.analysis->eof_header.get_data(container);
     ExecutionState& state = *([&](){
         if (vm.state == std::nullopt) {
-            vm.state.emplace(std::move(std::make_unique<ExecutionState>(*msg, rev, *host, ctx, container, data)));
+            vm.state.emplace(std::make_unique<ExecutionState>(*msg, rev, *host, ctx, container, data));
         }
         return vm.state.value().get();
     })();

@@ -87,7 +87,7 @@ if(DEBUG)
     )
 else()
     add_compile_options(
-        -O3 -flto -Wall -Wno-reorder -Wno-attributes
+        -O3 -Wall -Wno-reorder -Wno-attributes
         -DNDEBUG -ggdb
         -DPROJECT_VERSION="0.12.0-dev"
         -DEVMONE_X86_64_ARCH_LEVEL=${EVMONE_X86_64_ARCH_LEVEL}

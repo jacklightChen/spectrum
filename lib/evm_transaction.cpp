@@ -34,7 +34,7 @@ Transaction::Transaction(
     input(input.begin(), input.end()),
     evm_type{evm_type},
     vm{(evm_type == EVMType::BASIC || evm_type == EVMType::STRAWMAN) ? 
-        std::variant<evmone::VM, evmcow::VM>(std::move(evmone::VM())) : 
+        std::variant<evmone::VM, evmcow::VM>(evmone::VM()) : 
         std::variant<evmone::VM, evmcow::VM>(evmcow::VM())
     },
     tx_context{evmc_tx_context{
