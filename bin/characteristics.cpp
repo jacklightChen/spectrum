@@ -104,7 +104,7 @@ int main(int argc, char* argv[]) {
     // wait for a given duration, stop running, and print statistics
     std::this_thread::sleep_for(duration);
     stop_flag.store(true); handle.join();
-    std::cerr << "?:get !:put _:no-operation" << std::endl;
+    std::cerr << "'?' represents get, '!' represents put, '-' represents no-operation" << std::endl;
     std::cerr << statistics->PrintWithDuration(duration_cast<milliseconds>(steady_clock::now() - start_time));
     for (auto& entry: mock_table.Report(tx_count)) {
         auto& addr  = std::get<0>(std::get<0>(entry));
