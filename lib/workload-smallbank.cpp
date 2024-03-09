@@ -85,7 +85,7 @@ Transaction Smallbank::Next() {
         default: throw "unreachable";
     }}()).value();
     #undef X
-    return Transaction(this->evm_type, evmc::address{0x1}, evmc::address{0x2}, std::span{code}, std::span{input});
+    return Transaction(this->evm_type, evmc::address{0x1}, evmc::address{0x1}, std::span{code}, std::span{input});
 }
 
 } // namespace spectrum

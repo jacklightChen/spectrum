@@ -2,6 +2,7 @@
 #include <glog/logging.h>
 #include <cmath>
 #include <stdexcept>
+#include <algorithm>
 
 /*
     To investigate high-contention rate circumstance. We have to use Zipfian distribution. 
@@ -12,7 +13,7 @@
 namespace spectrum {
 
 Unif::Unif(size_t num_elements):
-    distribution(0, num_elements)
+    distribution(0, std::max(size_t(1), num_elements) - 1)
 {}
 
 size_t Unif::Next() {

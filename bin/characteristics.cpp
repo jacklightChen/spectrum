@@ -17,6 +17,7 @@
 
 #define K std::tuple<evmc::address, evmc::bytes32>
 
+/// @brief mock table for collecting workload characteristics
 class MockTable {
 
     private:
@@ -29,7 +30,10 @@ class MockTable {
         const evmc::address& addr, 
         const evmc::bytes32& key
     ) {
-        histogram[std::make_tuple(addr, key)].push_back({id, "get"});
+        auto& entry = histogram[std::make_tuple(addr, key)];
+        if (!entry.size() || std::get<0>(entry[entry.size() - 1]) != id) {
+            entry.push_back({id, "get"});
+        }
         return inner[std::make_tuple(addr, key)];
     }
 
@@ -39,7 +43,10 @@ class MockTable {
         const evmc::bytes32& key, 
         const evmc::bytes32& value
     ) {
-        histogram[std::make_tuple(addr, key)].push_back({id, "put"});
+        auto& entry = histogram[std::make_tuple(addr, key)];
+        if (!entry.size() || std::get<0>(entry[entry.size() - 1]) != id) {
+            entry.push_back({id, "put"});
+        }
         inner[std::make_tuple(addr, key)] = value;
     }
 
