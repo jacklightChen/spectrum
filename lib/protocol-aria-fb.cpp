@@ -143,7 +143,7 @@ void AriaTable::ReserveGet(T* tx, const K& k) {
             entry.reserved_get_tx = nullptr;
             entry.batch_id_get = tx->batch_id;
         }
-        if (entry.reserved_get_tx == nullptr || entry.reserved_get_tx->id < tx->id) {
+        if (entry.reserved_get_tx == nullptr || entry.reserved_get_tx->id > tx->id) {
             entry.reserved_get_tx = tx;
             DLOG(INFO) << tx->batch_id << ":" << tx->id << " reserve get ok" << std::endl;
         }
@@ -160,7 +160,7 @@ void AriaTable::ReservePut(T* tx, const K& k) {
             entry.reserved_put_tx = nullptr;
             entry.batch_id_put = tx->batch_id;
         }
-        if (entry.reserved_put_tx == nullptr || entry.reserved_put_tx->id < tx->id) {
+        if (entry.reserved_put_tx == nullptr || entry.reserved_put_tx->id > tx->id) {
             entry.reserved_put_tx = tx;
             DLOG(INFO) << tx->batch_id << ":" << tx->id << " reserve put ok" << std::endl; 
         }
@@ -176,7 +176,7 @@ bool AriaTable::CompareReservedGet(T* tx, const K& k) {
     Table::Get(k, [&](auto entry) {
         eq = entry.batch_id_get == tx->batch_id && (
             entry.reserved_get_tx == nullptr || 
-            entry.reserved_get_tx->id >= tx->id
+            entry.reserved_get_tx->id == tx->id
         );
     });
     return eq;
@@ -191,7 +191,7 @@ bool AriaTable::CompareReservedPut(T* tx, const K& k) {
     Table::Get(k, [&](auto entry) {
         eq = entry.batch_id_put == tx->batch_id && (
             entry.reserved_put_tx == nullptr || 
-            entry.reserved_put_tx->id >= tx->id
+            entry.reserved_put_tx->id == tx->id
         );
     });
     return eq;
@@ -285,7 +285,7 @@ void AriaExecutor::Verify(T* tx, AriaTable& table, bool enable_reordering) {
         tx->flag_conflict = waw || war;
     }
     if (waw || war) {
-        DLOG(INFO) << "abort" << std::endl;
+        DLOG(INFO) << "abort " << tx->batch_id << ":" << tx->id << std::endl;
     }
 }
 

@@ -1,7 +1,5 @@
 #include <iostream>
 #include <spectrum/hex.hpp>
-#include <spectrum/workload.hpp>
-#include <spectrum/workload-smallbank.hpp>
 #include <ranges>
 #include <string_view>
 #include <fmt/core.h>

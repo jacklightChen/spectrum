@@ -1,6 +1,7 @@
 #include <string>
 #include <cstdint>
 #include <span>
+#include <optional>
 
 namespace spectrum {
     std::optional<std::basic_string<uint8_t>> from_hex(std::string_view hex) noexcept;
