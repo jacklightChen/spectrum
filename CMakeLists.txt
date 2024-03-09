@@ -143,7 +143,7 @@ unset(INC)
 
 # -- add some unit-tests
 
-file(GLOB_RECURSE SRC unit-tests/*.cpp)
+file(GLOB_RECURSE SRC unit-tests/*.test.cpp)
 
 foreach(F ${SRC})
     file(RELATIVE_PATH REL ${CMAKE_CURRENT_SOURCE_DIR}/unit-tests ${F})
@@ -156,9 +156,14 @@ unset(SRC)
 
 # -- add the bench
 
-file(GLOB_RECURSE SRC bench/*.cpp)
+file(GLOB_RECURSE SRC bin/*.cpp)
 
-add_executable(bench ${SRC})
-target_link_libraries(bench PRIVATE spectrum glog::glog fmt)
+foreach(F ${SRC})
+    message(STATUS ${F})
+    file(RELATIVE_PATH REL ${CMAKE_CURRENT_SOURCE_DIR}/bin ${F})
+    string(REPLACE ".cpp" "" REL ${REL})
+    add_executable(${REL} ${F})
+    target_link_libraries(${REL} PRIVATE spectrum glog::glog fmt)
+endforeach()
 
 unset(SRC)
