@@ -3,6 +3,7 @@
 #include <optional>
 #include <span>
 #include <iostream>
+#include "./hex.hpp"
 
 namespace spectrum {
 
