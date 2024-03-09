@@ -280,11 +280,10 @@ void AriaExecutor::Verify(T* tx, AriaTable& table, bool enable_reordering) {
     }
     if (enable_reordering) {
         tx->flag_conflict = waw || (raw && war);
+        DLOG(INFO) << "abort " << tx->batch_id << ":" << tx->id << std::endl;
     }
     else {
         tx->flag_conflict = waw || war;
-    }
-    if (waw || war) {
         DLOG(INFO) << "abort " << tx->batch_id << ":" << tx->id << std::endl;
     }
 }
