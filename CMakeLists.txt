@@ -32,6 +32,11 @@ FetchContent_Declare(
     GIT_TAG             "v1.14.0"
 )
 FetchContent_Declare(
+    gflags
+    GIT_REPOSITORY      "https://github.com/gflags/gflags"
+    GIT_TAG             "v2.2.2"
+)
+FetchContent_Declare(
     glog
     GIT_REPOSITORY      "https://github.com/google/glog"
     GIT_TAG             "v0.7.0"
@@ -51,7 +56,7 @@ FetchContent_Declare(
     GIT_REPOSITORY      "https://github.com/cameron314/concurrentqueue"
     GIT_TAG             "v1.0.4"
 )
-FetchContent_MakeAvailable(glog gtest ethash intx fmt evmc thread_pool conqueue)
+FetchContent_MakeAvailable(gflags glog gtest ethash intx fmt evmc thread_pool conqueue)
 set(gtest_force_shared_crt ON CACHE BOOL "" FORCE)
 
 # -- Determine Compile Definitions
@@ -134,7 +139,7 @@ target_compile_features(
 )
 target_link_libraries(
     spectrum
-    PUBLIC evmc intx::intx fmt
+    PUBLIC evmc intx::intx fmt gflags
     PRIVATE ethash::keccak glog::glog
 )
 

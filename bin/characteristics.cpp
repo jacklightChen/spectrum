@@ -8,6 +8,7 @@
 #include <chrono>
 #include <glog/logging.h>
 #include <glog/flags.h>
+#include <gflags/gflags.h>
 #include <string.h>
 #include <evmc/evmc.h>
 #include <evmc/evmc.hpp>

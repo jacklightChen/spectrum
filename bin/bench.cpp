@@ -7,6 +7,7 @@
 #include <chrono>
 #include <glog/logging.h>
 #include <glog/flags.h>
+#include <gflags/gflags.h>
 #include <string.h>
 #include "argparse.hpp"
 #include "glog-prefix.hpp"
