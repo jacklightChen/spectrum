@@ -232,7 +232,6 @@ SpectrumExecutor::SpectrumExecutor(Spectrum& spectrum):
     last_execute{spectrum.last_execute},
     stop_flag{spectrum.stop_flag},
     statistics{spectrum.statistics},
-    queue{spectrum.queue},
     queue_amplification{spectrum.queue_amplification}
 {
     workload.SetEVMType(spectrum.evm_type);
@@ -325,11 +324,12 @@ void SpectrumExecutor::Run() {while (!stop_flag.load()) {
     }
     auto tx = queue.Pop().value_or(std::unique_ptr<T>(nullptr));
     if (tx.get() == nullptr) {
-        LOG(WARNING) << "queue is empty, performance may deteriorate. ";
+        queue.Push(Create());
         continue;
     }
     if (last_finalized.load() < tx->should_wait) {
         DLOG(INFO) << "requeue " << tx->id;
+        if (!queue.Size()) { queue.Push(Create()); }
         queue.Push(std::move(tx));
         continue;
     }
@@ -357,8 +357,9 @@ void SpectrumExecutor::Run() {while (!stop_flag.load()) {
             statistics.JournalCommit(latency);
             break;
         }
-        else {
+        else if (last_finalized.load() + 1 != tx->id) {
             // if cannot commit, then do something else
+            if (!queue.Size()) { queue.Push(Create()); }
             queue.Push(std::move(tx));
             break;
         }

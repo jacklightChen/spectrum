@@ -55,7 +55,7 @@ find_package(Threads REQUIRED)
 # -- download and build gflags
 execute_process(
     COMMAND             git clone --branch "v2.2.2" "https://github.com/gflags/gflags" "_deps/gflags"
-    WORKING_DIRECTORY   "${CMAKE_BINARY_DIR}"
+    WORKING_DIRECTORY   ${CMAKE_BINARY_DIR}
 )
 execute_process(
     COMMAND

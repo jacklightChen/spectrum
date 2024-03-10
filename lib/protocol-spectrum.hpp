@@ -77,11 +77,11 @@ struct SpectrumTable: private Table<K, V, KeyHasher> {
 
 class SpectrumExecutor;
 
-template<typename X>
+template<typename X, typename Compare>
 class LockQueue {
 
-    std::mutex      mu;
-    std::queue<X>   queue;
+    std::mutex        mu;
+    std::queue<X>     queue;
     
     public:
     void Push(X&& x) {
@@ -94,15 +94,28 @@ class LockQueue {
             return std::nullopt;
         }
         else {
-            auto front = std::move(queue.front());
+            auto front = std::move(const_cast<X&>(queue.front()));
             queue.pop();
             return front;
         }
     }
+    size_t Size() {
+        auto guard = std::lock_guard{mu};
+        return queue.size();
+    }
 
 };
 
-using ConQueue = LockQueue<std::unique_ptr<T>>;
+class SpectrumCompare {
+
+    public:
+    bool operator()(const std::unique_ptr<T>& a, const std::unique_ptr<T>& b) {
+        return a->id > b->id;
+    }
+
+};
+
+using ConQueue = LockQueue<std::unique_ptr<T>, SpectrumCompare>;
 
 class Spectrum: public Protocol {
 
@@ -110,7 +123,6 @@ class Spectrum: public Protocol {
     size_t              n_threads;
     size_t              queue_amplification;
     Workload&           workload;
-    ConQueue            queue;
     SpectrumTable       table;
     Statistics&         statistics;
     EVMType             evm_type;
@@ -132,7 +144,7 @@ class SpectrumExecutor {
 
     private:
     Workload&               workload;
-    ConQueue&               queue;
+    ConQueue                queue;
     size_t                  queue_amplification;
     SpectrumTable&          table;
     Statistics&             statistics;
