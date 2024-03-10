@@ -104,7 +104,8 @@
         "ranges": "cpp",
         "typeindex": "cpp",
         "source_location": "cpp",
-        "__tuple": "cpp"
+        "__tuple": "cpp",
+        "__functional_base_03": "cpp"
     },
     "C_Cpp.clang_format_fallbackStyle": 
         "{ BasedOnStyle: LLVM, IndentWidth: 4 }",

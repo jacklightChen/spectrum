@@ -7,18 +7,16 @@
 #include <stdexcept>
 #include <chrono>
 #include <glog/logging.h>
-#include <glog/flags.h>
-#include <gflags/gflags.h>
 #include <string.h>
 #include "argparse.hpp"
 #include "glog-prefix.hpp"
 
 int main(int argc, char* argv[]) {
     // configure prefix formatting and eat google logging command line arguments
-    google::InstallPrefixFormatter(PrefixFormatter);
-    google::InitGoogleLogging(argv[0]);
     FLAGS_stderrthreshold = 1;
     gflags::ParseCommandLineFlags(&argc, &argv, true);
+    google::InstallPrefixFormatter(PrefixFormatter);
+    google::InitGoogleLogging(argv[0]);
     // check if the rest arguments have the correct number
     CHECK(argc == 4) << "Except google logging flags, we only expect 3 flags. ";
     DLOG(WARNING) << "Debug Mode: don't expect good performance. " << std::endl;
