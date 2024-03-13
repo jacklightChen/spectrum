@@ -69,10 +69,7 @@ void Aria::Start() {
     pool.detach_task([&]() {
         while(!stop_flag.load()) {
             // -- construct an empty batch
-            auto batch = std::vector<std::unique_ptr<T>>();
-            for (size_t i = 0; i < batch_size; ++i) {
-                batch.push_back(nullptr);
-            }
+            auto batch = std::vector<std::unique_ptr<T>>(nullptr, batch_size);
             DLOG(INFO) << "generate batch" << std::endl;
             // -- execution stage
             ParallelEach([this](auto tx) {
@@ -137,7 +134,7 @@ AriaTransaction::AriaTransaction(
 /// @param tx the transaction
 /// @param k the reserved key
 void AriaTable::ReserveGet(T* tx, const K& k) {
-    Table::Put(k, [&](AriaEntry& entry) {
+    Table::Put(k, [&](auto& entry) {
         DLOG(INFO) << tx->id << " reserve get" << std::endl;
         if (entry.batch_id_get != tx->batch_id) {
             entry.reserved_get_tx = nullptr;
@@ -154,7 +151,7 @@ void AriaTable::ReserveGet(T* tx, const K& k) {
 /// @param tx the transaction
 /// @param k the reserved key
 void AriaTable::ReservePut(T* tx, const K& k) {
-    Table::Put(k, [&](AriaEntry& entry) {
+    Table::Put(k, [&](auto& entry) {
         DLOG(INFO) << tx->id << " reserve put" << std::endl; 
         if (entry.batch_id_put != tx->batch_id) {
             entry.reserved_put_tx = nullptr;
@@ -173,7 +170,7 @@ void AriaTable::ReservePut(T* tx, const K& k) {
 /// @return if current transaction reserved this entry successfully
 bool AriaTable::CompareReservedGet(T* tx, const K& k) {
     bool eq = true;
-    Table::Get(k, [&](auto entry) {
+    Table::Get(k, [&](auto& entry) {
         eq = entry.batch_id_get == tx->batch_id && (
             entry.reserved_get_tx == nullptr || 
             entry.reserved_get_tx->id == tx->id
@@ -188,7 +185,7 @@ bool AriaTable::CompareReservedGet(T* tx, const K& k) {
 /// @return if current transaction reserved this entry successfully
 bool AriaTable::CompareReservedPut(T* tx, const K& k) {
     bool eq = true;
-    Table::Get(k, [&](auto entry) {
+    Table::Get(k, [&](auto& entry) {
         eq = entry.batch_id_put == tx->batch_id && (
             entry.reserved_put_tx == nullptr || 
             entry.reserved_put_tx->id == tx->id
@@ -208,7 +205,7 @@ AriaLockTable::AriaLockTable(size_t partitions):
 /// @param table the table
 void AriaExecutor::Execute(T* tx, AriaTable& table) {
     // read from the public table
-    tx->UpdateGetStorageHandler([&](
+    tx->UpdateGetStorageHandler([tx, &table](
         const evmc::address &addr,
         const evmc::bytes32 &key
     ) {
@@ -229,7 +226,7 @@ void AriaExecutor::Execute(T* tx, AriaTable& table) {
         return value;
     });
     // write locally to local storage
-    tx->UpdateSetStorageHandler([&](
+    tx->UpdateSetStorageHandler([tx, &table](
         const evmc::address &addr, 
         const evmc::bytes32 &key,
         const evmc::bytes32 &value
