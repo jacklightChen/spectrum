@@ -98,6 +98,10 @@ void SparkleTable::Put(T* tx, const K k, const evmc::bytes32& v) {
                 DLOG(INFO) << tx->id << " abort " << _tx->id;
             }
         }
+        if (rit != end && rit->version == tx->id) {
+            rit->value = v;
+            return;
+        }
         // insert an entry
         _v.entries.insert(rit.base(), SparkleEntry {
             .value   = v,
@@ -264,14 +268,7 @@ void SparkleExecutor::Run() { while (!stop_flag.load()) {
     ) {
         DLOG(INFO) << tx->id << " set";
         auto _key   = std::make_tuple(addr, key);
-        // when there exists some key, do this
-        for (auto& tup: tx->tuples_put) {
-            if (std::get<0>(tup) == _key) {
-                std::get<1>(tup) = value;
-                return evmc_storage_status::EVMC_STORAGE_MODIFIED;
-            }
-        }
-        // else just push back
+        // just push back
         tx->tuples_put.push_back(std::make_tuple(_key, value));
         return evmc_storage_status::EVMC_STORAGE_MODIFIED;
     });
@@ -299,7 +296,7 @@ void SparkleExecutor::Run() { while (!stop_flag.load()) {
         return value;
     });
     tx->rerun_flag.store(true);
-    while (true) {
+    while (!stop_flag.load()) {
         DLOG(INFO) << "recycle " << tx->id << " finalized " << last_finalized.load();
         if (tx->rerun_flag.load()) {
             // sweep all operations from previous execution
@@ -330,13 +327,13 @@ void SparkleExecutor::Run() { while (!stop_flag.load()) {
                 table.ClearPut(tx.get(), std::get<0>(entry));
             }
             last_finalized.fetch_add(1);
+            DLOG(INFO) << "commit " << tx->id;
+            auto latency = duration_cast<microseconds>(steady_clock::now() - start).count();
+            statistics.JournalCommit(latency);
             break;
         }
         std::this_thread::yield();
     }
-    DLOG(INFO) << "commit " << tx->id;
-    auto latency = duration_cast<microseconds>(steady_clock::now() - start).count();
-    statistics.JournalCommit(latency);
 }}
 
 #undef T

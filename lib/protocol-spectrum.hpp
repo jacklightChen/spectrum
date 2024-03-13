@@ -25,6 +25,7 @@ using namespace moodycamel;
 struct SpectrumPutTuple {
     K               key;
     evmc::bytes32   value;
+    bool            is_committed;
 };
 
 struct SpectrumGetTuple {
@@ -56,7 +57,6 @@ struct SpectrumEntry {
 };
 
 struct SpectrumVersionList {
-    std::mutex  mu;
     T*          tx = nullptr;
     std::list<SpectrumEntry> entries;
     // readers that read default value
@@ -127,7 +127,7 @@ class Spectrum: public Protocol {
     Statistics&         statistics;
     EVMType             evm_type;
     std::atomic<size_t> last_execute{1};
-    std::atomic<size_t> last_finalized{1};
+    std::atomic<size_t> last_finalized{0};
     std::atomic<bool>   stop_flag{false};
     std::vector<std::unique_ptr<SpectrumExecutor>>      executors{};
     std::vector<std::thread>                            workers{};

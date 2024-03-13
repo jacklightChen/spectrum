@@ -7,7 +7,7 @@
 namespace spectrum {
 
 Smallbank::Smallbank(size_t num_elements, double zipf_exponent): 
-    evm_type{EVMType::BASIC},
+    evm_type{EVMType::STRAWMAN},
     rng{(zipf_exponent > 0.0 ? 
         std::unique_ptr<Random>(new Zipf(num_elements, zipf_exponent)) : 
         std::unique_ptr<Random>(new Unif(num_elements))

@@ -115,7 +115,6 @@ void Transaction::Break() {
     }
 }
 
-__attribute__((always_inline))
 void Transaction::Execute() {
     if (evm_type == EVMType::BASIC || evm_type == EVMType::STRAWMAN) {
         auto& _vm = std::get<evmone::VM>(vm);

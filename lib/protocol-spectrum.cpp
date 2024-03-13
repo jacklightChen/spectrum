@@ -57,7 +57,6 @@ SpectrumTable::SpectrumTable(size_t partitions):
 /// @param version (mutated to be) the version of read entry
 void SpectrumTable::Get(T* tx, const K& k, evmc::bytes32& v, size_t& version) {
     Table::Put(k, [&](V& _v) {
-        auto guard = std::lock_guard{_v.mu};
         auto rit = _v.entries.rbegin();
         auto end = _v.entries.rend();
         while (rit != end) {
@@ -67,9 +66,11 @@ void SpectrumTable::Get(T* tx, const K& k, evmc::bytes32& v, size_t& version) {
             v = rit->value;
             version = rit->version;
             rit->readers.insert(tx);
+            DLOG(INFO) << tx->id << "(" << tx << ")" << " read " << KeyHasher()(k) << " version " << rit->version << std::endl;
             return;
         }
         version = 0;
+        DLOG(INFO) << tx->id << "(" << tx << ")" << " read " << KeyHasher()(k) << " version 0" << std::endl;
         _v.readers_default.insert(tx);
     });
 }
@@ -80,8 +81,8 @@ void SpectrumTable::Get(T* tx, const K& k, evmc::bytes32& v, size_t& version) {
 /// @param v the value to write
 void SpectrumTable::Put(T* tx, const K& k, const evmc::bytes32& v) {
     CHECK(tx->id > 0) << "we reserve version(0) for default value";
+    DLOG(INFO) << tx->id << "(" << tx << ")" << " write " << KeyHasher()(k) << std::endl;
     Table::Put(k, [&](V& _v) {
-        auto guard = std::lock_guard{_v.mu};
         auto rit = _v.entries.rbegin();
         auto end = _v.entries.rend();
         // search from insertion position
@@ -91,6 +92,7 @@ void SpectrumTable::Put(T* tx, const K& k, const evmc::bytes32& v) {
             }
             // abort transactions that read outdated keys
             for (auto _tx: rit->readers) {
+                DLOG(INFO) << KeyHasher()(k) << " has read dependency " << "(" << _tx << ")" << std::endl;
                 if (_tx->id > tx->id) {
                     _tx->AddRerunKeys(k, tx->id);
                 }
@@ -98,9 +100,15 @@ void SpectrumTable::Put(T* tx, const K& k, const evmc::bytes32& v) {
             break;
         }
         for (auto _tx: _v.readers_default) {
+            DLOG(INFO) << KeyHasher()(k) << " has read dependency " << "(" << _tx << ")" << std::endl;
             if (_tx->id > tx->id) {
                 _tx->AddRerunKeys(k, tx->id);
             }
+        }
+        // handle duplicated write on the same key
+        if (rit != end && rit->version == tx->id) {
+            rit->value = v;
+            return;
         }
         // insert an entry
         _v.entries.insert(rit.base(), SpectrumEntry {
@@ -115,8 +123,8 @@ void SpectrumTable::Put(T* tx, const K& k, const evmc::bytes32& v) {
 /// @param tx the transaction that previously read this entry
 /// @param k the key of read entry
 void SpectrumTable::RegretGet(T* tx, const K& k, size_t version) {
+    DLOG(INFO) << "remove read record " << tx->id << "(" << tx << ")" << " from " << KeyHasher()(k) << std::endl;
     Table::Put(k, [&](V& _v) {
-        auto guard = std::lock_guard{_v.mu};
         auto vit = _v.entries.begin();
         auto end = _v.entries.end();
         while (vit != end) {
@@ -129,6 +137,17 @@ void SpectrumTable::RegretGet(T* tx, const K& k, size_t version) {
         if (version == 0) {
             _v.readers_default.erase(tx);
         }
+        #if !defined(NDEBUG)
+        {
+            auto end = _v.entries.end();
+            for (auto vit = _v.entries.begin(); vit != end; ++vit) {
+                DLOG(INFO) << "spot version " << vit->version << std::endl;
+                if (vit->readers.contains(tx)) {
+                    DLOG(ERROR) << "didn't remove " << tx->id << "(" << tx << ")" << " still on version " << vit->version  << std::endl;
+                }
+            }
+        }
+        #endif
     });
 }
 
@@ -136,8 +155,8 @@ void SpectrumTable::RegretGet(T* tx, const K& k, size_t version) {
 /// @param tx the transaction that previously put into this entry
 /// @param k the key of this put entry
 void SpectrumTable::RegretPut(T* tx, const K& k) {
+    DLOG(INFO) << "remove write record " << tx->id << "(" << tx << ")" << " from " << KeyHasher()(k) << std::endl;
     Table::Put(k, [&](V& _v) {
-        auto guard = std::lock_guard{_v.mu};
         auto vit = _v.entries.begin();
         auto end = _v.entries.end();
         while (vit != end) {
@@ -146,6 +165,7 @@ void SpectrumTable::RegretPut(T* tx, const K& k) {
             }
             // abort transactions that read from current transaction
             for (auto _tx: vit->readers) {
+                DLOG(INFO) << KeyHasher()(k) << " has read dependency " << "(" << _tx << ")" << std::endl;
                 _tx->AddRerunKeys(k, tx->id);
             }
             break;
@@ -159,20 +179,33 @@ void SpectrumTable::RegretPut(T* tx, const K& k) {
 /// @param k the key of read entry
 /// @param version the version of read entry, which indicates the transaction that writes this value
 void SpectrumTable::ClearGet(T* tx, const K& k, size_t version) {
+    DLOG(INFO) << "remove read record " << tx->id << "(" << tx << ")" << " from " << KeyHasher()(k) << std::endl;
     Table::Put(k, [&](V& _v) {
-        auto guard = std::lock_guard{_v.mu};
         auto vit = _v.entries.begin();
         auto end = _v.entries.end();
         while (vit != end) {
-            if (vit->version == version) {
-                vit->readers.erase(tx);
-                break;
+            if (vit->version != version) {
+                ++vit; continue;
             }
-            ++vit;
+            DLOG(INFO) << "remove " << tx->id << "(" << tx << ")" << " from version " << vit->version << std::endl; 
+            vit->readers.erase(tx);
+            break;
         }
         if (version == 0) {
             _v.readers_default.erase(tx);
         }
+        // run an extra check in debug mode
+        #if !defined(NDEBUG)
+        {
+            auto end = _v.entries.end();
+            for (auto vit = _v.entries.begin(); vit != end; ++vit) {
+                DLOG(INFO) << "spot version " << vit->version << std::endl;
+                if (vit->readers.contains(tx)) {
+                    DLOG(ERROR) << "didn't remove " << tx->id << "(" << tx << ")" << " still on version " << vit->version  << std::endl;
+                }
+            }
+        }
+        #endif
     });
 }
 
@@ -180,8 +213,8 @@ void SpectrumTable::ClearGet(T* tx, const K& k, size_t version) {
 /// @param tx the transaction the previously wrote this entry
 /// @param k the key of written entry
 void SpectrumTable::ClearPut(T* tx, const K& k) {
+    DLOG(INFO) << "remove write record before " << tx->id << "(" << tx << ")" << " from " << KeyHasher()(k) << std::endl;
     Table::Put(k, [&](V& _v) {
-        auto guard = std::lock_guard{_v.mu};
         while (_v.entries.size() && _v.entries.front().version < tx->id) {
             _v.entries.pop_front();
         }
@@ -240,31 +273,39 @@ SpectrumExecutor::SpectrumExecutor(Spectrum& spectrum):
 /// @brief generate a transaction and execute it
 std::unique_ptr<T> SpectrumExecutor::Create() {
     auto tx = std::make_unique<T>(workload.Next(), last_execute.fetch_add(1));
-    tx->UpdateSetStorageHandler([&](
+    auto tx_ref = tx.get();
+    tx->UpdateSetStorageHandler([tx_ref](
         const evmc::address &addr, 
         const evmc::bytes32 &key, 
         const evmc::bytes32 &value
     ) {
+        auto tx = tx_ref;
         auto _key   = std::make_tuple(addr, key);
-        tx->tuples_put.push_back({.key = _key, .value = value});
+        tx->tuples_put.push_back({
+            .key = _key, 
+            .value = value, 
+            .is_committed=false
+        });
         if (tx->HasRerunKeys()) { tx->Break(); }
         return evmc_storage_status::EVMC_STORAGE_MODIFIED;
     });
-    tx->UpdateGetStorageHandler([&](
+    tx->UpdateGetStorageHandler([tx_ref, this](
         const evmc::address &addr, 
         const evmc::bytes32 &key
     ) {
+        auto tx = tx_ref;
         auto _key   = std::make_tuple(addr, key);
         auto value  = evmc::bytes32{0};
         auto version = size_t{0};
-        for (auto& tup: std::ranges::views::reverse(tx->tuples_put)) {
+        for (int i = 0; i < tx->tuples_put.size(); ++i) {
+            auto& tup = tx->tuples_put[tx->tuples_put.size() - i - 1];
             if (tup.key == _key) { return tup.value; }
         }
         for (auto& tup: tx->tuples_get) {
             if (tup.key == _key) { return tup.value; }
         }
         if (tx->HasRerunKeys()) { tx->Break(); return evmc::bytes32{0}; }
-        table.Get(tx.get(), _key, value, version);
+        table.Get(tx, _key, value, version);
         size_t checkpoint_id = tx->MakeCheckpoint();
         tx->tuples_get.push_back({
             .key            = _key, 
@@ -278,6 +319,13 @@ std::unique_ptr<T> SpectrumExecutor::Create() {
     DLOG(INFO) << "spectrum execute " << tx->id;
     tx->Execute();
     statistics.JournalExecute();
+    // commit all results if possible & necessary
+    for (auto entry: tx->tuples_put) {
+        if (tx->HasRerunKeys()) { break; }
+        if (entry.is_committed) { continue; }
+        table.Put(tx.get(), entry.key, entry.value);
+        entry.is_committed = true;
+    }
     return tx;
 }
 
@@ -292,7 +340,7 @@ void SpectrumExecutor::ReExecute(SpectrumTransaction* tx) {
         std::swap(tx->rerun_keys, rerun_keys);
     }
     auto back_to = ~size_t{0};
-    // find checkpoint 
+    // find checkpoint
     for (auto& key: rerun_keys) {
         for (size_t i = 0; i < tx->tuples_get.size(); ++i) {
             if (tx->tuples_get[i].key != key) { continue; }
@@ -305,44 +353,34 @@ void SpectrumExecutor::ReExecute(SpectrumTransaction* tx) {
     auto& tup = tx->tuples_get[back_to];
     tx->ApplyCheckpoint(tup.checkpoint_id);
     for (size_t i = tup.tuples_put_len; i < tx->tuples_put.size(); ++i) {
-        table.RegretPut(tx, tx->tuples_put[i].key);
+        if (tx->tuples_put[i].is_committed) {
+            table.RegretPut(tx, tx->tuples_put[i].key);
+        }
     }
-    for (size_t i = back_to; i < tx->tuples_put.size(); ++i) {
+    for (size_t i = back_to; i < tx->tuples_get.size(); ++i) {
         table.RegretGet(tx, tx->tuples_get[i].key, tx->tuples_get[i].version);
     }
     tx->tuples_put.resize(tup.tuples_put_len);
     tx->tuples_get.resize(back_to);
     tx->Execute();
     statistics.JournalExecute();
+    // commit all results if possible & necessary
+    for (auto entry: tx->tuples_put) {
+        if (tx->HasRerunKeys()) { break; }
+        if (entry.is_committed) { continue; }
+        table.Put(tx, entry.key, entry.value);
+        entry.is_committed = true;
+    }
 }
 
 /// @brief start an executor
 void SpectrumExecutor::Run() {while (!stop_flag.load()) {
-    if (last_execute.load() - last_finalized.load() < this->queue_amplification) {
-        queue.Push(Create());
-        continue;
-    }
-    auto tx = queue.Pop().value_or(std::unique_ptr<T>(nullptr));
-    if (tx.get() == nullptr) {
-        queue.Push(Create());
-        continue;
-    }
-    if (last_finalized.load() < tx->should_wait) {
-        DLOG(INFO) << "requeue " << tx->id;
-        if (!queue.Size()) { queue.Push(Create()); }
-        queue.Push(std::move(tx));
-        continue;
-    }
+    auto tx = Create();
     while (true) {
         if (tx->HasRerunKeys()) {
             // sweep all operations from previous execution
+            DLOG(INFO) << "re-execute " << tx->id;
             ReExecute(tx.get());
-            if (tx->HasRerunKeys()) { continue; }
-            // commit all results
-            for (auto entry: tx->tuples_put) {
-                table.Put(tx.get(), entry.key, entry.value);
-                if (tx->HasRerunKeys()) { continue; }
-            }
         }
         else if (last_finalized.load() + 1 == tx->id && !tx->HasRerunKeys()) {
             DLOG(INFO) << "spectrum finalize " << tx->id;
@@ -355,12 +393,6 @@ void SpectrumExecutor::Run() {while (!stop_flag.load()) {
             }
             auto latency = duration_cast<microseconds>(steady_clock::now() - tx->start_time).count();
             statistics.JournalCommit(latency);
-            break;
-        }
-        else if (last_finalized.load() + 1 != tx->id) {
-            // if cannot commit, then do something else
-            if (!queue.Size()) { queue.Push(Create()); }
-            queue.Push(std::move(tx));
             break;
         }
     }

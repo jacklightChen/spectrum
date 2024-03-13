@@ -43,6 +43,8 @@ public:
     alignas(sizeof(uint256)) uint256 m_stack_space[limit];
 };
 
+const static size_t ALIGN = size_t(4);
+
 /// COW Stack implementation
 class StackTop
 {
@@ -54,9 +56,9 @@ public:
     /// space limit
     uint256* limit;
     /// pointers to slices
-    std::array<uint256*, 16> slices;
+    std::array<uint256*, 1024/ALIGN> slices;
     /// ownership
-    std::array<bool, 16> ownership;
+    std::array<bool, 1024/ALIGN> ownership;
     /// initialize a stack top for nothing
     StackTop():
         height{0},
@@ -90,24 +92,24 @@ public:
         slices[slice_index] = base;
         uint256* new_slice  = base;
         ownership[slice_index] = true;
-        base += 64;
+        base += ALIGN;
         if (base > limit) {
             LOG(FATAL) << "exceed stack height limit";
         }
         if (old_slice != nullptr) {
-            memcpy(new_slice, old_slice, 64 * sizeof(uint256));
+            memcpy(new_slice, old_slice, ALIGN * sizeof(uint256));
         }
     }
     /// push an item onto current stack top
     inline void push(const uint256& item) {
-        ensure(height >> 6);
-        slices[height >> 6][height & 63] = item;
+        ensure(height / ALIGN);
+        slices[height / ALIGN][height % ALIGN] = item;
         height += 1;
     }
     /// pop an item and return it
     inline const uint256 &pop() {
         height -= 1;
-        return slices[height >> 6][height & 63];
+        return slices[height / ALIGN][height % ALIGN];
     }
     /// equivalent to get(0)
     inline const uint256& top() {
@@ -120,13 +122,13 @@ public:
     /// read item on stack, counting from stack top to stack bottom
     inline const uint256& get(size_t index) const {
         index = height - 1 - index;
-        return slices[index >> 6][index & 63];
+        return slices[index / ALIGN][index % ALIGN];
     }
     /// write item to stack
     inline uint256& get_mut(size_t index) {
         index = height - 1 - index;
-        ensure(index >> 6);
-        return slices[index >> 6][index & 63];
+        ensure(index / ALIGN);
+        return slices[index / ALIGN][index % ALIGN];
     }
 };
 
@@ -281,7 +283,7 @@ public:
             .code_it = this->position.value().code_it,
             .stack   = this->stack_top,
         };
-        this->stack_top.ownership = std::array<bool, 16>{{false}};
+        this->stack_top.ownership = std::array<bool, 1024/ALIGN>{{false}};
         return checkpoint;
     }
 
