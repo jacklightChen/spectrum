@@ -264,6 +264,7 @@ class LockManager {
 #undef TABLE_SIZE
 
 class CalvinExecutor;
+class CalvinScheduler;
 
 class Calvin : public Protocol {
   private:
@@ -275,9 +276,13 @@ class Calvin : public Protocol {
     volatile std::atomic<bool> stop_flag{false};
     volatile std::atomic<size_t> tx_counter{0};
     volatile std::atomic<size_t> commit_num{0};
-    BS::thread_pool pool;
-    void ParallelEach(std::function<void(T *)> map,
-                      std::vector<std::unique_ptr<T>> &batch);
+
+    std::unique_ptr<CalvinScheduler> scheduler;
+    std::thread sche_worker;
+
+    std::vector<std::unique_ptr<CalvinExecutor>> executors{};
+    std::vector<std::thread> workers{};
+
     size_t n_lock_manager;
     size_t n_workers;
 
@@ -298,9 +303,9 @@ class CalvinExecutor {
     moodycamel::ConcurrentQueue<T *> transaction_queue;
     std::atomic<bool> &stop_flag;
     std::atomic<size_t> &commit_num;
-    size_t& batch_size;
-    size_t& n_lock_manager;
-    size_t& n_workers;
+    size_t &batch_size;
+    size_t &n_lock_manager;
+    size_t &n_workers;
     Workload &workload;
     Statistics &statistics;
     std::size_t executor_id;
@@ -316,9 +321,9 @@ class CalvinScheduler {
   private:
     std::atomic<bool> &stop_flag;
     std::atomic<size_t> &commit_num;
-    size_t& batch_size;
-    size_t& n_lock_manager;
-    size_t& n_workers;
+    size_t &batch_size;
+    size_t &n_lock_manager;
+    size_t &n_workers;
     size_t scheduler_id;
     LockManager *lock_manager;
     moodycamel::ConcurrentQueue<T *> done_queue;

@@ -14,7 +14,7 @@ using namespace std::chrono;
 Calvin::Calvin(Workload &workload, Statistics &statistics, size_t n_threads,
                size_t table_partitions, size_t batch_size)
     : workload{workload}, statistics{statistics}, batch_size{batch_size},
-      pool{(unsigned int)n_threads}, table{table_partitions} {
+      table{table_partitions} {
     LOG(INFO) << fmt::format("Calvin({}, {}, {})", n_threads, table_partitions,
                              batch_size)
               << std::endl;
@@ -63,7 +63,7 @@ void CalvinScheduler::ScheduleTransactions() {
         while (!lock_manager->ready_txns_.empty()) {
             auto txn = lock_manager->ready_txns_.front();
             lock_manager->ready_txns_.pop_front();
-            
+
             auto worker = get_available_worker(n_lock_manager, n_workers,
                                                request_id++, scheduler_id);
             txn->scheduler_id = scheduler_id;
@@ -75,7 +75,7 @@ void CalvinScheduler::ScheduleTransactions() {
 void CalvinExecutor::RunTransactions() {
     while (!stop_flag.load()) {
         T *nxt = nullptr;
-        while(transaction_queue.try_dequeue(nxt) != false){
+        while (transaction_queue.try_dequeue(nxt) != false) {
             // do exec
 
             done_queue.enqueue(nxt);
@@ -83,12 +83,30 @@ void CalvinExecutor::RunTransactions() {
     }
 }
 
-void Calvin::Start() {}
+void Calvin::Start() {
+    stop_flag.store(false);
+
+    // start lock manger and workers
+    scheduler = std::make_unique<CalvinScheduler>(*this);
+
+    sche_worker = std::thread([this] { scheduler->ScheduleTransactions(); });
+
+    for (size_t i = 0; i != n_workers; ++i) {
+        executors.push_back(std::make_unique<CalvinExecutor>(*this));
+    }
+    for (size_t i = 0; i != n_workers; ++i) {
+        this->workers.push_back(
+            std::thread([this, i] { executors[i]->RunTransactions(); }));
+    }
+}
 
 void Calvin::Stop() {
     stop_flag.store(true);
-    pool.wait();
     DLOG(INFO) << "calvin stop";
+    sche_worker.join();
+    for (auto &worker : workers) {
+        worker.join();
+    }
 }
 
 // evmc::bytes32 CalvinTable::GetStorage(const evmc::address& addr,
