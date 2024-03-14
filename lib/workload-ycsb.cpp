@@ -69,9 +69,13 @@ Transaction YCSB::Next() {
     auto input = spectrum::from_hex([&]() {
                      std::stringstream ss;
                      ss << std::string{"f3d7af72"};
+                     //  10 key 5 read 5 write(may be blind)
                      for (int i = 0; i < 10; i++) {
                          ss << X;
                      }
+                     // val
+                     ss << X;
+
                      return ss.str();
                  }())
                      .value();
