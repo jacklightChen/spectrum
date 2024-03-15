@@ -2,8 +2,6 @@
 #include <conqueue/concurrentqueue.h>
 #include <functional>
 #include <thread>
-#include <thread_pool/BS_thread_pool.hpp>
-#include <thread_pool/BS_thread_pool_utils.hpp>
 
 #include "evm_hash.hpp"
 #include "protocol.hpp"
@@ -25,6 +23,8 @@ struct CalvinTransaction : public Transaction {
 
     size_t scheduler_id;
     size_t executor_id;
+
+    void analysis(){};
 };
 
 class CalvinTable : public Table<K, V, KeyHasher> {
@@ -273,9 +273,9 @@ class Calvin : public Protocol {
     Workload &workload;
     size_t batch_size;
     Statistics &statistics;
-    volatile std::atomic<bool> stop_flag{false};
-    volatile std::atomic<size_t> tx_counter{0};
-    volatile std::atomic<size_t> commit_num{0};
+    std::atomic<bool> stop_flag{false};
+    std::atomic<size_t> tx_counter{0};
+    std::atomic<size_t> commit_num{0};
 
     std::unique_ptr<CalvinScheduler> scheduler;
     std::thread sche_worker;
@@ -283,8 +283,12 @@ class Calvin : public Protocol {
     std::vector<std::unique_ptr<CalvinExecutor>> executors{};
     std::vector<std::thread> workers{};
 
+    moodycamel::ConcurrentQueue<T *> done_queue;
+
     size_t n_lock_manager;
     size_t n_workers;
+    friend class CalvinExecutor;
+    friend class CalvinScheduler;
 
   public:
     Calvin(Workload &workload, Statistics &statistics, size_t n_threads,
@@ -296,7 +300,6 @@ class Calvin : public Protocol {
 class CalvinExecutor {
   public:
     CalvinExecutor(Calvin &calvin);
-    std::unique_ptr<T> Create();
     void RunTransactions();
 
   public:
@@ -308,6 +311,7 @@ class CalvinExecutor {
     size_t &n_workers;
     Workload &workload;
     Statistics &statistics;
+    CalvinTable& table;
     std::size_t executor_id;
     moodycamel::ConcurrentQueue<T *> &done_queue;
 };
@@ -324,9 +328,12 @@ class CalvinScheduler {
     size_t &batch_size;
     size_t &n_lock_manager;
     size_t &n_workers;
+    Workload &workload;
+    Statistics &statistics;
+    CalvinTable& table;
     size_t scheduler_id;
     LockManager *lock_manager;
-    moodycamel::ConcurrentQueue<T *> done_queue;
+    moodycamel::ConcurrentQueue<T *> &done_queue;
     std::vector<CalvinExecutor *> all_executors;
 };
 

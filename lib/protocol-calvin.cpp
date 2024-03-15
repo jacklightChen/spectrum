@@ -23,16 +23,37 @@ Calvin::Calvin(Workload &workload, Statistics &statistics, size_t n_threads,
 std::size_t get_available_worker(std::size_t n_lock_manager,
                                  std::size_t n_workers, std::size_t request_id,
                                  std::size_t scheduler_id) {
-    // assume there are n lock managers and m workers
-    // 0, 1, .. n-1 are lock managers
-    // n, n + 1, .., n + m - 1 are workers
-
-    // the first lock managers assign transactions to n, .. , n + m/n - 1
-
-    auto start_worker_id =
-        n_lock_manager + n_workers / n_lock_manager * scheduler_id;
+    auto start_worker_id = n_workers / n_lock_manager * scheduler_id;
     auto len = n_workers / n_lock_manager;
     return request_id % len + start_worker_id;
+}
+
+CalvinExecutor::CalvinExecutor(Calvin& calvin):
+    workload{calvin.workload},
+    table{calvin.table},
+    stop_flag{calvin.stop_flag},
+    statistics{calvin.statistics},
+    commit_num{calvin.commit_num},
+    n_lock_manager{calvin.n_lock_manager},
+    n_workers{calvin.n_workers},
+    batch_size{calvin.batch_size},
+    done_queue{calvin.done_queue}
+{
+    
+}
+
+CalvinScheduler::CalvinScheduler(Calvin& calvin):
+    workload{calvin.workload},
+    table{calvin.table},
+    stop_flag{calvin.stop_flag},
+    statistics{calvin.statistics},
+    commit_num{calvin.commit_num},
+    n_lock_manager{calvin.n_lock_manager},
+    n_workers{calvin.n_workers},
+    batch_size{calvin.batch_size},
+    done_queue{calvin.done_queue}
+{
+    
 }
 
 void CalvinScheduler::ScheduleTransactions() {
@@ -123,16 +144,5 @@ void Calvin::Stop() {
 #undef K
 #undef V
 #undef T
-// class CalvinScheduler {
-//   void run(){
-
-//   };
-// };
-
-// class CalvinExecutor {
-//   void run(){
-
-//   };
-// };
 
 } // namespace spectrum
