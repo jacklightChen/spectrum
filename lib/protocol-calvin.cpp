@@ -10,6 +10,14 @@ namespace spectrum {
 #define T CalvinTransaction
 using namespace std::chrono;
 
+/// @brief wrap a base transaction into a calvin transaction
+/// @param inner the base transaction
+/// @param id transaction id
+CalvinTransaction::CalvinTransaction(Transaction&& inner, size_t id):
+    Transaction{std::move(inner)},
+    id{id}
+{}
+
 Calvin::Calvin(Workload &workload, Statistics &statistics, size_t n_threads,
                size_t table_partitions, size_t batch_size)
     : workload{workload}, statistics{statistics}, batch_size{batch_size},
@@ -76,8 +84,8 @@ void CalvinScheduler::ScheduleTransactions() {
 
         for (int j = 0; j < batch_size; ++j) {
             // getNextTx()
-            T *nxt = nullptr;
-            lock_manager->Lock(nxt);
+            auto tx = std::make_unique<T>(workload.Next(), i);
+            lock_manager->Lock(tx.release());
             i += n_lock_manager;
         }
 

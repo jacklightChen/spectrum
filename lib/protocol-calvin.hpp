@@ -17,6 +17,7 @@ namespace spectrum {
 #define T CalvinTransaction
 
 struct CalvinTransaction : public Transaction {
+    size_t id;
     std::vector<std::string> get_rdset();
     std::vector<std::string> get_wrset();
 
@@ -25,7 +26,8 @@ struct CalvinTransaction : public Transaction {
 
     size_t scheduler_id;
     size_t executor_id;
-
+    
+    CalvinTransaction(Transaction&& inner, size_t id);
     void analysis(){};
 };
 
