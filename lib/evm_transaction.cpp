@@ -16,6 +16,9 @@
 
 namespace spectrum {
 
+/// @brief create a EVMType enum value from given string
+/// @param s BASIC | STRAWMAN | COPYONWRITE
+/// @return the indicated EVMType
 EVMType ParseEVMType(std::basic_string_view<char> s) {
     if (s == "BASIC")       { return EVMType::BASIC; }
     if (s == "STRAWMAN")    { return EVMType::STRAWMAN; }
@@ -67,6 +70,8 @@ void Transaction::UpdateGetStorageHandler(spectrum::GetStorage&& handler) {
     host.get_storage_inner = handler;
 }
 
+/// @brief making checkpoint
+/// @return checkpoint id, see Transaction::ApplyCheckpoint
 size_t Transaction::MakeCheckpoint() {
     // can only be called inside execution
     if (evm_type == EVMType::BASIC) {
@@ -85,6 +90,8 @@ size_t Transaction::MakeCheckpoint() {
     return 0;
 }
 
+/// @brief making checkpoint
+/// @param checkpoint_id the checkpoint id to go back to
 void Transaction::ApplyCheckpoint(size_t checkpoint_id) {
     if (evm_type == EVMType::BASIC) {
         return;
@@ -103,6 +110,7 @@ void Transaction::ApplyCheckpoint(size_t checkpoint_id) {
     }
 }
 
+/// @brief break current execution
 void Transaction::Break() {
     // can only be called inside execution
     if (evm_type == EVMType::BASIC || evm_type == EVMType::STRAWMAN) {
@@ -115,6 +123,7 @@ void Transaction::Break() {
     }
 }
 
+/// @brief execute a transaction
 void Transaction::Execute() {
     if (evm_type == EVMType::BASIC || evm_type == EVMType::STRAWMAN) {
         auto& _vm = std::get<evmone::VM>(vm);
