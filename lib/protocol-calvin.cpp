@@ -66,6 +66,7 @@ void CalvinScheduler::ScheduleTransactions() {
         while (done_queue.try_dequeue(tmp) != false) {
             lock_manager->Release(tmp);
             delete tmp;
+            commit_num++;
         }
 
         if (i - commit_num > batch_size * 2) {
@@ -94,11 +95,17 @@ void CalvinScheduler::ScheduleTransactions() {
 }
 void CalvinExecutor::RunTransactions() {
     while (!stop_flag.load()) {
-        T *nxt = nullptr;
-        while (transaction_queue.try_dequeue(nxt) != false) {
-            // do exec
-
-            done_queue.enqueue(nxt);
+        T *tx = nullptr;
+        while (transaction_queue.try_dequeue(tx) != false) {
+            if(tx == nullptr) continue;
+            auto start = steady_clock::now();
+            // tx->UpdateSetStorageHandler();
+            // tx->UpdateGetStorageHandler();
+            statistics.JournalExecute();
+            tx->Execute();
+            done_queue.enqueue(tx);
+            auto latency = duration_cast<microseconds>(steady_clock::now() - start).count();
+            statistics.JournalCommit(latency);
         }
     }
 }

@@ -2,7 +2,7 @@ import matplotlib.pyplot as plt
 import pandas as pd
 
 df = pd.read_csv('bench_results.csv')
-print(df)
+# print(df)
 fig ,ax = plt.subplots()
 for protocol in df['protocol'].unique():
     df_protocol = df[df['protocol'] == protocol]

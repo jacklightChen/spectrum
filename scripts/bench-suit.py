@@ -10,9 +10,10 @@ if __name__ == '__main__':
     for n_threads in range(6, 36, 6):
         # n_partitions    = n_threads * 8
         n_partitions    = 1
+        n_dispatchers   = n_threads
         protocols       = [
             f"Aria:{n_threads}:{n_partitions}:128:FALSE", 
-            f"Sparkle:{n_threads}:{n_partitions}", 
+            f"Sparkle:{n_threads}:{n_dispatchers}:{n_partitions}", 
             f"Spectrum:{n_threads}:{n_partitions}:{n_threads + 16}:COPYONWRITE"
         ]
         for cc in protocols:
@@ -36,7 +37,7 @@ if __name__ == '__main__':
     fig ,ax = plt.subplots()
     for protocol in df['protocol'].unique():
         df_protocol = df[df['protocol'] == protocol]
-        ax.plot(df['threads'], df['commit'], label=protocol)
+        ax.plot(df_protocol['threads'], df_protocol['commit'], label=protocol)
     
     ax.set_xlabel('Threads')
     ax.set_ylabel('Throughput (txn/s)')

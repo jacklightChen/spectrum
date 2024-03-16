@@ -265,6 +265,20 @@ class LockManager {
 };
 #undef TABLE_SIZE
 
+// /// @brief calvin queue
+// class CalvinQueue {
+
+//     private:
+//     std::mutex                      mu;
+//     std::queue<std::unique_ptr<T>>  queue;
+
+//     public:
+//     CalvinQueue() = default;
+//     void Push(std::unique_ptr<T>&& tx);
+//     std::unique_ptr<T> Pop();
+
+// };
+
 class CalvinExecutor;
 class CalvinScheduler;
 
