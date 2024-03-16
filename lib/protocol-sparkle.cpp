@@ -213,27 +213,48 @@ void SparkleTable::ClearPut(T* tx, const K k) {
     });
 }
 
+/// @brief push transaction into the queue
+/// @param tx a unique pointer to transaction (boxed transaction)
+void SparkleQueue::Push(std::unique_ptr<T>&& tx) {
+    auto guard = std::lock_guard{mu};
+    queue.push(std::move(tx));
+}
+
+/// @brief pop a transaction from the queue
+/// @return a unique pointer to transaction (boxed transaction)
+std::unique_ptr<T> SparkleQueue::Pop() {
+    auto guard = std::lock_guard{mu};
+    auto tx = std::move(queue.front());
+    queue.pop();
+    return tx;
+}
+
 /// @brief sparkle initialization parameters
 /// @param workload the transaction generator
 /// @param table_partitions the number of parallel partitions to use in the hash table
-Sparkle::Sparkle(Workload& workload, Statistics& statistics, size_t n_threads, size_t table_partitions):
+Sparkle::Sparkle(Workload& workload, Statistics& statistics, size_t n_executors, size_t n_dispatchers, size_t table_partitions):
     workload{workload},
     statistics{statistics},
-    n_threads{n_threads},
+    n_executors{n_executors},
+    n_dispatchers{n_dispatchers},
+    queue_bundle(n_executors),
     table{table_partitions}
 {
-    LOG(INFO) << fmt::format("Sparkle({}, {})", n_threads, table_partitions);
+    LOG(INFO) << fmt::format("Sparkle({}, {}, {})", n_executors, n_dispatchers, table_partitions);
 }
 
 /// @brief start sparkle protocol
-/// @param n_threads the number of threads to start
 void Sparkle::Start() {
     stop_flag.store(false);
-    for (size_t i = 0; i != n_threads; ++i) {
-        executors.push_back(std::make_unique<SparkleExecutor>(*this));
+    for (size_t i = 0; i != n_dispatchers; ++i) {
+        dispatchers.push_back(std::thread([this] {
+            SparkleDispatch(*this).Run();
+        }));
     }
-    for (size_t i = 0; i != n_threads; ++i) {
-        this->workers.push_back(std::thread([this, i] { executors[i]->Run(); }));
+    for (size_t i = 0; i != n_executors; ++i) {
+        executors.push_back(std::thread([this, i] {
+            SparkleExecutor(*this, queue_bundle[i]).Run();
+        }));
     }
 }
 
@@ -241,15 +262,31 @@ void Sparkle::Start() {
 /// @return statistics of this execution
 void Sparkle::Stop() {
     stop_flag.store(true);
-    for (auto& worker: workers) {
-        worker.join();
-    }
+    for (auto& x: executors)    { x.join(); }
+    for (auto& x: dispatchers)  { x.join(); }
+}
+
+/// @brief initialize a dispatcher
+/// @param sparkle the sparkle protocol configuration
+SparkleDispatch::SparkleDispatch(Sparkle& sparkle):
+    workload{sparkle.workload},
+    last_execute{sparkle.last_execute},
+    queue_bundle{sparkle.queue_bundle},
+    stop_flag{sparkle.stop_flag}
+{}
+
+/// @brief run dispatcher
+void SparkleDispatch::Run() {
+    while(!stop_flag.load()) {for (auto& queue: queue_bundle) {
+        // round-robin dispatch
+        queue.Push(std::make_unique<T>(workload.Next(), last_execute.fetch_add(1)));
+    }}
 }
 
 /// @brief sparkle executor
 /// @param sparkle sparkle initialization paremeters
-SparkleExecutor::SparkleExecutor(Sparkle& sparkle):
-    workload{sparkle.workload},
+SparkleExecutor::SparkleExecutor(Sparkle& sparkle, SparkleQueue& queue):
+    queue{queue},
     table{sparkle.table},
     last_finalized{sparkle.last_finalized},
     last_execute{sparkle.last_execute},
@@ -259,7 +296,7 @@ SparkleExecutor::SparkleExecutor(Sparkle& sparkle):
 
 /// @brief start an executor
 void SparkleExecutor::Run() { while (!stop_flag.load()) {
-    auto tx = std::make_unique<T>(workload.Next(), last_execute.fetch_add(1));
+    auto tx = queue.Pop();
     auto start = steady_clock::now();
     tx->UpdateSetStorageHandler([&](
         const evmc::address &addr, 
