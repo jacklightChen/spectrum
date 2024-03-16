@@ -15,6 +15,8 @@
 
 namespace spectrum {
 
+#define K std::tuple<evmc::address, evmc::bytes32>
+
 enum EVMType { BASIC = 0, STRAWMAN = 1, COPYONWRITE = 2 };
 
 EVMType ParseEVMType(std::basic_string_view<char> s);
@@ -23,6 +25,11 @@ struct Result : public evmc_result {
 
     Result(evmc_result result);
     ~Result();
+};
+
+struct Prediction {
+    std::vector<K> get;
+    std::vector<K> put;
 };
 
 class Transaction {
@@ -41,6 +48,7 @@ class Transaction {
                 std::span<uint8_t> code, std::span<uint8_t> input);
     void UpdateSetStorageHandler(spectrum::SetStorage &&handler);
     void UpdateGetStorageHandler(spectrum::GetStorage &&handler);
+    void Analyze(Prediction& prediction);
     void Execute();
     void Break();
     void ApplyCheckpoint(size_t checkpoint_id);
@@ -63,3 +71,5 @@ template <> struct fmt::formatter<spectrum::EVMType> {
         throw std::runtime_error("unreachable");
     }
 };
+
+#undef K
