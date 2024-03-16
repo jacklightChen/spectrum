@@ -1,7 +1,6 @@
 #include "protocol-calvin.hpp"
 
 #include <chrono>
-#include <deque>
 #include <string>
 #include <vector>
 

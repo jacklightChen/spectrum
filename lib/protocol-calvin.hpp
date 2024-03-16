@@ -2,6 +2,8 @@
 #include <conqueue/concurrentqueue.h>
 #include <functional>
 #include <thread>
+#include <deque>
+#include <queue>
 
 #include "evm_hash.hpp"
 #include "protocol.hpp"
