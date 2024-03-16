@@ -118,7 +118,6 @@ class SparkleExecutor {
     SparkleQueue&           queue;
     SparkleTable&           table;
     Statistics&             statistics;
-    std::atomic<size_t>&    last_execute;
     std::atomic<size_t>&    last_finalized;
     std::atomic<bool>&      stop_flag;
 

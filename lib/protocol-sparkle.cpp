@@ -116,7 +116,7 @@ void SparkleTable::Put(T* tx, const K k, const evmc::bytes32& v) {
 /// @param k the key of written entry
 /// @return true if lock succeeds
 bool SparkleTable::Lock(T* tx, const K k) {
-    volatile bool succeed = false;
+    bool succeed = false;
     Table::Put(k, [&](V& _v) {
         auto guard = std::lock_guard{_v.mu};
         succeed = _v.tx == nullptr || _v.tx->id >= tx->id;
@@ -293,7 +293,6 @@ SparkleExecutor::SparkleExecutor(Sparkle& sparkle, SparkleQueue& queue):
     queue{queue},
     table{sparkle.table},
     last_finalized{sparkle.last_finalized},
-    last_execute{sparkle.last_execute},
     statistics{sparkle.statistics},
     stop_flag{sparkle.stop_flag}
 {}
