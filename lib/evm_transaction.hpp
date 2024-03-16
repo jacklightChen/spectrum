@@ -15,16 +15,26 @@
 
 namespace spectrum {
 
+#define K std::tuple<evmc::address, evmc::bytes32>
+
 enum EVMType { BASIC = 0, STRAWMAN = 1, COPYONWRITE = 2 };
 
 EVMType ParseEVMType(std::basic_string_view<char> s);
 
+/// @brief the evmc_result that automatically destructs itself
 struct Result : public evmc_result {
 
     Result(evmc_result result);
     ~Result();
 };
 
+/// @brief a structure tailored for Transaction::Analyze to dump r/w keys into
+struct Prediction {
+    std::vector<K> get; // the read keys
+    std::vector<K> put; // the write keys
+};
+
+/// @brief the base class for evm transactions, providing COPYONWRITE, BASIC, STRAWMAN mode for mini-checkpointing
 class Transaction {
 
     private:
@@ -41,6 +51,7 @@ class Transaction {
                 std::span<uint8_t> code, std::span<uint8_t> input);
     void UpdateSetStorageHandler(spectrum::SetStorage &&handler);
     void UpdateGetStorageHandler(spectrum::GetStorage &&handler);
+    void Analyze(Prediction& prediction);
     void Execute();
     void Break();
     void ApplyCheckpoint(size_t checkpoint_id);
@@ -50,6 +61,7 @@ class Transaction {
 
 } // namespace spectrum
 
+/// @brief specify template fmt::formatter for formatting EVMType values
 template <> struct fmt::formatter<spectrum::EVMType> {
     template <typename ParseContext> constexpr auto parse(ParseContext &ctx) {
         return ctx.begin();
@@ -63,3 +75,5 @@ template <> struct fmt::formatter<spectrum::EVMType> {
         throw std::runtime_error("unreachable");
     }
 };
+
+#undef K

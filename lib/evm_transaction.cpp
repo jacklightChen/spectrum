@@ -16,6 +16,9 @@
 
 namespace spectrum {
 
+/// @brief create a EVMType enum value from given string
+/// @param s BASIC | STRAWMAN | COPYONWRITE
+/// @return the indicated EVMType
 EVMType ParseEVMType(std::basic_string_view<char> s) {
     if (s == "BASIC")       { return EVMType::BASIC; }
     if (s == "STRAWMAN")    { return EVMType::STRAWMAN; }
@@ -67,6 +70,8 @@ void Transaction::UpdateGetStorageHandler(spectrum::GetStorage&& handler) {
     host.get_storage_inner = handler;
 }
 
+/// @brief making checkpoint
+/// @return checkpoint id, see Transaction::ApplyCheckpoint
 size_t Transaction::MakeCheckpoint() {
     // can only be called inside execution
     if (evm_type == EVMType::BASIC) {
@@ -85,6 +90,8 @@ size_t Transaction::MakeCheckpoint() {
     return 0;
 }
 
+/// @brief making checkpoint
+/// @param checkpoint_id the checkpoint id to go back to
 void Transaction::ApplyCheckpoint(size_t checkpoint_id) {
     if (evm_type == EVMType::BASIC) {
         return;
@@ -103,6 +110,7 @@ void Transaction::ApplyCheckpoint(size_t checkpoint_id) {
     }
 }
 
+/// @brief break current execution
 void Transaction::Break() {
     // can only be called inside execution
     if (evm_type == EVMType::BASIC || evm_type == EVMType::STRAWMAN) {
@@ -115,6 +123,7 @@ void Transaction::Break() {
     }
 }
 
+/// @brief execute a transaction
 void Transaction::Execute() {
     if (evm_type == EVMType::BASIC || evm_type == EVMType::STRAWMAN) {
         auto& _vm = std::get<evmone::VM>(vm);
@@ -128,9 +137,7 @@ void Transaction::Execute() {
         if (result.status_code != evmc_status_code::EVMC_SUCCESS) {
             DLOG(ERROR) << "function hash: " << to_hex(std::span{&input[0], 4}) <<  " transaction status: " << result.status_code << std::endl;
         }
-        if (result.output_data) {
-            result.release(&result);
-        }
+        if (result.output_data) { result.release(&result); }
         return;
     }
     if (evm_type == EVMType::COPYONWRITE) {
@@ -153,6 +160,34 @@ void Transaction::Execute() {
     LOG(FATAL) << "not possible";
 }
 
+/// @brief run the transaction once, append read and write keys into the prediction struct
+void Transaction::Analyze(Prediction& prediction) {
+    // store current get storage and set storage handler
+    auto _get_storage_handler = host.get_storage_inner;
+    auto _set_storage_handler = host.set_storage_inner;
+    this->UpdateGetStorageHandler([&prediction](auto& address, auto& key) {
+        prediction.get.push_back({address, key});
+        return evmc::bytes32{0};
+    });
+    this->UpdateSetStorageHandler([&prediction](auto& address, auto& key, auto& /* value */) {
+        prediction.put.push_back({address, key});
+        return evmc_storage_status::EVMC_STORAGE_MODIFIED;
+    });
+    // execute the evmone once with basic strategy
+    auto _vm = evmone::VM();
+    auto result = evmone::baseline::execute(
+        _vm, &host.get_interface(), host.to_context(),
+        EVMC_SHANGHAI, &message,
+        &code[0], code.size() - 1
+    );
+    if (result.output_data) { result.release(&result); }
+    // restore access storage handlers
+    host.get_storage_inner = _get_storage_handler;
+    host.set_storage_inner = _set_storage_handler;
+}
+
+/// @brief result of evmc
+/// @param result 
 Result::Result(evmc_result result):
     evmc_result{result}
 {}

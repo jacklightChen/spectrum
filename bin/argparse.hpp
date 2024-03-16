@@ -83,7 +83,7 @@ std::unique_ptr<Workload> ParseWorkload(const char* arg) {
         return static_cast<std::unique_ptr<Workload>>(std::make_unique<X>(Y)); \
     };
     OPT(Smallbank, INT, DOUBLE)
-    OPT(YCSB, INT, DOUBLE)
+    OPT(YCSB     , INT, DOUBLE)
     #undef OPT
     // fallback to an error
     THROW("unknown workload option ({})", std::string{name});
@@ -101,7 +101,7 @@ std::unique_ptr<Protocol> ParseProtocol(const char* arg, Workload& workload, Sta
         return static_cast<std::unique_ptr<Protocol>>(std::make_unique<X>(workload, statistics, Y));  \
     };
     OPT(Aria,     INT, INT, INT, BOOL)
-    OPT(Sparkle,  INT, INT)
+    OPT(Sparkle,  INT, INT, INT)
     OPT(Spectrum, INT, INT, INT, EVMTYPE)
     OPT(Serial,   EVMTYPE, INT)
     #undef OPT
