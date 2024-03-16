@@ -224,6 +224,7 @@ void SparkleQueue::Push(std::unique_ptr<T>&& tx) {
 /// @return a unique pointer to transaction (boxed transaction)
 std::unique_ptr<T> SparkleQueue::Pop() {
     auto guard = std::lock_guard{mu};
+    if (!queue.size()) return {nullptr};
     auto tx = std::move(queue.front());
     queue.pop();
     return tx;
@@ -240,20 +241,23 @@ Sparkle::Sparkle(Workload& workload, Statistics& statistics, size_t n_executors,
     queue_bundle(n_executors),
     table{table_partitions}
 {
-    LOG(INFO) << fmt::format("Sparkle({}, {}, {})", n_executors, n_dispatchers, table_partitions);
+    LOG(INFO) << fmt::format("Sparkle(n_executors={}, n_dispatchers={}, n_table_partitions={})", n_executors, n_dispatchers, table_partitions);
 }
 
 /// @brief start sparkle protocol
 void Sparkle::Start() {
     stop_flag.store(false);
     for (size_t i = 0; i != n_dispatchers; ++i) {
+        DLOG(INFO) << "start dispatcher " << i << std::endl;
         dispatchers.push_back(std::thread([this] {
             SparkleDispatch(*this).Run();
         }));
     }
     for (size_t i = 0; i != n_executors; ++i) {
-        executors.push_back(std::thread([this, i] {
-            SparkleExecutor(*this, queue_bundle[i]).Run();
+        DLOG(INFO) << "start executor " << i << std::endl;
+        auto queue = &queue_bundle[i];
+        executors.push_back(std::thread([this, queue] {
+            SparkleExecutor(*this, *queue).Run();
         }));
     }
 }
@@ -262,8 +266,8 @@ void Sparkle::Start() {
 /// @return statistics of this execution
 void Sparkle::Stop() {
     stop_flag.store(true);
-    for (auto& x: executors)    { x.join(); }
     for (auto& x: dispatchers)  { x.join(); }
+    for (auto& x: executors)    { x.join(); }
 }
 
 /// @brief initialize a dispatcher
@@ -297,6 +301,7 @@ SparkleExecutor::SparkleExecutor(Sparkle& sparkle, SparkleQueue& queue):
 /// @brief start an executor
 void SparkleExecutor::Run() { while (!stop_flag.load()) {
     auto tx = queue.Pop();
+    if (tx == nullptr) { continue; }
     auto start = steady_clock::now();
     tx->UpdateSetStorageHandler([&](
         const evmc::address &addr, 
