@@ -1,5 +1,10 @@
+#ifndef _WORKLOAD_
+#define _WORKLOAD_
+
 #include "workload.hpp"
 #include "random.hpp"
+
+#endif
 
 namespace spectrum {
 

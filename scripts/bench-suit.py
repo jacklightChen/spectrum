@@ -13,5 +13,5 @@ if __name__ == '__main__':
         ]
         for cc in protocols:
             print(f"#COMMIT-{hash}",  f"CONFIG-{cc}")
-            result = subprocess.run(["./build/bench", cc, "Smallbank:100000:2.0", "2s"], **conf)
+            result = subprocess.run(["../build/bench", cc, "Smallbank:100000:2.0", "2s"], **conf)
             print(result.stderr.decode('utf-8').strip())
