@@ -19,8 +19,8 @@ CalvinTransaction::CalvinTransaction(Transaction&& inner, size_t id):
 {}
 
 Calvin::Calvin(Workload &workload, Statistics &statistics, size_t n_threads,
-               size_t table_partitions, size_t batch_size)
-    : workload{workload}, statistics{statistics}, batch_size{batch_size},
+               size_t table_partitions)
+    : workload{workload}, statistics{statistics},
       table{table_partitions} {
     LOG(INFO) << fmt::format("Calvin({}, {}, {})", n_threads, table_partitions,
                              batch_size)

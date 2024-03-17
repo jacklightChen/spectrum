@@ -18,8 +18,12 @@ namespace spectrum {
 
 struct CalvinTransaction : public Transaction {
     size_t id;
-    std::vector<std::string> get_rdset();
-    std::vector<std::string> get_wrset();
+    std::vector<std::string> get_rdset(){
+        return rd_set;
+    };
+    std::vector<std::string> get_wrset(){
+        return wr_set;
+    };
 
     std::vector<std::string> rd_set;
     std::vector<std::string> wr_set;
@@ -289,7 +293,7 @@ class Calvin : public Protocol {
     // EVMType             evm_type;
     CalvinTable table;
     Workload &workload;
-    size_t batch_size;
+    size_t batch_size{100};
     Statistics &statistics;
     std::atomic<bool> stop_flag{false};
     std::atomic<size_t> tx_counter{0};
@@ -310,7 +314,7 @@ class Calvin : public Protocol {
 
   public:
     Calvin(Workload &workload, Statistics &statistics, size_t n_threads,
-           size_t table_partitions, size_t batch_size);
+           size_t table_partitions);
     void Start() override;
     void Stop() override;
 };

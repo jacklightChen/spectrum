@@ -3,6 +3,7 @@
 #include <spectrum/protocol-sparkle.hpp>
 #include <spectrum/protocol-aria-fb.hpp>
 #include <spectrum/protocol-serial.hpp>
+#include <spectrum/protocol-calvin.hpp>
 #include <spectrum/workload.hpp>
 #include <spectrum/workload-smallbank.hpp>
 #include <spectrum/workload-ycsb.hpp>
@@ -104,6 +105,7 @@ std::unique_ptr<Protocol> ParseProtocol(const char* arg, Workload& workload, Sta
     OPT(Sparkle,  INT, INT, INT)
     OPT(Spectrum, INT, INT, INT, EVMTYPE)
     OPT(Serial,   EVMTYPE, INT)
+    OPT(Calvin,   INT, INT)
     #undef OPT
     // fallback to an error
     THROW("unknown protocol option ({})", std::string{name});

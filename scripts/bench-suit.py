@@ -10,11 +10,12 @@ if __name__ == '__main__':
     for n_threads in range(6, 36, 6):
         # n_partitions    = n_threads * 8
         n_partitions    = 1
-        n_dispatchers   = n_threads
+        n_dispatchers   = 2
         protocols       = [
-            f"Aria:{n_threads}:{n_partitions}:128:FALSE", 
+            # f"Aria:{n_threads}:{n_partitions}:128:FALSE", 
+            # f"AriaReordering:{n_threads}:{n_partitions}:128:TRUE",
             f"Sparkle:{n_threads}:{n_dispatchers}:{n_partitions}", 
-            f"Spectrum:{n_threads}:{n_partitions}:{n_threads + 16}:COPYONWRITE"
+            # f"Spectrum:{n_threads}:{n_partitions}:{n_threads + 16}:COPYONWRITE"
         ]
         for cc in protocols:
             print(f"#COMMIT-{hash}",  f"CONFIG-{cc}")

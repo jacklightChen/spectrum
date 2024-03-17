@@ -244,6 +244,21 @@ Sparkle::Sparkle(Workload& workload, Statistics& statistics, size_t n_executors,
     LOG(INFO) << fmt::format("Sparkle(n_executors={}, n_dispatchers={}, n_table_partitions={})", n_executors, n_dispatchers, table_partitions);
 }
 
+void pin_thread_to_core(std::thread &t) {
+#ifndef __APPLE__
+    static std::size_t core_id = 56;
+    LOG(INFO) << "core_id: " << core_id;
+    cpu_set_t cpuset;
+    CPU_ZERO(&cpuset);
+    auto _core_id = core_id;
+    ++core_id;
+    CPU_SET(core_id, &cpuset);
+    int rc =
+        pthread_setaffinity_np(t.native_handle(), sizeof(cpu_set_t), &cpuset);
+    CHECK(rc == 0);
+#endif
+}
+
 /// @brief start sparkle protocol
 void Sparkle::Start() {
     stop_flag.store(false);
@@ -259,6 +274,7 @@ void Sparkle::Start() {
         executors.push_back(std::thread([this, queue] {
             SparkleExecutor(*this, *queue).Run();
         }));
+        pin_thread_to_core(executors[i]);
     }
 }
 
