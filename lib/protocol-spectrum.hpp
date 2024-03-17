@@ -77,7 +77,7 @@ struct SpectrumTable: private Table<K, V, KeyHasher> {
 
 class SpectrumExecutor;
 
-template<typename X, typename Compare>
+template<typename X>
 class LockQueue {
 
     std::mutex        mu;
@@ -106,8 +106,6 @@ class LockQueue {
 
 };
 
-using ConQueue = LockQueue<std::unique_ptr<T>, SpectrumCompare>;
-
 class Spectrum: public Protocol {
 
     private:
@@ -124,7 +122,7 @@ class Spectrum: public Protocol {
     friend class SpectrumExecutor;
 
     public:
-    Spectrum(Workload& workload, Statistics& statistics, size_t n_threads, size_t table_partitions, size_t queue_amplification, EVMType evm_type);
+    Spectrum(Workload& workload, Statistics& statistics, size_t n_threads, size_t table_partitions, EVMType evm_type);
     void Start() override;
     void Stop() override;
 
@@ -134,8 +132,6 @@ class SpectrumExecutor {
 
     private:
     Workload&               workload;
-    ConQueue                queue;
-    size_t                  queue_amplification;
     SpectrumTable&          table;
     Statistics&             statistics;
     std::atomic<size_t>&    last_execute;

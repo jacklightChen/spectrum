@@ -102,7 +102,7 @@ std::unique_ptr<Protocol> ParseProtocol(const char* arg, Workload& workload, Sta
     };
     OPT(Aria,     INT, INT, INT, BOOL)
     OPT(Sparkle,  INT, INT, INT)
-    OPT(Spectrum, INT, INT, INT, EVMTYPE)
+    OPT(Spectrum, INT, INT, EVMTYPE)
     OPT(Serial,   EVMTYPE, INT)
     #undef OPT
     // fallback to an error

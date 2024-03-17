@@ -224,15 +224,14 @@ void SpectrumTable::ClearPut(T* tx, const K& k) {
 /// @brief spectrum initialization parameters
 /// @param workload the transaction generator
 /// @param table_partitions the number of parallel partitions to use in the hash table
-Spectrum::Spectrum(Workload& workload, Statistics& statistics, size_t n_threads, size_t table_partitions, size_t queue_amplification, EVMType evm_type):
+Spectrum::Spectrum(Workload& workload, Statistics& statistics, size_t n_threads, size_t table_partitions, EVMType evm_type):
     workload{workload},
     statistics{statistics},
     n_threads{n_threads},
     table{table_partitions},
-    queue_amplification{queue_amplification},
     evm_type{evm_type}
 {
-    LOG(INFO) << fmt::format("Spectrum({}, {}, {}, {})", n_threads, table_partitions, queue_amplification, evm_type);
+    LOG(INFO) << fmt::format("Spectrum(n_threads={}, table_partitions={}, evm_type={})", n_threads, table_partitions, evm_type);
 }
 
 /// @brief start spectrum protocol
@@ -240,10 +239,9 @@ Spectrum::Spectrum(Workload& workload, Statistics& statistics, size_t n_threads,
 void Spectrum::Start() {
     stop_flag.store(false);
     for (size_t i = 0; i != n_threads; ++i) {
-        executors.push_back(std::make_unique<SpectrumExecutor>(*this));
-    }
-    for (size_t i = 0; i != n_threads; ++i) {
-        this->workers.push_back(std::thread([this, i] { executors[i]->Run(); }));
+        executors.push_back(std::thread([this]{
+            std::make_unique<SpectrumExecutor>(*this)->Run();
+        }));
     }
 }
 
@@ -251,9 +249,7 @@ void Spectrum::Start() {
 /// @return statistics of this execution
 void Spectrum::Stop() {
     stop_flag.store(true);
-    for (auto& worker: workers) {
-        worker.join();
-    }
+    for (auto& x: executors) { x.join(); }
 }
 
 /// @brief spectrum executor
@@ -264,8 +260,7 @@ SpectrumExecutor::SpectrumExecutor(Spectrum& spectrum):
     last_finalized{spectrum.last_finalized},
     last_execute{spectrum.last_execute},
     stop_flag{spectrum.stop_flag},
-    statistics{spectrum.statistics},
-    queue_amplification{spectrum.queue_amplification}
+    statistics{spectrum.statistics}
 {
     workload.SetEVMType(spectrum.evm_type);
 }

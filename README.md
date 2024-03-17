@@ -69,6 +69,10 @@ Currently Aria, Sparkle and Spectrum all works properly.
 
 # Dev Log
 
+## Sparkle
+
+1. 
+
 ## Pre-schedule
 
 1. Only schedule hot keys -- select highest. (YCSB / Smallbank)
@@ -77,3 +81,4 @@ Currently Aria, Sparkle and Spectrum all works properly.
 
 1. Detect: transaction cannot commit / don't re-execute immediately. 
 2. Wait until (pessimistic)
+
