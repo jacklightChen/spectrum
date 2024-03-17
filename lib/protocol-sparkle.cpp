@@ -227,7 +227,7 @@ void SparkleQueue::Push(std::unique_ptr<T>&& tx) {
 std::unique_ptr<T> SparkleQueue::Pop() {
     auto guard = std::lock_guard{mu};
     if (!queue.size()) return {nullptr};
-    auto tx = std::move(queue.front());
+    auto tx = std::move(const_cast<std::unique_ptr<T>&>(queue.top()));
     queue.pop();
     return tx;
 }
@@ -251,6 +251,7 @@ Sparkle::Sparkle(Workload& workload, Statistics& statistics, size_t n_executors,
     table{table_partitions}
 {
     LOG(INFO) << fmt::format("Sparkle(n_executors={}, n_dispatchers={}, n_table_partitions={})", n_executors, n_dispatchers, table_partitions);
+    workload.SetEVMType(EVMType::BASIC);
 }
 
 /// @brief start sparkle protocol
@@ -294,9 +295,7 @@ SparkleDispatch::SparkleDispatch(Sparkle& sparkle):
 void SparkleDispatch::Run() {
     while(!stop_flag.load()) {for (auto& queue: queue_bundle) {
         // round-robin dispatch
-        if (queue.Size() <= 5) {
-            queue.Push(std::make_unique<T>(workload.Next(), last_execute.fetch_add(1)));
-        }
+        queue.Push(std::make_unique<T>(workload.Next(), last_execute.fetch_add(1)));
     }}
 }
 
@@ -370,8 +369,6 @@ void SparkleExecutor::Run() { while (!stop_flag.load()) {
             for (auto entry: tx->tuples_put) {
                 table.Put(tx.get(), std::get<0>(entry), std::get<1>(entry));
             }
-            queue.Push(std::move(tx));
-            break;
         }
         else if (last_finalized.load() + 1 == tx->id) {
             // here no previous transaction will affect the result of this transaction. 
