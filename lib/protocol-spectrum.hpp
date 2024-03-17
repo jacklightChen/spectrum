@@ -75,41 +75,29 @@ struct SpectrumTable: private Table<K, V, KeyHasher> {
 
 };
 
-class SpectrumExecutor;
+/// @brief spectrum queue
+class SpectrumQueue {
 
-template<typename X>
-class LockQueue {
+    private:
+    std::mutex                      mu;
+    std::queue<std::unique_ptr<T>>  queue;
 
-    std::mutex        mu;
-    std::queue<X>     queue;
-    
     public:
-    void Push(X&& x) {
-        auto guard = std::lock_guard{mu};
-        queue.push(std::move(x));
-    }
-    std::optional<X> Pop() {
-        auto guard = std::lock_guard{mu};
-        if (queue.size() == 0) {
-            return std::nullopt;
-        }
-        else {
-            auto front = std::move(const_cast<X&>(queue.front()));
-            queue.pop();
-            return front;
-        }
-    }
-    size_t Size() {
-        auto guard = std::lock_guard{mu};
-        return queue.size();
-    }
+    SpectrumQueue() = default;
+    void Push(std::unique_ptr<T>&& tx);
+    std::unique_ptr<T> Pop();
+    size_t Size();
 
 };
+
+class SpectrumExecutor;
+class SpectrumDispatch;
 
 class Spectrum: public Protocol {
 
     private:
-    size_t              n_threads;
+    size_t              n_executors;
+    size_t              n_dispatchers;
     Workload&           workload;
     SpectrumTable       table;
     Statistics&         statistics;
@@ -117,12 +105,14 @@ class Spectrum: public Protocol {
     std::atomic<size_t> last_execute{1};
     std::atomic<size_t> last_finalized{0};
     std::atomic<bool>   stop_flag{false};
+    std::vector<SpectrumQueue>  queue_bundle;
     std::vector<std::thread>    executors{};
     std::vector<std::thread>    dispatchers{};
     friend class SpectrumExecutor;
+    friend class SpectrumDispatch;
 
     public:
-    Spectrum(Workload& workload, Statistics& statistics, size_t n_threads, size_t table_partitions, EVMType evm_type);
+    Spectrum(Workload& workload, Statistics& statistics, size_t n_executors, size_t n_dispatchers, size_t table_partitions, EVMType evm_type);
     void Start() override;
     void Stop() override;
 
@@ -131,17 +121,30 @@ class Spectrum: public Protocol {
 class SpectrumExecutor {
 
     private:
-    Workload&               workload;
+    SpectrumQueue&          queue;
     SpectrumTable&          table;
     Statistics&             statistics;
-    std::atomic<size_t>&    last_execute;
     std::atomic<size_t>&    last_finalized;
     std::atomic<bool>&      stop_flag;
 
     public:
-    SpectrumExecutor(Spectrum& spectrum);
+    SpectrumExecutor(Spectrum& spectrum, SpectrumQueue& queue);
     std::unique_ptr<T> Create();
     void ReExecute(SpectrumTransaction* tx);
+    void Run();
+
+};
+
+class SpectrumDispatch {
+
+    private:
+    Workload&                   workload;
+    std::atomic<size_t>&        last_execute;
+    std::vector<SpectrumQueue>& queue_bundle;
+    std::atomic<bool>&          stop_flag;
+
+    public:
+    SpectrumDispatch(Spectrum& spectrum);
     void Run();
 
 };

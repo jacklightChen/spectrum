@@ -225,25 +225,34 @@ void SpectrumTable::ClearPut(T* tx, const K& k) {
 /// @brief spectrum initialization parameters
 /// @param workload the transaction generator
 /// @param table_partitions the number of parallel partitions to use in the hash table
-Spectrum::Spectrum(Workload& workload, Statistics& statistics, size_t n_threads, size_t table_partitions, EVMType evm_type):
+Spectrum::Spectrum(Workload& workload, Statistics& statistics, size_t n_executors, size_t n_dispatchers, size_t table_partitions, EVMType evm_type):
     workload{workload},
     statistics{statistics},
-    n_threads{n_threads},
-    table{table_partitions},
-    evm_type{evm_type}
+    n_executors{n_executors},
+    n_dispatchers{n_dispatchers},
+    queue_bundle(n_executors),
+    table{table_partitions}
 {
-    LOG(INFO) << fmt::format("Spectrum(n_threads={}, table_partitions={}, evm_type={})", n_threads, table_partitions, evm_type);
+    LOG(INFO) << fmt::format("Spectrum(n_executors={}, n_dispatchers={}, table_partitions={}, evm_type={})", n_executors, n_dispatchers, table_partitions, evm_type);
+    workload.SetEVMType(evm_type);
 }
 
 /// @brief start spectrum protocol
-/// @param n_threads the number of threads to start
+/// @param n_executors the number of threads to start
 void Spectrum::Start() {
     stop_flag.store(false);
-    for (size_t i = 0; i != n_threads; ++i) {
-        executors.push_back(std::thread([this]{
-            std::make_unique<SpectrumExecutor>(*this)->Run();
+    for (size_t i = 0; i != n_dispatchers; ++i) {
+        dispatchers.push_back(std::thread([this]{
+            std::make_unique<SpectrumDispatch>(*this)->Run();
         }));
-        PinRoundRobin(executors[i], i);
+        PinRoundRobin(dispatchers[i], i);
+    }
+    for (size_t i = 0; i != n_executors; ++i) {
+        auto queue = &queue_bundle[i];
+        executors.push_back(std::thread([this, queue]{
+            std::make_unique<SpectrumExecutor>(*this, *queue)->Run();
+        }));
+        PinRoundRobin(executors[i], i + n_dispatchers);
     }
 }
 
@@ -254,22 +263,64 @@ void Spectrum::Stop() {
     for (auto& x: executors) { x.join(); }
 }
 
+/// @brief push transaction into the queue
+/// @param tx a unique pointer to transaction (boxed transaction)
+void SpectrumQueue::Push(std::unique_ptr<T>&& tx) {
+    auto guard = std::lock_guard{mu};
+    queue.push(std::move(tx));
+}
+
+/// @brief pop a transaction from the queue
+/// @return a unique pointer to transaction (boxed transaction)
+std::unique_ptr<T> SpectrumQueue::Pop() {
+    auto guard = std::lock_guard{mu};
+    if (!queue.size()) return {nullptr};
+    auto tx = std::move(queue.front());
+    queue.pop();
+    return tx;
+}
+
+/// @brief current spectrum queue size
+/// @return current spectrum queue size
+size_t SpectrumQueue::Size() {
+    auto guard = std::lock_guard{mu};
+    return queue.size();
+}
+
+
+/// @brief initialize a dispatcher
+/// @param spectrum the spectrum protocol configuration
+SpectrumDispatch::SpectrumDispatch(Spectrum& spectrum):
+    workload{spectrum.workload},
+    last_execute{spectrum.last_execute},
+    queue_bundle{spectrum.queue_bundle},
+    stop_flag{spectrum.stop_flag}
+{}
+
+/// @brief run dispatcher
+void SpectrumDispatch::Run() {
+    while(!stop_flag.load()) {for (auto& queue: queue_bundle) {
+        // round-robin dispatch
+        if (queue.Size() <= 5) {
+            queue.Push(std::make_unique<T>(workload.Next(), last_execute.fetch_add(1)));
+        }
+    }}
+}
+
 /// @brief spectrum executor
 /// @param spectrum spectrum initialization paremeters
-SpectrumExecutor::SpectrumExecutor(Spectrum& spectrum):
-    workload{spectrum.workload},
+SpectrumExecutor::SpectrumExecutor(Spectrum& spectrum, SpectrumQueue& queue):
+    queue{queue},
     table{spectrum.table},
     last_finalized{spectrum.last_finalized},
-    last_execute{spectrum.last_execute},
     stop_flag{spectrum.stop_flag},
     statistics{spectrum.statistics}
-{
-    workload.SetEVMType(spectrum.evm_type);
-}
+{}
 
 /// @brief generate a transaction and execute it
 std::unique_ptr<T> SpectrumExecutor::Create() {
-    auto tx = std::make_unique<T>(workload.Next(), last_execute.fetch_add(1));
+    auto tx = queue.Pop();
+    if (tx == nullptr) return tx;
     auto tx_ref = tx.get();
     tx->UpdateSetStorageHandler([tx_ref](
         const evmc::address &addr, 
@@ -373,6 +424,7 @@ void SpectrumExecutor::ReExecute(SpectrumTransaction* tx) {
 /// @brief start an executor
 void SpectrumExecutor::Run() {while (!stop_flag.load()) {
     auto tx = Create();
+    if (tx == nullptr) continue;
     while (true) {
         if (tx->HasRerunKeys()) {
             // sweep all operations from previous execution

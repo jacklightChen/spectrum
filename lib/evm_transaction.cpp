@@ -94,6 +94,7 @@ size_t Transaction::MakeCheckpoint() {
 /// @param checkpoint_id the checkpoint id to go back to
 void Transaction::ApplyCheckpoint(size_t checkpoint_id) {
     if (evm_type == EVMType::BASIC) {
+        vm.emplace<evmone::VM>();
         return;
     }
     if (evm_type == EVMType::STRAWMAN) {

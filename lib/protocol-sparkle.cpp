@@ -293,7 +293,7 @@ SparkleDispatch::SparkleDispatch(Sparkle& sparkle):
 void SparkleDispatch::Run() {
     while(!stop_flag.load()) {for (auto& queue: queue_bundle) {
         // round-robin dispatch
-        if (queue.Size() == 0) {
+        if (queue.Size() <= 5) {
             queue.Push(std::make_unique<T>(workload.Next(), last_execute.fetch_add(1)));
         }
     }}
@@ -369,6 +369,8 @@ void SparkleExecutor::Run() { while (!stop_flag.load()) {
             for (auto entry: tx->tuples_put) {
                 table.Put(tx.get(), std::get<0>(entry), std::get<1>(entry));
             }
+            queue.Push(std::move(tx));
+            break;
         }
         else if (last_finalized.load() + 1 == tx->id) {
             // here no previous transaction will affect the result of this transaction. 
