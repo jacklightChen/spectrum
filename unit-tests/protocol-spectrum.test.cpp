@@ -16,7 +16,7 @@ TEST(Spectrum, JustRunSmallbank) {
     GLOG_PREFIX;
     auto statistics = Statistics();
     auto workload = Smallbank(10000, 0.0);
-    auto protocol = Spectrum(workload, statistics, 8, 32, 16, EVMType::COPYONWRITE);
+    auto protocol = Spectrum(workload, statistics, 8, 32, EVMType::COPYONWRITE);
     protocol.Start();
     std::this_thread::sleep_for(1000ms);
     protocol.Stop();
