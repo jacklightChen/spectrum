@@ -1,0 +1,1 @@
+void PinRoundRobin(unsigned rotate_id);
