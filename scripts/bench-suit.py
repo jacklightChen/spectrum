@@ -15,7 +15,7 @@ if __name__ == '__main__':
             # f"Aria:{n_threads}:{n_partitions}:128:FALSE", 
             # f"AriaReordering:{n_threads}:{n_partitions}:128:TRUE",
             f"Sparkle:{n_threads}:{n_dispatchers}:{n_partitions}", 
-            # f"Spectrum:{n_threads}:{n_partitions}:{n_threads + 16}:COPYONWRITE"
+            # f"Spectrum:{n_threads}:{n_partitions}:COPYONWRITE"
         ]
         for cc in protocols:
             print(f"#COMMIT-{hash}",  f"CONFIG-{cc}")
