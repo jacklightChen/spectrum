@@ -268,7 +268,7 @@ void Sparkle::Start() {
         executors.push_back(std::thread([this, queue] {
             SparkleExecutor(*this, *queue).Run();
         }));
-        PinRoundRobin(executors[i], i);
+        PinRoundRobin(executors[i], i + n_dispatchers);
     }
 }
 
