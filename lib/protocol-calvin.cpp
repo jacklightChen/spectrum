@@ -1,9 +1,10 @@
 #include "protocol-calvin.hpp"
 
+#include "./hex.hpp"
+#include "./thread-util.hpp"
 #include <chrono>
 #include <string>
 #include <vector>
-#include "./hex.hpp"
 
 namespace spectrum {
 #define K std::tuple<evmc::address, evmc::bytes32>
@@ -19,7 +20,8 @@ CalvinTransaction::CalvinTransaction(Transaction &&inner, size_t id)
 
 Calvin::Calvin(Workload &workload, Statistics &statistics, size_t n_threads,
                size_t n_dispatchers, size_t table_partitions)
-    : workload{workload}, statistics{statistics}, table{table_partitions} {
+    : workload{workload}, statistics{statistics}, n_workers{n_threads},
+      table{table_partitions} {
     LOG(INFO) << fmt::format("Calvin({}, {}, {})", n_threads, table_partitions,
                              batch_size)
               << std::endl;
@@ -31,6 +33,22 @@ std::size_t get_available_worker(std::size_t n_lock_manager,
     auto start_worker_id = n_workers / n_lock_manager * scheduler_id;
     auto len = n_workers / n_lock_manager;
     return request_id % len + start_worker_id;
+}
+
+CalvinTable::CalvinTable(size_t partitions)
+    : Table<K, V, KeyHasher>{partitions} {}
+
+evmc::bytes32 CalvinTable::GetStorage(const evmc::address &addr,
+                                      const evmc::bytes32 &key) {
+    auto v = evmc::bytes32{0};
+    Table::Get(std::make_tuple(addr, key), [&](auto _v) { v = _v; });
+    return v;
+}
+
+void CalvinTable::SetStorage(const evmc::address &addr,
+                             const evmc::bytes32 &key,
+                             const evmc::bytes32 &value) {
+    Table::Put(std::make_tuple(addr, key), [&](evmc::bytes32& v){ v = value; });
 }
 
 CalvinExecutor::CalvinExecutor(Calvin &calvin)
@@ -45,18 +63,18 @@ CalvinScheduler::CalvinScheduler(Calvin &calvin)
       stop_flag{calvin.stop_flag}, statistics{calvin.statistics},
       commit_num{calvin.commit_num}, n_lock_manager{calvin.n_lock_manager},
       n_workers{calvin.n_workers}, batch_size{calvin.batch_size},
-      done_queue{calvin.done_queue} {}
+      done_queue{calvin.done_queue}, lock_manager{},
+      all_executors{calvin.executors} {}
 
 void CalvinScheduler::ScheduleTransactions() {
     auto i = 0;
     auto request_id = 0;
-    std::queue<std::unique_ptr<T>> pool;
 
     while (!stop_flag.load()) {
         T *tmp;
 
         while (done_queue.try_dequeue(tmp) != false) {
-            lock_manager->Release(tmp);
+            lock_manager.Release(tmp);
             delete tmp;
             commit_num++;
         }
@@ -70,18 +88,37 @@ void CalvinScheduler::ScheduleTransactions() {
             auto tx = std::make_unique<T>(workload.Next(), i);
             Prediction p;
             tx->Analyze(p);
-            for(auto &k: p.get) {
-                // tx->rd_set.insert(spectrum::to_hex(k));
-            }
-            
+            std::set<std::string> wr_set;
+            std::set<std::string> rd_set;
 
-            lock_manager->Lock(tx.release());
+            for (auto &k : p.put) {
+                auto &key = std::get<1>(k);
+                wr_set.insert(to_hex(std::span{(uint8_t *)&key, 32}));
+            }
+
+            for (auto &k : p.get) {
+                auto &key = std::get<1>(k);
+                auto keystr = to_hex(std::span{(uint8_t *)&key, 32});
+                if (!wr_set.contains(keystr)) {
+                    rd_set.insert(keystr);
+                }
+            }
+
+            for (auto &k : wr_set) {
+                tx->wr_vec.push_back(k);
+            }
+
+            for (auto &k : rd_set) {
+                tx->rd_vec.push_back(k);
+            }
+
+            lock_manager.Lock(tx.release());
             i += n_lock_manager;
         }
 
-        while (!lock_manager->ready_txns_.empty()) {
-            auto txn = lock_manager->ready_txns_.front();
-            lock_manager->ready_txns_.pop_front();
+        while (!lock_manager.ready_txns_.empty()) {
+            auto txn = lock_manager.ready_txns_.front();
+            lock_manager.ready_txns_.pop_front();
 
             auto worker = get_available_worker(n_lock_manager, n_workers,
                                                request_id++, scheduler_id);
@@ -98,8 +135,17 @@ void CalvinExecutor::RunTransactions() {
             if (tx == nullptr)
                 continue;
             auto start = steady_clock::now();
-            // tx->UpdateSetStorageHandler();
-            // tx->UpdateGetStorageHandler();
+            tx->UpdateGetStorageHandler(
+                [&](const evmc::address &addr, const evmc::bytes32 &key) {
+                    // transaction.MakeCheckpoint();
+                    return table.GetStorage(addr, key);
+                });
+            tx->UpdateSetStorageHandler([&](const evmc::address &addr,
+                                            const evmc::bytes32 &key,
+                                            const evmc::bytes32 &value) {
+                table.SetStorage(addr, key, value);
+                return evmc_storage_status::EVMC_STORAGE_ASSIGNED;
+            });
             statistics.JournalExecute();
             tx->Execute();
             done_queue.enqueue(tx);
@@ -115,17 +161,19 @@ void Calvin::Start() {
     stop_flag.store(false);
 
     // start lock manger and workers
-    scheduler = std::make_unique<CalvinScheduler>(*this);
-
-    sche_worker = std::thread([this] { scheduler->ScheduleTransactions(); });
-
     for (size_t i = 0; i != n_workers; ++i) {
         executors.push_back(std::make_unique<CalvinExecutor>(*this));
     }
     for (size_t i = 0; i != n_workers; ++i) {
         this->workers.push_back(
             std::thread([this, i] { executors[i]->RunTransactions(); }));
+        PinRoundRobin(this->workers[i], i);
     }
+
+    scheduler = std::make_unique<CalvinScheduler>(*this);
+
+    sche_worker = std::thread([this] { scheduler->ScheduleTransactions(); });
+    PinRoundRobin(sche_worker, n_workers);
 }
 
 void Calvin::Stop() {

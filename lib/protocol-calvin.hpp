@@ -1,15 +1,15 @@
-#include <atomic>
-#include <conqueue/concurrentqueue.h>
-#include <deque>
-#include <functional>
-#include <queue>
-#include <thread>
-
 #include "evm_hash.hpp"
 #include "protocol.hpp"
 #include "statistics.hpp"
 #include "table.hpp"
 #include "workload.hpp"
+#include <atomic>
+#include <conqueue/concurrentqueue.h>
+#include <deque>
+#include <functional>
+#include <queue>
+#include <set>
+#include <thread>
 
 namespace spectrum {
 #define K std::tuple<evmc::address, evmc::bytes32>
@@ -18,11 +18,11 @@ namespace spectrum {
 
 struct CalvinTransaction : public Transaction {
     size_t id;
-    std::vector<std::string> get_rdset() { return rd_set; };
-    std::vector<std::string> get_wrset() { return wr_set; };
+    std::vector<std::string> get_rdset() { return rd_vec; };
+    std::vector<std::string> get_wrset() { return wr_vec; };
 
-    std::vector<std::string> rd_set;
-    std::vector<std::string> wr_set;
+    std::vector<std::string> rd_vec;
+    std::vector<std::string> wr_vec;
 
     size_t scheduler_id;
     size_t executor_id;
@@ -32,17 +32,12 @@ struct CalvinTransaction : public Transaction {
 };
 
 class CalvinTable : public Table<K, V, KeyHasher> {
-    //  private:
-    //   std::unordered_map<std::tuple<evmc::address, evmc::bytes32>,
-    //   evmc::bytes32,
-    //                      KeyHasher>
-    //       inner;
-
-    //  public:
-    //   evmc::bytes32 GetStorage(const evmc::address& addr, const
-    //   evmc::bytes32& key); void SetStorage(const evmc::address& addr, const
-    //   evmc::bytes32& key,
-    //                   const evmc::bytes32& value);
+  public:
+    CalvinTable(size_t partitions);
+    evmc::bytes32 GetStorage(const evmc::address &addr,
+                             const evmc::bytes32 &key);
+    void SetStorage(const evmc::address &addr, const evmc::bytes32 &key,
+                    const evmc::bytes32 &value);
 };
 
 #define TABLE_SIZE 100000
@@ -289,7 +284,7 @@ class Calvin : public Protocol {
     // EVMType             evm_type;
     CalvinTable table;
     Workload &workload;
-    size_t batch_size{100};
+    size_t batch_size{50};
     Statistics &statistics;
     std::atomic<bool> stop_flag{false};
     std::atomic<size_t> tx_counter{0};
@@ -303,8 +298,8 @@ class Calvin : public Protocol {
 
     moodycamel::ConcurrentQueue<T *> done_queue;
 
-    size_t n_lock_manager;
-    size_t n_workers;
+    size_t n_lock_manager{1};
+    size_t n_workers{1};
     friend class CalvinExecutor;
     friend class CalvinScheduler;
 
@@ -350,9 +345,10 @@ class CalvinScheduler {
     Statistics &statistics;
     CalvinTable &table;
     size_t scheduler_id;
-    LockManager *lock_manager;
+    LockManager lock_manager;
     moodycamel::ConcurrentQueue<T *> &done_queue;
-    std::vector<CalvinExecutor *> all_executors;
+    // std::vector<CalvinExecutor *> all_executors;
+    std::vector<std::unique_ptr<CalvinExecutor>> &all_executors;
 };
 
 #undef K
