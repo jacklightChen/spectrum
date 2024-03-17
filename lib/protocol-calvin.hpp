@@ -17,6 +17,7 @@ namespace spectrum {
 #define T CalvinTransaction
 
 struct CalvinTransaction : public Transaction {
+    size_t id;
     std::vector<std::string> get_rdset();
     std::vector<std::string> get_wrset();
 
@@ -25,7 +26,8 @@ struct CalvinTransaction : public Transaction {
 
     size_t scheduler_id;
     size_t executor_id;
-
+    
+    CalvinTransaction(Transaction&& inner, size_t id);
     void analysis(){};
 };
 
@@ -264,6 +266,20 @@ class LockManager {
     std::unordered_map<TransactionType *, int> txn_waits_;
 };
 #undef TABLE_SIZE
+
+// /// @brief calvin queue
+// class CalvinQueue {
+
+//     private:
+//     std::mutex                      mu;
+//     std::queue<std::unique_ptr<T>>  queue;
+
+//     public:
+//     CalvinQueue() = default;
+//     void Push(std::unique_ptr<T>&& tx);
+//     std::unique_ptr<T> Pop();
+
+// };
 
 class CalvinExecutor;
 class CalvinScheduler;

@@ -10,6 +10,14 @@ namespace spectrum {
 #define T CalvinTransaction
 using namespace std::chrono;
 
+/// @brief wrap a base transaction into a calvin transaction
+/// @param inner the base transaction
+/// @param id transaction id
+CalvinTransaction::CalvinTransaction(Transaction&& inner, size_t id):
+    Transaction{std::move(inner)},
+    id{id}
+{}
+
 Calvin::Calvin(Workload &workload, Statistics &statistics, size_t n_threads,
                size_t table_partitions, size_t batch_size)
     : workload{workload}, statistics{statistics}, batch_size{batch_size},
@@ -66,6 +74,7 @@ void CalvinScheduler::ScheduleTransactions() {
         while (done_queue.try_dequeue(tmp) != false) {
             lock_manager->Release(tmp);
             delete tmp;
+            commit_num++;
         }
 
         if (i - commit_num > batch_size * 2) {
@@ -75,8 +84,8 @@ void CalvinScheduler::ScheduleTransactions() {
 
         for (int j = 0; j < batch_size; ++j) {
             // getNextTx()
-            T *nxt = nullptr;
-            lock_manager->Lock(nxt);
+            auto tx = std::make_unique<T>(workload.Next(), i);
+            lock_manager->Lock(tx.release());
             i += n_lock_manager;
         }
 
@@ -94,11 +103,17 @@ void CalvinScheduler::ScheduleTransactions() {
 }
 void CalvinExecutor::RunTransactions() {
     while (!stop_flag.load()) {
-        T *nxt = nullptr;
-        while (transaction_queue.try_dequeue(nxt) != false) {
-            // do exec
-
-            done_queue.enqueue(nxt);
+        T *tx = nullptr;
+        while (transaction_queue.try_dequeue(tx) != false) {
+            if(tx == nullptr) continue;
+            auto start = steady_clock::now();
+            // tx->UpdateSetStorageHandler();
+            // tx->UpdateGetStorageHandler();
+            statistics.JournalExecute();
+            tx->Execute();
+            done_queue.enqueue(tx);
+            auto latency = duration_cast<microseconds>(steady_clock::now() - start).count();
+            statistics.JournalCommit(latency);
         }
     }
 }
