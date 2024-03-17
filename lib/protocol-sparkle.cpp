@@ -230,6 +230,13 @@ std::unique_ptr<T> SparkleQueue::Pop() {
     return tx;
 }
 
+/// @brief current sparkle queue size
+/// @return current sparkle queue size
+size_t SparkleQueue::Size() {
+    auto guard = std::lock_guard{mu};
+    return queue.size();
+}
+
 /// @brief sparkle initialization parameters
 /// @param workload the transaction generator
 /// @param table_partitions the number of parallel partitions to use in the hash table
@@ -283,7 +290,9 @@ SparkleDispatch::SparkleDispatch(Sparkle& sparkle):
 void SparkleDispatch::Run() {
     while(!stop_flag.load()) {for (auto& queue: queue_bundle) {
         // round-robin dispatch
-        queue.Push(std::make_unique<T>(workload.Next(), last_execute.fetch_add(1)));
+        if (queue.Size() == 0) {
+            queue.Push(std::make_unique<T>(workload.Next(), last_execute.fetch_add(1)));
+        }
     }}
 }
 
