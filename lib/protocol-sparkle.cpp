@@ -1,12 +1,12 @@
 #include "./protocol-sparkle.hpp"
 #include "./table.hpp"
 #include "./hex.hpp"
+#include "./thread-util.hpp"
 #include <functional>
 #include <thread>
 #include <chrono>
 #include <glog/logging.h>
 #include <fmt/core.h>
-#include <thread-util.hpp>
 
 /*
     This is a implementation of "Sparkle: Speculative Deterministic Concurrency Control for Partially Replicated Transactional Data Stores" (Zhongmiao Li, Peter Van Roy and Paolo Romano). 
@@ -257,18 +257,18 @@ void Sparkle::Start() {
     stop_flag.store(false);
     for (size_t i = 0; i != n_dispatchers; ++i) {
         DLOG(INFO) << "start dispatcher " << i << std::endl;
-        PinRoundRobin(i);
         dispatchers.push_back(std::thread([this] {
             SparkleDispatch(*this).Run();
         }));
+        PinRoundRobin(dispatchers[i], i);
     }
     for (size_t i = 0; i != n_executors; ++i) {
         DLOG(INFO) << "start executor " << i << std::endl;
         auto queue = &queue_bundle[i];
-        PinRoundRobin(i + n_dispatchers);
         executors.push_back(std::thread([this, queue] {
             SparkleExecutor(*this, *queue).Run();
         }));
+        PinRoundRobin(executors[i], i);
     }
 }
 
