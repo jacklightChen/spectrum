@@ -33,6 +33,7 @@ void SparkleTransaction::Reset() {
     tuples_get.resize(0);
     tuples_put.resize(0);
     rerun_flag.store(false);
+    Transaction::ApplyCheckpoint(0);
 }
 
 /// @brief the multi-version table for sparkle
