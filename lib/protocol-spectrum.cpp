@@ -1,6 +1,7 @@
 #include "./protocol-spectrum.hpp"
 #include "./table.hpp"
 #include "./hex.hpp"
+#include "./thread-util.hpp"
 #include <functional>
 #include <thread>
 #include <chrono>
@@ -242,6 +243,7 @@ void Spectrum::Start() {
         executors.push_back(std::thread([this]{
             std::make_unique<SpectrumExecutor>(*this)->Run();
         }));
+        PinRoundRobin(executors[i], i);
     }
 }
 
