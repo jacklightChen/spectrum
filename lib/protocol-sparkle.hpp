@@ -66,6 +66,7 @@ class SparkleQueue {
     SparkleQueue() = default;
     void Push(std::unique_ptr<T>&& tx);
     std::unique_ptr<T> Pop();
+    size_t Size();
 
 };
 
