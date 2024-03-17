@@ -260,7 +260,8 @@ void Spectrum::Start() {
 /// @return statistics of this execution
 void Spectrum::Stop() {
     stop_flag.store(true);
-    for (auto& x: executors) { x.join(); }
+    for (auto& x: executors) 	{ x.join(); }
+    for (auto& x: dispatchers) 	{ x.join(); }
 }
 
 /// @brief push transaction into the queue

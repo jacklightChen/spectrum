@@ -1,9 +1,9 @@
 #include <atomic>
 #include <conqueue/concurrentqueue.h>
-#include <functional>
-#include <thread>
 #include <deque>
+#include <functional>
 #include <queue>
+#include <thread>
 
 #include "evm_hash.hpp"
 #include "protocol.hpp"
@@ -18,20 +18,16 @@ namespace spectrum {
 
 struct CalvinTransaction : public Transaction {
     size_t id;
-    std::vector<std::string> get_rdset(){
-        return rd_set;
-    };
-    std::vector<std::string> get_wrset(){
-        return wr_set;
-    };
+    std::vector<std::string> get_rdset() { return rd_set; };
+    std::vector<std::string> get_wrset() { return wr_set; };
 
     std::vector<std::string> rd_set;
     std::vector<std::string> wr_set;
 
     size_t scheduler_id;
     size_t executor_id;
-    
-    CalvinTransaction(Transaction&& inner, size_t id);
+
+    CalvinTransaction(Transaction &&inner, size_t id);
     void analysis(){};
 };
 
@@ -314,7 +310,7 @@ class Calvin : public Protocol {
 
   public:
     Calvin(Workload &workload, Statistics &statistics, size_t n_threads,
-           size_t table_partitions);
+           size_t n_dispatchers, size_t table_partitions);
     void Start() override;
     void Stop() override;
 };
@@ -333,7 +329,7 @@ class CalvinExecutor {
     size_t &n_workers;
     Workload &workload;
     Statistics &statistics;
-    CalvinTable& table;
+    CalvinTable &table;
     std::size_t executor_id;
     moodycamel::ConcurrentQueue<T *> &done_queue;
 };
@@ -352,7 +348,7 @@ class CalvinScheduler {
     size_t &n_workers;
     Workload &workload;
     Statistics &statistics;
-    CalvinTable& table;
+    CalvinTable &table;
     size_t scheduler_id;
     LockManager *lock_manager;
     moodycamel::ConcurrentQueue<T *> &done_queue;

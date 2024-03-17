@@ -105,7 +105,7 @@ std::unique_ptr<Protocol> ParseProtocol(const char* arg, Workload& workload, Sta
     OPT(Sparkle,  INT, INT, INT)
     OPT(Spectrum, INT, INT, INT, EVMTYPE)
     OPT(Serial,   EVMTYPE, INT)
-    OPT(Calvin,   INT, INT)
+    OPT(Calvin,   INT, INT, INT)
     #undef OPT
     // fallback to an error
     THROW("unknown protocol option ({})", std::string{name});

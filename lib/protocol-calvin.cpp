@@ -3,6 +3,7 @@
 #include <chrono>
 #include <string>
 #include <vector>
+#include "./hex.hpp"
 
 namespace spectrum {
 #define K std::tuple<evmc::address, evmc::bytes32>
@@ -13,15 +14,12 @@ using namespace std::chrono;
 /// @brief wrap a base transaction into a calvin transaction
 /// @param inner the base transaction
 /// @param id transaction id
-CalvinTransaction::CalvinTransaction(Transaction&& inner, size_t id):
-    Transaction{std::move(inner)},
-    id{id}
-{}
+CalvinTransaction::CalvinTransaction(Transaction &&inner, size_t id)
+    : Transaction{std::move(inner)}, id{id} {}
 
 Calvin::Calvin(Workload &workload, Statistics &statistics, size_t n_threads,
-               size_t table_partitions)
-    : workload{workload}, statistics{statistics},
-      table{table_partitions} {
+               size_t n_dispatchers, size_t table_partitions)
+    : workload{workload}, statistics{statistics}, table{table_partitions} {
     LOG(INFO) << fmt::format("Calvin({}, {}, {})", n_threads, table_partitions,
                              batch_size)
               << std::endl;
@@ -35,33 +33,19 @@ std::size_t get_available_worker(std::size_t n_lock_manager,
     return request_id % len + start_worker_id;
 }
 
-CalvinExecutor::CalvinExecutor(Calvin& calvin):
-    workload{calvin.workload},
-    table{calvin.table},
-    stop_flag{calvin.stop_flag},
-    statistics{calvin.statistics},
-    commit_num{calvin.commit_num},
-    n_lock_manager{calvin.n_lock_manager},
-    n_workers{calvin.n_workers},
-    batch_size{calvin.batch_size},
-    done_queue{calvin.done_queue}
-{
-    
-}
+CalvinExecutor::CalvinExecutor(Calvin &calvin)
+    : workload{calvin.workload}, table{calvin.table},
+      stop_flag{calvin.stop_flag}, statistics{calvin.statistics},
+      commit_num{calvin.commit_num}, n_lock_manager{calvin.n_lock_manager},
+      n_workers{calvin.n_workers}, batch_size{calvin.batch_size},
+      done_queue{calvin.done_queue} {}
 
-CalvinScheduler::CalvinScheduler(Calvin& calvin):
-    workload{calvin.workload},
-    table{calvin.table},
-    stop_flag{calvin.stop_flag},
-    statistics{calvin.statistics},
-    commit_num{calvin.commit_num},
-    n_lock_manager{calvin.n_lock_manager},
-    n_workers{calvin.n_workers},
-    batch_size{calvin.batch_size},
-    done_queue{calvin.done_queue}
-{
-    
-}
+CalvinScheduler::CalvinScheduler(Calvin &calvin)
+    : workload{calvin.workload}, table{calvin.table},
+      stop_flag{calvin.stop_flag}, statistics{calvin.statistics},
+      commit_num{calvin.commit_num}, n_lock_manager{calvin.n_lock_manager},
+      n_workers{calvin.n_workers}, batch_size{calvin.batch_size},
+      done_queue{calvin.done_queue} {}
 
 void CalvinScheduler::ScheduleTransactions() {
     auto i = 0;
@@ -83,8 +67,14 @@ void CalvinScheduler::ScheduleTransactions() {
         }
 
         for (int j = 0; j < batch_size; ++j) {
-            // getNextTx()
             auto tx = std::make_unique<T>(workload.Next(), i);
+            Prediction p;
+            tx->Analyze(p);
+            for(auto &k: p.get) {
+                // tx->rd_set.insert(spectrum::to_hex(k));
+            }
+            
+
             lock_manager->Lock(tx.release());
             i += n_lock_manager;
         }
@@ -105,14 +95,17 @@ void CalvinExecutor::RunTransactions() {
     while (!stop_flag.load()) {
         T *tx = nullptr;
         while (transaction_queue.try_dequeue(tx) != false) {
-            if(tx == nullptr) continue;
+            if (tx == nullptr)
+                continue;
             auto start = steady_clock::now();
             // tx->UpdateSetStorageHandler();
             // tx->UpdateGetStorageHandler();
             statistics.JournalExecute();
             tx->Execute();
             done_queue.enqueue(tx);
-            auto latency = duration_cast<microseconds>(steady_clock::now() - start).count();
+            auto latency =
+                duration_cast<microseconds>(steady_clock::now() - start)
+                    .count();
             statistics.JournalCommit(latency);
         }
     }

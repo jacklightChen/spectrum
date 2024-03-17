@@ -111,7 +111,8 @@
     "__tuple": "cpp",
     "__functional_base_03": "cpp",
     "format": "cpp",
-    "charconv": "cpp"
+    "charconv": "cpp",
+    "*.ipp": "cpp"
   },
   "C_Cpp.clang_format_fallbackStyle": "{ BasedOnStyle: LLVM, IndentWidth: 4 }",
   "C_Cpp.clang_format_style": "{ BasedOnStyle: LLVM, IndentWidth: 4 }",
