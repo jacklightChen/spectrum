@@ -66,3 +66,14 @@ Currently Aria, Sparkle and Spectrum all works properly.
 ./build/bench Spectrum:8:32:32:STRAWMAN       Smallbank:1000000:0.5 5000ms
 ./build/bench Spectrum:8:32:32:COPYONWRITE    Smallbank:1000000:0.5 5000ms
 ```
+
+# Dev Log
+
+## Pre-schedule
+
+1. Only schedule hot keys -- select highest. (YCSB / Smallbank)
+
+## Re-schedule
+
+1. Detect: transaction cannot commit / don't re-execute immediately. 
+2. Wait until (pessimistic)
