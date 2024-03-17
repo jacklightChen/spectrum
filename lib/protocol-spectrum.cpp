@@ -425,7 +425,7 @@ void SpectrumExecutor::ReExecute(SpectrumTransaction* tx) {
 void SpectrumExecutor::Run() {while (!stop_flag.load()) {
     auto tx = Create();
     if (tx == nullptr) continue;
-    while (true) {
+    while (!stop_flag.load()) {
         if (tx->HasRerunKeys()) {
             // sweep all operations from previous execution
             DLOG(INFO) << "re-execute " << tx->id;
