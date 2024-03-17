@@ -106,22 +106,12 @@ class LockQueue {
 
 };
 
-class SpectrumCompare {
-
-    public:
-    bool operator()(const std::unique_ptr<T>& a, const std::unique_ptr<T>& b) {
-        return a->id > b->id;
-    }
-
-};
-
 using ConQueue = LockQueue<std::unique_ptr<T>, SpectrumCompare>;
 
 class Spectrum: public Protocol {
 
     private:
     size_t              n_threads;
-    size_t              queue_amplification;
     Workload&           workload;
     SpectrumTable       table;
     Statistics&         statistics;
@@ -129,8 +119,8 @@ class Spectrum: public Protocol {
     std::atomic<size_t> last_execute{1};
     std::atomic<size_t> last_finalized{0};
     std::atomic<bool>   stop_flag{false};
-    std::vector<std::unique_ptr<SpectrumExecutor>>      executors{};
-    std::vector<std::thread>                            workers{};
+    std::vector<std::thread>    executors{};
+    std::vector<std::thread>    dispatchers{};
     friend class SpectrumExecutor;
 
     public:

@@ -23,6 +23,7 @@ void Serial::Start() {
                 const evmc::address& addr, 
                 const evmc::bytes32& key
             ){
+                transaction.MakeCheckpoint();
                 return table.GetStorage(addr, key);
             }
         );

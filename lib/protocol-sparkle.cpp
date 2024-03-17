@@ -389,7 +389,10 @@ void SparkleExecutor::Run() { while (!stop_flag.load()) {
             statistics.JournalCommit(latency);
             break;
         }
-        std::this_thread::yield();
+        else {
+            queue.Push(std::move(tx));
+            break;
+        }
     }
 }}
 
