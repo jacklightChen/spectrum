@@ -47,7 +47,7 @@ SparkleTable::SparkleTable(size_t partitions):
 /// @param k the key of the read entry
 /// @param v (mutated to be) the value of read entry
 /// @param version (mutated to be) the version of read entry
-void SparkleTable::Get(T* tx, const K k, evmc::bytes32& v, size_t& version) {
+void SparkleTable::Get(T* tx, const K& k, evmc::bytes32& v, size_t& version) {
     DLOG(INFO) << tx->id << " get";
     Table::Put(k, [&](V& _v) {
         auto guard = std::lock_guard{_v.mu};
@@ -72,7 +72,7 @@ void SparkleTable::Get(T* tx, const K k, evmc::bytes32& v, size_t& version) {
 /// @param tx the transaction that writes the value
 /// @param k the key of the written entry
 /// @param v the value to write
-void SparkleTable::Put(T* tx, const K k, const evmc::bytes32& v) {
+void SparkleTable::Put(T* tx, const K& k, const evmc::bytes32& v) {
     CHECK(tx->id > 0) << "we reserve version(0) for default value";
     DLOG(INFO) << "commit " << tx->id;
     Table::Put(k, [&](V& _v) {
@@ -117,7 +117,7 @@ void SparkleTable::Put(T* tx, const K k, const evmc::bytes32& v) {
 /// @param tx the transaction containing write operation
 /// @param k the key of written entry
 /// @return true if lock succeeds
-bool SparkleTable::Lock(T* tx, const K k) {
+bool SparkleTable::Lock(T* tx, const K& k) {
     bool succeed = false;
     Table::Put(k, [&](V& _v) {
         auto guard = std::lock_guard{_v.mu};
@@ -134,7 +134,7 @@ bool SparkleTable::Lock(T* tx, const K k) {
 /// @brief remove a read dependency from this entry
 /// @param tx the transaction that previously read this entry
 /// @param k the key of read entry
-void SparkleTable::RegretGet(T* tx, const K k, size_t version) {
+void SparkleTable::RegretGet(T* tx, const K& k, size_t version) {
     DLOG(INFO) << "regret get " << tx->id << std::endl;
     Table::Put(k, [&](V& _v) {
         auto guard = std::lock_guard{_v.mu};
@@ -156,7 +156,7 @@ void SparkleTable::RegretGet(T* tx, const K k, size_t version) {
 /// @brief undo a put operation and abort all dependent transactions
 /// @param tx the transaction that previously put into this entry
 /// @param k the key of this put entry
-void SparkleTable::RegretPut(T* tx, const K k) {
+void SparkleTable::RegretPut(T* tx, const K& k) {
     DLOG(INFO) << "regret put" << tx->id << std::endl;
     Table::Put(k, [&](V& _v) {
         auto guard = std::lock_guard{_v.mu};
@@ -183,7 +183,7 @@ void SparkleTable::RegretPut(T* tx, const K k) {
 /// @param tx the transaction that previously read this entry
 /// @param k the key of read entry
 /// @param version the version of read entry, which indicates the transaction that writes this value
-void SparkleTable::ClearGet(T* tx, const K k, size_t version) {
+void SparkleTable::ClearGet(T* tx, const K& k, size_t version) {
     DLOG(INFO) << "clear get " << tx->id << std::endl;
     Table::Put(k, [&](V& _v) {
         auto guard = std::lock_guard{_v.mu};
@@ -205,7 +205,7 @@ void SparkleTable::ClearGet(T* tx, const K k, size_t version) {
 /// @brief remove versions preceeding current transaction
 /// @param tx the transaction the previously wrote this entry
 /// @param k the key of written entry
-void SparkleTable::ClearPut(T* tx, const K k) {
+void SparkleTable::ClearPut(T* tx, const K& k) {
     DLOG(INFO) << "regret put" << tx->id << std::endl;
     Table::Put(k, [&](V& _v) {
         auto guard = std::lock_guard{_v.mu};
@@ -213,30 +213,6 @@ void SparkleTable::ClearPut(T* tx, const K k) {
             _v.entries.pop_front();
         }
     });
-}
-
-/// @brief push transaction into the queue
-/// @param tx a unique pointer to transaction (boxed transaction)
-void SparkleQueue::Push(std::unique_ptr<T>&& tx) {
-    auto guard = std::lock_guard{mu};
-    queue.push(std::move(tx));
-}
-
-/// @brief pop a transaction from the queue
-/// @return a unique pointer to transaction (boxed transaction)
-std::unique_ptr<T> SparkleQueue::Pop() {
-    auto guard = std::lock_guard{mu};
-    if (!queue.size()) return {nullptr};
-    auto tx = std::move(const_cast<std::unique_ptr<T>&>(queue.top()));
-    queue.pop();
-    return tx;
-}
-
-/// @brief current sparkle queue size
-/// @return current sparkle queue size
-size_t SparkleQueue::Size() {
-    auto guard = std::lock_guard{mu};
-    return queue.size();
 }
 
 /// @brief sparkle initialization parameters
@@ -275,7 +251,6 @@ void Sparkle::Start() {
 }
 
 /// @brief stop sparkle protocol
-/// @return statistics of this execution
 void Sparkle::Stop() {
     stop_flag.store(true);
     for (auto& x: dispatchers)  { x.join(); }

@@ -1,8 +1,7 @@
-#include "protocol-calvin.hpp"
-
+#include "./protocol-calvin.hpp"
 #include "./hex.hpp"
 #include "./thread-util.hpp"
-#include <chrono>
+#include <algorithm>
 #include <string>
 #include <vector>
 
@@ -10,199 +9,236 @@ namespace spectrum {
 #define K std::tuple<evmc::address, evmc::bytes32>
 #define V evmc::bytes32
 #define T CalvinTransaction
+
 using namespace std::chrono;
 
-/// @brief wrap a base transaction into a calvin transaction
-/// @param inner the base transaction
-/// @param id transaction id
-CalvinTransaction::CalvinTransaction(Transaction &&inner, size_t id)
-    : Transaction{std::move(inner)}, id{id},
-      start_time{std::chrono::steady_clock::now()} {}
-
-Calvin::Calvin(Workload &workload, Statistics &statistics, size_t n_threads,
-               size_t n_dispatchers, size_t table_partitions)
-    : workload{workload}, statistics{statistics}, n_workers{n_threads},
-      table{table_partitions} {
-    LOG(INFO) << fmt::format("Calvin({}, {}, {})", n_threads, table_partitions,
-                             batch_size)
-              << std::endl;
+/// @brief wrap a transaction into calvin transaction
+/// @param inner inner transaction
+/// @param id the schedule id of this transaction
+CalvinTransaction::CalvinTransaction(Transaction&& inner, size_t id):
+    Transaction{std::move(inner)},
+    id{id},
+    start_time{std::chrono::steady_clock::now()}
+{
+    this->Analyze(this->prediction);
 }
 
-std::size_t get_available_worker(std::size_t n_lock_manager,
-                                 std::size_t n_workers, std::size_t request_id,
-                                 std::size_t scheduler_id) {
-    auto start_worker_id = n_workers / n_lock_manager * scheduler_id;
-    auto len = n_workers / n_lock_manager;
-    return request_id % len + start_worker_id;
-}
-
-CalvinTable::CalvinTable(size_t partitions)
-    : Table<K, V, KeyHasher>{partitions} {}
-
-evmc::bytes32 CalvinTable::GetStorage(const evmc::address &addr,
-                                      const evmc::bytes32 &key) {
-    auto v = evmc::bytes32{0};
-    Table::Get(std::make_tuple(addr, key), [&](auto _v) { v = _v; });
-    return v;
-}
-
-void CalvinTable::SetStorage(const evmc::address &addr,
-                             const evmc::bytes32 &key,
-                             const evmc::bytes32 &value) {
-    Table::Put(std::make_tuple(addr, key),
-               [&](evmc::bytes32 &v) { v = value; });
-}
-
-CalvinExecutor::CalvinExecutor(Calvin &calvin)
-    : workload{calvin.workload}, table{calvin.table},
-      stop_flag{calvin.stop_flag}, statistics{calvin.statistics},
-      commit_num{calvin.commit_num}, n_lock_manager{calvin.n_lock_manager},
-      n_workers{calvin.n_workers}, batch_size{calvin.batch_size},
-      done_queue{calvin.done_queue} {}
-
-CalvinScheduler::CalvinScheduler(Calvin &calvin)
-    : workload{calvin.workload}, table{calvin.table},
-      stop_flag{calvin.stop_flag}, statistics{calvin.statistics},
-      commit_num{calvin.commit_num}, n_lock_manager{calvin.n_lock_manager},
-      n_workers{calvin.n_workers}, batch_size{calvin.batch_size},
-      done_queue{calvin.done_queue}, lock_manager{},
-      all_executors{calvin.executors} {}
-
-void CalvinScheduler::ScheduleTransactions() {
-    auto i = 0;
-    auto request_id = 0;
-
-    while (!stop_flag.load()) {
-        T *tmp;
-
-        if (done_queue.try_dequeue(tmp) != false) {
-            lock_manager.Release(tmp);
-            delete tmp;
-            commit_num++;
-
-            while (done_queue.try_dequeue(tmp) != false) {
-                lock_manager.Release(tmp);
-                delete tmp;
-                commit_num++;
-            }
-        } else {
-            if (i - commit_num > batch_size * 2) {
-                __asm volatile("pause" : :);
-                continue;
-            }
-
-            for (int j = 0; j < batch_size; ++j) {
-                auto tx = std::make_unique<T>(workload.Next(), i);
-                // Prediction p;
-                // tx->Analyze(p);
-
-                // tx->rd_vec = p.get;
-                // tx->wr_vec = p.put;
-                std::set<std::string> wr_set;
-                std::set<std::string> rd_set;
-
-                for (auto &k : tx->pred.put) {
-                    wr_set.insert(k);
-                }
-
-                for (const auto &k : wr_set) {
-                    tx->wr_vec.push_back(k);
-                }
-
-                for (auto &k : tx->pred.get) {
-                    if(wr_set.find(k) == wr_set.end()) {
-                        rd_set.insert(k);
-                    }
-                }
-                
-                for (const auto &k : rd_set) {
-                    tx->rd_vec.push_back(k);
-                }
-
-
-                lock_manager.Lock(tx.release());
-                i += n_lock_manager;
-            }
-        }
-
-        while (!lock_manager.ready_txns_.empty()) {
-            auto tx = lock_manager.ready_txns_.front();
-            lock_manager.ready_txns_.pop_front();
-
-            auto worker = get_available_worker(n_lock_manager, n_workers,
-                                               request_id++, scheduler_id);
-            tx->scheduler_id = scheduler_id;
-            tx->executor_id = worker;
-            all_executors[worker]->transaction_queue.enqueue(tx);
-        }
-    }
-}
-void CalvinExecutor::RunTransactions() {
-    while (!stop_flag.load()) {
-        T *tx = nullptr;
-        while (transaction_queue.try_dequeue(tx) != false) {
-            if (tx == nullptr)
-                continue;
-            tx->UpdateGetStorageHandler(
-                [&](const evmc::address &addr, const evmc::bytes32 &key) {
-                    // transaction.MakeCheckpoint();
-                    return table.GetStorage(addr, key);
-                });
-            tx->UpdateSetStorageHandler([&](const evmc::address &addr,
-                                            const evmc::bytes32 &key,
-                                            const evmc::bytes32 &value) {
-                table.SetStorage(addr, key, value);
-                return evmc_storage_status::EVMC_STORAGE_ASSIGNED;
-            });
-            tx->Execute();
-            done_queue.enqueue(tx);
-            auto latency = duration_cast<microseconds>(steady_clock::now() -
-                                                       tx->start_time)
-                               .count();
-            statistics.JournalExecute();
-            statistics.JournalCommit(latency);
-        }
+void CalvinTransaction::UpdateWait(size_t _id) {
+    auto guard = std::lock_guard{mu};
+    if (_id < id) { 
+        should_wait = std::max(_id, should_wait);
     }
 }
 
+/// @brief the multi-version lock table for calvin
+/// @param partitions the number of partitions
+CalvinLockTable::CalvinLockTable(size_t partitions):
+    Table<K, CalvinLockQueue, KeyHasher>{partitions}
+{}
+
+/// @brief remove versions preceeding current transaction
+/// @param tx the transaction the previously wrote this entry
+/// @param k the key of written entry
+void CalvinLockTable::Release(T* tx, const K& k) {
+    DLOG(INFO) << "clear put " << tx->id << std::endl;
+    Table::Put(k, [&](auto& _v) {
+        for (auto& entry: _v.entries) {
+            entry.readers.erase(tx);
+        }
+        _v.readers_default.erase(tx);
+        while (_v.entries.size() && _v.entries.front().version <= tx->id) {
+            _v.entries.pop_front();
+        }
+    });
+}
+
+/// @brief append a read request to lock table
+/// @param tx the transaction that reads the value
+/// @param k the key of the read entry
+void CalvinLockTable::Get(T* tx, const K& k) {
+    DLOG(INFO) << tx->id << " get";
+    Table::Put(k, [&](auto& _v) {
+        auto rit = _v.entries.rbegin();
+        auto end = _v.entries.rend();
+        while (rit != end) {
+            if (rit->version > tx->id) {
+                ++rit; continue;
+            }
+            rit->readers.insert(tx);
+            rit->tx->UpdateWait(tx->id);
+            if (rit != _v.entries.rbegin()) {
+                (--rit)->tx->UpdateWait(tx->id);
+            }
+            return;
+        }
+        DLOG(INFO) << "default";
+        _v.readers_default.insert(tx);
+    });
+}
+
+/// @brief append a write request to lock table
+/// @param tx the transaction the writes the value
+/// @param k the key of write entry
+void CalvinLockTable::Put(T* tx, const K& k) {
+    DLOG(INFO) << tx->id << " put";
+        Table::Put(k, [&](auto& _v) {
+        auto rit = _v.entries.rbegin();
+        auto end = _v.entries.rend();
+        auto readers_ = std::unordered_set<T*>();
+        // search from insertion position
+        while (rit != end) {
+            if (rit->version > tx->id) {
+                ++rit; continue;
+            }
+            // reset transactions' should_wait that read outdated keys
+            for (auto it = rit->readers.begin(); it != rit->readers.end();) {
+                if ((*it)->id >= tx->id) {
+                    readers_.insert(*it);
+                    (*it)->UpdateWait(tx->id);
+                    // this one is very tricky. we **must** use `it++` here.  
+                    rit->readers.erase(it++);
+                }
+                else {
+                    tx->UpdateWait((*it)->id);
+                    ++it;
+                }
+            }
+            break;
+        }
+        for (auto it = _v.readers_default.begin(); it != _v.readers_default.end();) {
+            if ((*it)->id >= tx->id) {
+                readers_.insert(*it);
+                (*it)->UpdateWait(tx->id);
+                _v.readers_default.erase(it++);
+            }
+            else {
+                tx->UpdateWait((*it)->id);
+                ++it;
+            }
+        }
+        // insert an entry, with readers exempted from previous version
+        _v.entries.insert(rit.base(), {
+            .tx      = tx,
+            .version = tx->id,
+            .readers = readers_
+        });
+    });
+}
+
+Calvin::Calvin(Workload& workload, Statistics& statistics, size_t n_executors, size_t n_dispatchers, size_t table_partitions):
+    workload{workload},
+    statistics{statistics},
+    n_executors{n_executors},
+    n_dispatchers{n_dispatchers},
+    queue_bundle(n_executors),
+    table{table_partitions},
+    lock_table{table_partitions}
+{
+    LOG(INFO) << fmt::format("Calvin(n_executors={}, n_dispatchers={}, n_table_partitions={})", n_executors, n_dispatchers, table_partitions);
+    workload.SetEVMType(EVMType::BASIC);
+}
+
+/// @brief start calvin protocol
 void Calvin::Start() {
     stop_flag.store(false);
-
-    // start lock manger and workers
-    for (size_t i = 0; i != n_workers; ++i) {
-        executors.push_back(std::make_unique<CalvinExecutor>(*this));
+    for (size_t i = 0; i != n_dispatchers; ++i) {
+        DLOG(INFO) << "start dispatcher " << i << std::endl;
+        dispatchers.push_back(std::thread([this] {
+            CalvinDispatch(*this).Run();
+        }));
+        PinRoundRobin(dispatchers[i], i);
     }
-    for (size_t i = 0; i != n_workers; ++i) {
-        this->workers.push_back(
-            std::thread([this, i] { executors[i]->RunTransactions(); }));
-        PinRoundRobin(this->workers[i], i);
+    for (size_t i = 0; i != n_executors; ++i) {
+        DLOG(INFO) << "start executor " << i << std::endl;
+        auto queue = &queue_bundle[i];
+        executors.push_back(std::thread([this, queue] {
+            CalvinExecutor(*this, *queue).Run();
+        }));
+        PinRoundRobin(executors[i], i + n_dispatchers);
     }
-
-    scheduler = std::make_unique<CalvinScheduler>(*this);
-
-    sche_worker = std::thread([this] { scheduler->ScheduleTransactions(); });
-    PinRoundRobin(sche_worker, n_workers);
 }
 
+/// @brief stop calvin protocol
 void Calvin::Stop() {
     stop_flag.store(true);
-    DLOG(INFO) << "calvin stop";
-    sche_worker.join();
-    for (auto &worker : workers) {
-        worker.join();
-    }
+    for (auto& x: dispatchers)  { x.join(); }
+    for (auto& x: executors)    { x.join(); }
 }
 
-// evmc::bytes32 CalvinTable::GetStorage(const evmc::address& addr,
-//                                       const evmc::bytes32& key) {
-//   return inner[std::make_tuple(addr, key)];
-// }
+/// @brief initialize a calvin executor
+/// @param calvin the calvin instance with configuration
+/// @param queue the queue of transactions
+CalvinExecutor::CalvinExecutor(Calvin& calvin, CalvinQueue& queue):
+    queue{queue},
+    stop_flag{calvin.stop_flag},
+    last_committed{calvin.last_committed},
+    table{calvin.table},
+    statistics{calvin.statistics}
+{}
 
-// void CalvinTable::SetStorage(const evmc::address& addr,
-//                              const evmc::bytes32& key,
-//                              const evmc::bytes32& value) {
-//   inner[std::make_tuple(addr, key)] = value;
-// }
+/// @brief run calvin executor until stop_flag modified to true
+void CalvinExecutor::Run() {while(!stop_flag.load()) {
+    auto tx = queue.Pop();
+    if (tx == nullptr) { continue; }
+    DLOG(INFO) << "execute " << tx->id << std::endl;
+    tx->UpdateGetStorageHandler([&](auto& address, auto& key) {
+        V v; table.Get({address, key}, [&](auto& _v) { v = _v; });
+        return v;
+    });
+    tx->UpdateSetStorageHandler([&](auto& address, auto& key, auto& v) {
+        table.Put({address, key}, [&](auto& _v) { _v = v; });
+        return evmc_storage_status::EVMC_STORAGE_MODIFIED;
+    });
+    tx->Execute();
+    statistics.JournalExecute();
+    statistics.JournalCommit(duration_cast<microseconds>(steady_clock::now() - tx->start_time).count());
+    last_committed.fetch_add(1);
+}}
+
+/// @brief dispatch a transaction
+/// @param calvin the calvin instance with configuration
+CalvinDispatch::CalvinDispatch(Calvin& calvin):
+    workload{calvin.workload},
+    stop_flag{calvin.stop_flag},
+    queue_bundle{calvin.queue_bundle},
+    lock_table{calvin.lock_table},
+    last_scheduled{calvin.last_scheduled},
+    last_assigned{calvin.last_assigned},
+    last_committed{calvin.last_committed}
+{}
+
+/// @brief run a calvin dispatcher
+void CalvinDispatch::Run() {while(!stop_flag.load()) {
+    // generate and analyze the transaction
+    auto tx = std::make_unique<T>(workload.Next(), last_scheduled.fetch_add(1));
+    // make get/put requests in lock table
+    DLOG(INFO) << tx->id << " fetch locks" << std::endl;
+    for (auto& k: tx->prediction.get) {
+        lock_table.Get(tx.get(), k);
+    }
+    for (auto& k: tx->prediction.put) {
+        lock_table.Put(tx.get(), k);
+    }
+    // wait until the should_wait to finalize
+    while (tx->id != last_assigned.load() + 1) {
+        DLOG(INFO) << tx->id << " wait last assigned" << std::endl;
+    }
+    DLOG(INFO) << tx->id << " release locks" << std::endl;
+    for (auto& k: tx->prediction.get) {
+        lock_table.Release(tx.get(), k);
+    }
+    for (auto& k: tx->prediction.put) {
+        lock_table.Release(tx.get(), k);
+    }
+    last_assigned.fetch_add(1);
+    // now we have the real should_wait, so we wait until it can be executed
+    while (true) {
+        auto guard = std::lock_guard{tx->mu}; 
+        DLOG(INFO) << tx->id << " wait " << tx->should_wait << std::endl;
+        if (tx->should_wait <= last_committed.load()) break;
+    }
+    queue_bundle[tx->id % queue_bundle.size()].Push(std::move(tx));
+}}
 
 #undef K
 #undef V

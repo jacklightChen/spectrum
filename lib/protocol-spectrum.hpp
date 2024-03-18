@@ -2,6 +2,7 @@
 #include "./table.hpp"
 #include "./protocol.hpp"
 #include "./evm_hash.hpp"
+#include "./lock_queue.hpp"
 #include <list>
 #include <atomic>
 #include <tuple>
@@ -10,7 +11,6 @@
 #include <thread>
 #include <queue>
 #include <optional>
-#include <conqueue/concurrentqueue.h>
 
 namespace spectrum {
 
@@ -20,7 +20,6 @@ namespace spectrum {
 #define T SpectrumTransaction
 
 using namespace std::chrono;
-using namespace moodycamel;
 
 struct SpectrumPutTuple {
     K               key;
@@ -75,21 +74,7 @@ struct SpectrumTable: private Table<K, V, KeyHasher> {
 
 };
 
-/// @brief spectrum queue
-class SpectrumQueue {
-
-    private:
-    std::mutex                      mu;
-    std::queue<std::unique_ptr<T>>  queue;
-
-    public:
-    SpectrumQueue() = default;
-    void Push(std::unique_ptr<T>&& tx);
-    std::unique_ptr<T> Pop();
-    size_t Size();
-
-};
-
+using SpectrumQueue = LockPriorityQueue<T>;
 class SpectrumExecutor;
 class SpectrumDispatch;
 

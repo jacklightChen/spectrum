@@ -2,6 +2,7 @@
 #include "./table.hpp"
 #include "./protocol.hpp"
 #include "./evm_hash.hpp"
+#include "./lock_queue.hpp"
 #include <list>
 #include <atomic>
 #include <tuple>
@@ -45,41 +46,17 @@ struct SparkleVersionList {
 struct SparkleTable: private Table<K, V, KeyHasher> {
 
     SparkleTable(size_t partitions);
-    void Get(T* tx, const K k, evmc::bytes32& v, size_t& version);
-    void Put(T* tx, const K k, const evmc::bytes32& v);
-    bool Lock(T* tx, const K k);
-    void RegretGet(T* tx, const K k, size_t version);
-    void RegretPut(T* tx, const K k);
-    void ClearGet(T* tx, const K k, size_t version);
-    void ClearPut(T* tx, const K k);
+    void Get(T* tx, const K& k, evmc::bytes32& v, size_t& version);
+    void Put(T* tx, const K& k, const evmc::bytes32& v);
+    bool Lock(T* tx, const K& k);
+    void RegretGet(T* tx, const K& k, size_t version);
+    void RegretPut(T* tx, const K& k);
+    void ClearGet(T* tx, const K& k, size_t version);
+    void ClearPut(T* tx, const K& k);
 
 };
 
-/// @brief sparkle queue
-class SparkleQueue {
-
-    #define TP std::unique_ptr<T>
-
-    struct Cmp {
-        bool operator()(const TP& l, const TP& r) { 
-            return l->id > r->id; 
-        }
-    };
-
-    private:
-    std::mutex mu;
-    std::priority_queue<TP, std::vector<TP>, Cmp> queue;
-
-    public:
-    SparkleQueue() = default;
-    void Push(std::unique_ptr<T>&& tx);
-    std::unique_ptr<T> Pop();
-    size_t Size();
-
-    #undef TP
-
-};
-
+using SparkleQueue = LockQueue<T>;
 class SparkleDispatch;
 class SparkleExecutor;
 

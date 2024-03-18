@@ -264,31 +264,6 @@ void Spectrum::Stop() {
     for (auto& x: dispatchers) 	{ x.join(); }
 }
 
-/// @brief push transaction into the queue
-/// @param tx a unique pointer to transaction (boxed transaction)
-void SpectrumQueue::Push(std::unique_ptr<T>&& tx) {
-    auto guard = std::lock_guard{mu};
-    queue.push(std::move(tx));
-}
-
-/// @brief pop a transaction from the queue
-/// @return a unique pointer to transaction (boxed transaction)
-std::unique_ptr<T> SpectrumQueue::Pop() {
-    auto guard = std::lock_guard{mu};
-    if (!queue.size()) return {nullptr};
-    auto tx = std::move(queue.front());
-    queue.pop();
-    return tx;
-}
-
-/// @brief current spectrum queue size
-/// @return current spectrum queue size
-size_t SpectrumQueue::Size() {
-    auto guard = std::lock_guard{mu};
-    return queue.size();
-}
-
-
 /// @brief initialize a dispatcher
 /// @param spectrum the spectrum protocol configuration
 SpectrumDispatch::SpectrumDispatch(Spectrum& spectrum):

@@ -1,5 +1,4 @@
 #pragma once
-
 #include <unordered_map>
 #include <evmc/evmc.hpp>
 #include <glog/logging.h>
@@ -19,8 +18,8 @@ class Table {
 
     public:
     Table(size_t partitions);
-    void Get(const K k, std::function<void(const V& v)>&& vmap);
-    void Put(const K k, std::function<void(V& v)>&& vmap);
+    void Get(const K& k, std::function<void(const V& v)>&& vmap);
+    void Put(const K& k, std::function<void(V& v)>&& vmap);
 
 };
 
@@ -32,7 +31,7 @@ Table<K, V, Hasher>::Table(size_t partitions)
 {}
 
 template<typename K, typename V, typename Hasher>
-void Table<K, V, Hasher>::Get(const K k, std::function<void(const V& v)>&& vmap) {
+void Table<K, V, Hasher>::Get(const K& k, std::function<void(const V& v)>&& vmap) {
     auto partition_id = ((size_t)Hasher()(k)) % n_partitions;
     auto guard = std::lock_guard{locks[partition_id]};
     auto& partition = this->partitions[partition_id];
@@ -40,7 +39,7 @@ void Table<K, V, Hasher>::Get(const K k, std::function<void(const V& v)>&& vmap)
 }
 
 template<typename K, typename V, typename Hasher>
-void Table<K, V, Hasher>::Put(const K k, std::function<void(V& v)>&& vmap) {
+void Table<K, V, Hasher>::Put(const K& k, std::function<void(V& v)>&& vmap) {
     auto partition_id = ((size_t)Hasher()(k)) % n_partitions;
     DLOG(INFO) << "at partition " << partition_id;
     auto guard = std::lock_guard{locks[partition_id]};
