@@ -1,4 +1,4 @@
-#include "evm_hash.hpp"
+#include "./evm_hash.hpp"
 #include "protocol.hpp"
 #include "statistics.hpp"
 #include "table.hpp"
@@ -10,6 +10,7 @@
 #include <queue>
 #include <set>
 #include <thread>
+#include <chrono>
 
 namespace spectrum {
 #define K std::tuple<evmc::address, evmc::bytes32>
@@ -18,6 +19,7 @@ namespace spectrum {
 
 struct CalvinTransaction : public Transaction {
     size_t id;
+    // auto cmp = [](K a, K b) { return keyHasher(a) };
     std::vector<std::string> get_rdset() { return rd_vec; };
     std::vector<std::string> get_wrset() { return wr_vec; };
 
@@ -26,6 +28,7 @@ struct CalvinTransaction : public Transaction {
 
     size_t scheduler_id;
     size_t executor_id;
+    std::chrono::time_point<std::chrono::steady_clock> start_time;
 
     CalvinTransaction(Transaction &&inner, size_t id);
     void analysis(){};
@@ -40,7 +43,7 @@ class CalvinTable : public Table<K, V, KeyHasher> {
                     const evmc::bytes32 &value);
 };
 
-#define TABLE_SIZE 100000
+#define TABLE_SIZE 10000
 
 class LockManager {
     using TransactionType = CalvinTransaction;
@@ -74,7 +77,7 @@ class LockManager {
         int wr_size = wrvec.size();
 
         for (int i = 0; i < wr_size; i++) {
-            std::string wr_key = wrvec[i];
+            auto& wr_key = wrvec[i];
 
             std::deque<KeysList> *key_requests = lock_table_[Hash(wr_key)];
             std::deque<KeysList>::iterator it;
@@ -105,7 +108,7 @@ class LockManager {
         int rd_size = rdvec.size();
 
         for (int i = 0; i < rd_size; i++) {
-            std::string rd_key = rdvec[i];
+            auto& rd_key = rdvec[i];
             std::deque<KeysList> *key_requests = lock_table_[Hash(rd_key)];
 
             std::deque<KeysList>::iterator it;
@@ -238,6 +241,7 @@ class LockManager {
             hash = hash * 16777619;
         }
         return hash % TABLE_SIZE;
+        // return KeyHasher()(key) % TABLE_SIZE;
     }
 
     struct LockRequest {

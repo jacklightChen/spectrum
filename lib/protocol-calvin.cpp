@@ -16,7 +16,8 @@ using namespace std::chrono;
 /// @param inner the base transaction
 /// @param id transaction id
 CalvinTransaction::CalvinTransaction(Transaction &&inner, size_t id)
-    : Transaction{std::move(inner)}, id{id} {}
+    : Transaction{std::move(inner)}, id{id},
+      start_time{std::chrono::steady_clock::now()} {}
 
 Calvin::Calvin(Workload &workload, Statistics &statistics, size_t n_threads,
                size_t n_dispatchers, size_t table_partitions)
@@ -48,7 +49,8 @@ evmc::bytes32 CalvinTable::GetStorage(const evmc::address &addr,
 void CalvinTable::SetStorage(const evmc::address &addr,
                              const evmc::bytes32 &key,
                              const evmc::bytes32 &value) {
-    Table::Put(std::make_tuple(addr, key), [&](evmc::bytes32& v){ v = value; });
+    Table::Put(std::make_tuple(addr, key),
+               [&](evmc::bytes32 &v) { v = value; });
 }
 
 CalvinExecutor::CalvinExecutor(Calvin &calvin)
@@ -73,58 +75,65 @@ void CalvinScheduler::ScheduleTransactions() {
     while (!stop_flag.load()) {
         T *tmp;
 
-        while (done_queue.try_dequeue(tmp) != false) {
+        if (done_queue.try_dequeue(tmp) != false) {
             lock_manager.Release(tmp);
             delete tmp;
             commit_num++;
-        }
 
-        if (i - commit_num > batch_size * 2) {
-            __asm volatile("pause" : :);
-            continue;
-        }
-
-        for (int j = 0; j < batch_size; ++j) {
-            auto tx = std::make_unique<T>(workload.Next(), i);
-            Prediction p;
-            tx->Analyze(p);
-            std::set<std::string> wr_set;
-            std::set<std::string> rd_set;
-
-            for (auto &k : p.put) {
-                auto &key = std::get<1>(k);
-                wr_set.insert(to_hex(std::span{(uint8_t *)&key, 32}));
+            while (done_queue.try_dequeue(tmp) != false) {
+                lock_manager.Release(tmp);
+                delete tmp;
+                commit_num++;
+            }
+        } else {
+            if (i - commit_num > batch_size * 2) {
+                __asm volatile("pause" : :);
+                continue;
             }
 
-            for (auto &k : p.get) {
-                auto &key = std::get<1>(k);
-                auto keystr = to_hex(std::span{(uint8_t *)&key, 32});
-                if (!wr_set.contains(keystr)) {
-                    rd_set.insert(keystr);
+            for (int j = 0; j < batch_size; ++j) {
+                auto tx = std::make_unique<T>(workload.Next(), i);
+                // Prediction p;
+                // tx->Analyze(p);
+
+                // tx->rd_vec = p.get;
+                // tx->wr_vec = p.put;
+                std::set<std::string> wr_set;
+                std::set<std::string> rd_set;
+
+                for (auto &k : tx->pred.put) {
+                    wr_set.insert(k);
                 }
-            }
 
-            for (auto &k : wr_set) {
-                tx->wr_vec.push_back(k);
-            }
+                for (const auto &k : wr_set) {
+                    tx->wr_vec.push_back(k);
+                }
 
-            for (auto &k : rd_set) {
-                tx->rd_vec.push_back(k);
-            }
+                for (auto &k : tx->pred.get) {
+                    if(wr_set.find(k) == wr_set.end()) {
+                        rd_set.insert(k);
+                    }
+                }
+                
+                for (const auto &k : rd_set) {
+                    tx->rd_vec.push_back(k);
+                }
 
-            lock_manager.Lock(tx.release());
-            i += n_lock_manager;
+
+                lock_manager.Lock(tx.release());
+                i += n_lock_manager;
+            }
         }
 
         while (!lock_manager.ready_txns_.empty()) {
-            auto txn = lock_manager.ready_txns_.front();
+            auto tx = lock_manager.ready_txns_.front();
             lock_manager.ready_txns_.pop_front();
 
             auto worker = get_available_worker(n_lock_manager, n_workers,
                                                request_id++, scheduler_id);
-            txn->scheduler_id = scheduler_id;
-            txn->executor_id = worker;
-            all_executors[worker]->transaction_queue.enqueue(txn);
+            tx->scheduler_id = scheduler_id;
+            tx->executor_id = worker;
+            all_executors[worker]->transaction_queue.enqueue(tx);
         }
     }
 }
@@ -134,7 +143,6 @@ void CalvinExecutor::RunTransactions() {
         while (transaction_queue.try_dequeue(tx) != false) {
             if (tx == nullptr)
                 continue;
-            auto start = steady_clock::now();
             tx->UpdateGetStorageHandler(
                 [&](const evmc::address &addr, const evmc::bytes32 &key) {
                     // transaction.MakeCheckpoint();
@@ -146,12 +154,12 @@ void CalvinExecutor::RunTransactions() {
                 table.SetStorage(addr, key, value);
                 return evmc_storage_status::EVMC_STORAGE_ASSIGNED;
             });
-            statistics.JournalExecute();
             tx->Execute();
             done_queue.enqueue(tx);
-            auto latency =
-                duration_cast<microseconds>(steady_clock::now() - start)
-                    .count();
+            auto latency = duration_cast<microseconds>(steady_clock::now() -
+                                                       tx->start_time)
+                               .count();
+            statistics.JournalExecute();
             statistics.JournalCommit(latency);
         }
     }

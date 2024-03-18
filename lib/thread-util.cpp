@@ -4,10 +4,11 @@
 #include <string>
 #include <sstream>
 #include <fmt/core.h>
+#include <iostream>
 
 void PinRoundRobin(std::thread& thread, unsigned rotate_id) {
     #include <pthread.h>
-    auto core_id    = rotate_id % std::thread::hardware_concurrency();
+    auto core_id    = rotate_id + 56 % std::thread::hardware_concurrency();
     cpu_set_t   cpu_set;
     CPU_ZERO(&cpu_set);
     CPU_SET (core_id, &cpu_set);

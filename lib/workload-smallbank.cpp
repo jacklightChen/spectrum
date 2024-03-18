@@ -70,22 +70,75 @@ inline std::string to_string(uint32_t key) {
     return ss.str();
 }
 
+// Transaction Smallbank::Next() {
+//     DLOG(INFO) << "smallbank next" << std::endl;
+//     auto guard  = std::lock_guard{mu};
+//     auto option = rng->Next() % 6;
+//     #define X to_string(rng->Next())
+//     auto input = spectrum::from_hex([&](){switch (option) {
+//         case 0: return std::string{"1e010439"} + X;
+//         case 1: return std::string{"bb27eb2c"} + X + X;
+//         case 2: return std::string{"ad0f98c0"} + X + X;
+//         case 3: return std::string{"83406251"} + X + X;
+//         case 4: return std::string{"8ac10b9c"} + X + X + X;
+//         case 5: return std::string{"97b63212"} + X + X;
+//         default: throw "unreachable";
+//     }}()).value();
+//     #undef X
+//     return Transaction(this->evm_type, evmc::address{0x1}, evmc::address{0x1}, std::span{code}, std::span{input});
+// }
+
 Transaction Smallbank::Next() {
     DLOG(INFO) << "smallbank next" << std::endl;
     auto guard  = std::lock_guard{mu};
     auto option = rng->Next() % 6;
+    StaticPrediction p;
     #define X to_string(rng->Next())
     auto input = spectrum::from_hex([&](){switch (option) {
-        case 0: return std::string{"1e010439"} + X;
-        case 1: return std::string{"bb27eb2c"} + X + X;
-        case 2: return std::string{"ad0f98c0"} + X + X;
-        case 3: return std::string{"83406251"} + X + X;
-        case 4: return std::string{"8ac10b9c"} + X + X + X;
-        case 5: return std::string{"97b63212"} + X + X;
+        case 0: {
+            auto rnd1 = rng->Next();
+            p.get.push_back(std::to_string(rnd1));
+            return std::string{"1e010439"} + to_string(rnd1);
+        }
+        case 1: {
+            auto rnd1 = rng->Next();
+            auto rnd2 = rng->Next();
+            p.put.push_back(std::to_string(rnd1));
+            return std::string{"bb27eb2c"} + to_string(rnd1) + to_string(rnd2);
+        }
+        case 2: {
+            auto rnd1 = rng->Next();
+            auto rnd2 = rng->Next();
+            p.put.push_back(std::to_string(rnd1));
+            return std::string{"ad0f98c0"} + to_string(rnd1) + to_string(rnd2);
+        }
+        case 3: {
+            auto rnd1 = rng->Next();
+            auto rnd2 = rng->Next();
+            p.put.push_back(std::to_string(rnd1));
+            return std::string{"83406251"} + to_string(rnd1) + to_string(rnd2);
+        }
+        case 4: {
+            auto rnd1 = rng->Next();
+            auto rnd2 = rng->Next();
+            auto rnd3 = rng->Next();
+            p.put.push_back(std::to_string(rnd1));
+            p.put.push_back(std::to_string(rnd2));
+            return std::string{"8ac10b9c"} + to_string(rnd1) + to_string(rnd2) + to_string(rnd3);
+        };
+        case 5: {
+            auto rnd1 = rng->Next();
+            auto rnd2 = rng->Next();
+            p.put.push_back(std::to_string(rnd1));
+            p.put.push_back(std::to_string(rnd2));
+            return std::string{"97b63212"} + to_string(rnd1) + to_string(rnd2);
+        };
         default: throw "unreachable";
     }}()).value();
     #undef X
-    return Transaction(this->evm_type, evmc::address{0x1}, evmc::address{0x1}, std::span{code}, std::span{input});
+    auto txn = Transaction(this->evm_type, evmc::address{0x1}, evmc::address{0x1}, std::span{code}, std::span{input});
+    txn.pred = p;
+    return txn;
 }
 
 } // namespace spectrum
