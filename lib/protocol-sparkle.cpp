@@ -323,7 +323,18 @@ void SparkleExecutor::Run() { while (!stop_flag.load()) {
         tx->tuples_get.push_back(std::make_tuple(_key, value, version));
         return value;
     });
-    tx->rerun_flag.store(true);
+    
+    if (!tx->berun_flag.load()) {
+        DLOG(INFO) << "execute (in) " << tx->id;
+        statistics.JournalExecute();
+        tx->Execute();
+        DLOG(INFO) << "execute (out) " << tx->id;
+        for (auto entry: tx->tuples_put) {
+            table.Put(tx.get(), std::get<0>(entry), std::get<1>(entry));
+        }
+        tx->berun_flag.store(true);
+    }
+
     while (!stop_flag.load()) {
         DLOG(INFO) << "recycle " << tx->id << " finalized " << last_finalized.load();
         if (tx->rerun_flag.load()) {

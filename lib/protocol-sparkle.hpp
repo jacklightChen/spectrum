@@ -24,6 +24,7 @@ struct SparkleTransaction: public Transaction {
     std::vector<std::tuple<K, evmc::bytes32, size_t>>   tuples_get{};
     std::vector<std::tuple<K, evmc::bytes32>>           tuples_put{};
     std::atomic<bool>   rerun_flag{false};
+    std::atomic<bool>   berun_flag{false};
     SparkleTransaction(Transaction&& inner, size_t id);
     void Reset();
 };
