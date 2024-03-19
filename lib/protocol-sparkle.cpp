@@ -355,7 +355,7 @@ void SparkleExecutor::Run() { while (!stop_flag.load()) {
                 table.ClearPut(tx.get(), std::get<0>(entry));
             }
             last_finalized.fetch_add(1);
-            DLOG(INFO) << "commit " << tx->id;
+            DLOG(INFO) << "final commit " << tx->id;
             auto latency = duration_cast<microseconds>(steady_clock::now() - start).count();
             statistics.JournalCommit(latency);
             break;

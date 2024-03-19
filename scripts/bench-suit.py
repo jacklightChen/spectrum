@@ -2,48 +2,64 @@ import subprocess
 import matplotlib.pyplot as plt
 import pandas as pd
 import re
+import time
+
+import sys
+sys.path.extend(['.', '..', '../..'])
+from plot.plot import MyPlot
+
+keys = 1000000
+workload = 'Smallbank'
+zipf = 0
+times_to_tun = 2
 
 if __name__ == '__main__':
-    df = pd.DataFrame(columns=['protocol', 'threads', 'zipf', 'partition', 'commit', 'abort'])
+    df = pd.DataFrame(columns=['protocol', 'threads', 'zipf', 'table_partition', 'commit', 'abort'])
     conf = {'stdout': subprocess.PIPE, 'stderr': subprocess.PIPE}
     hash = subprocess.run(["git", "rev-parse", "HEAD"], **conf).stdout.decode('utf-8').strip()
     for n_threads in range(6, 36, 6):
-        # n_partitions    = n_threads * 8
-        n_partitions    = 1
-        n_dispatchers   = 2
+        table_partitions    = 9973
+        n_dispatchers       = 8
         protocols       = [
-            # f"Aria:{n_threads}:{n_partitions}:128:FALSE", 
-            # f"AriaReordering:{n_threads}:{n_partitions}:128:TRUE",
-            f"Sparkle:{n_threads}:{n_dispatchers}:{n_partitions}", 
-            # f"Spectrum:{n_threads}:{n_partitions}:COPYONWRITE"
+            f"Calvin:{n_threads}:{n_dispatchers}:{table_partitions}",
+            f"Aria:{n_threads}:{table_partitions}:128:FALSE", 
+            f"Aria:{n_threads}:{table_partitions}:128:TRUE",
+            f"Sparkle:{n_threads}:{n_dispatchers}:{table_partitions}", 
+            f"Spectrum:{n_threads}:{n_dispatchers}:{table_partitions}:COPYONWRITE"
         ]
         for cc in protocols:
             print(f"#COMMIT-{hash}",  f"CONFIG-{cc}")
-            print(f'bench {cc} Smallbank:1000000:0 2s')
-            result = subprocess.run(["../build/bench", cc, "Smallbank:100000:0", "2s"], **conf)
+            print(f'../bench {cc} {workload}:{keys}:{zipf} {times_to_tun}s')
+            result = subprocess.run(["../build/bench", cc, f"{workload}:{keys}:{zipf}", f"{times_to_tun}s"], **conf)
             result_str = result.stderr.decode('utf-8').strip()
             print(result_str)
             commit = float(re.search(r'commit\s+([\d.]+)', result_str).group(1))
             execution = float(re.search(r'execution\s+([\d.]+)', result_str).group(1))
             df.loc[len(df)] = {
-                'protocol': cc.split(':')[0], 
+                'protocol': cc.split(':')[0] if cc.split(':')[-1] != 'TRUE' else 'AriaRe', 
                 'threads': n_threads, 
                 'zipf': 0, 
-                'partition': n_partitions, 
+                'table_partition': table_partitions, 
                 'commit': commit,
                 'abort': execution - commit
             }
     df.to_csv('bench_results.csv')
 
-    df = pd.read_csv('bench_results.csv')
-    fig ,ax = plt.subplots()
-    for protocol in df['protocol'].unique():
-        df_protocol = df[df['protocol'] == protocol]
-        ax.plot(df_protocol['threads'], df_protocol['commit'], label=protocol)
-    
-    ax.set_xlabel('Threads')
-    ax.set_ylabel('Throughput (txn/s)')
-    ax.legend()
-    plt.savefig('bench_results.png')
+    recs = df
+    X, XLABEL = "threads", "Threads"
+    Y, YLABEL = "commit", "Troughput(Txn/s)"
+    p = MyPlot(1, 1)
+    ax: plt.Axes = p.axes
+    ax.grid(axis=p.grid, linewidth=p.border_width)
+    p.init(ax)
+    for idx, schema in enumerate(recs['protocol'].unique()):
+        records = recs[recs['protocol'] == schema]
+        p.plot(ax, xdata=records[X], ydata=records[Y], color=None, legend_label=schema,)
+    ax.set_xticks([int(t) for t in recs['threads'].unique()])
+    p.format_yticks(ax, suffix='K')
+    ax.set_ylim(None, p.max_y_data * 1.15)       # 折线图的Y轴上限设置为数据最大值的1.15倍
+    p.set_labels(ax, XLABEL, YLABEL)
+    p.legend(ax, loc="upper center", ncol=3, anchor=(0.5, 1.25))
+    p.save(f'exp_results/bench_results_{int(time.time())}.pdf')
 
             

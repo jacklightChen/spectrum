@@ -56,7 +56,7 @@ struct SparkleTable: private Table<K, V, KeyHasher> {
 
 };
 
-using SparkleQueue = LockQueue<T>;
+using SparkleQueue = LockPriorityQueue<T>;
 class SparkleDispatch;
 class SparkleExecutor;
 
