@@ -141,13 +141,6 @@ Calvin::Calvin(Workload& workload, Statistics& statistics, size_t n_executors, s
 /// @brief start calvin protocol
 void Calvin::Start() {
     stop_flag.store(false);
-    for (size_t i = 0; i != n_dispatchers; ++i) {
-        DLOG(INFO) << "start dispatcher " << i << std::endl;
-        dispatchers.push_back(std::thread([this] {
-            CalvinDispatch(*this).Run();
-        }));
-        PinRoundRobin(dispatchers[i], i);
-    }
     for (size_t i = 0; i != n_executors; ++i) {
         DLOG(INFO) << "start executor " << i << std::endl;
         auto queue = &queue_bundle[i];
@@ -155,6 +148,13 @@ void Calvin::Start() {
             CalvinExecutor(*this, *queue).Run();
         }));
         PinRoundRobin(executors[i], i + n_dispatchers);
+    }
+    for (size_t i = 0; i != n_dispatchers; ++i) {
+        DLOG(INFO) << "start dispatcher " << i << std::endl;
+        dispatchers.push_back(std::thread([this] {
+            CalvinDispatch(*this).Run();
+        }));
+        PinRoundRobin(dispatchers[i], i);
     }
 }
 

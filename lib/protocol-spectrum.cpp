@@ -241,18 +241,18 @@ Spectrum::Spectrum(Workload& workload, Statistics& statistics, size_t n_executor
 /// @param n_executors the number of threads to start
 void Spectrum::Start() {
     stop_flag.store(false);
-    for (size_t i = 0; i != n_dispatchers; ++i) {
-        dispatchers.push_back(std::thread([this]{
-            std::make_unique<SpectrumDispatch>(*this)->Run();
-        }));
-        PinRoundRobin(dispatchers[i], i);
-    }
     for (size_t i = 0; i != n_executors; ++i) {
         auto queue = &queue_bundle[i];
         executors.push_back(std::thread([this, queue]{
             std::make_unique<SpectrumExecutor>(*this, *queue)->Run();
         }));
         PinRoundRobin(executors[i], i + n_dispatchers);
+    }
+    for (size_t i = 0; i != n_dispatchers; ++i) {
+        dispatchers.push_back(std::thread([this]{
+            std::make_unique<SpectrumDispatch>(*this)->Run();
+        }));
+        PinRoundRobin(dispatchers[i], i);
     }
 }
 

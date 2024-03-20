@@ -227,13 +227,6 @@ Sparkle::Sparkle(Workload& workload, Statistics& statistics, size_t n_executors,
 /// @brief start sparkle protocol
 void Sparkle::Start() {
     stop_flag.store(false);
-    for (size_t i = 0; i != n_dispatchers; ++i) {
-        DLOG(INFO) << "start dispatcher " << i << std::endl;
-        dispatchers.push_back(std::thread([this] {
-            SparkleDispatch(*this).Run();
-        }));
-        PinRoundRobin(dispatchers[i], i);
-    }
     for (size_t i = 0; i != n_executors; ++i) {
         DLOG(INFO) << "start executor " << i << std::endl;
         auto queue = &queue_bundle[i];
@@ -241,6 +234,13 @@ void Sparkle::Start() {
             SparkleExecutor(*this, *queue).Run();
         }));
         PinRoundRobin(executors[i], i + n_dispatchers);
+    }
+    for (size_t i = 0; i != n_dispatchers; ++i) {
+        DLOG(INFO) << "start dispatcher " << i << std::endl;
+        dispatchers.push_back(std::thread([this] {
+            SparkleDispatch(*this).Run();
+        }));
+        PinRoundRobin(dispatchers[i], i);
     }
 }
 
