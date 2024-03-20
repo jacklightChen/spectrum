@@ -299,8 +299,8 @@ void SparkleExecutor::Run() { while (!stop_flag.load()) {
     // when a transaction is not runned before, execute that transaction
     if (!tx->berun_flag.load()) {
         DLOG(INFO) << "execute (in) " << tx->id;
-
-        tx->Execute();
+            statistics.JournalExecute();
+            tx->Execute();
         DLOG(INFO) << "execute (out) " << tx->id;
         for (auto entry: tx->tuples_put) {
             table.Put(tx.get(), std::get<0>(entry), std::get<1>(entry));
@@ -320,7 +320,7 @@ void SparkleExecutor::Run() { while (!stop_flag.load()) {
             tx->Reset();
             // execute and try to commit
             DLOG(INFO) << "execute (in) " << tx->id;
-
+            statistics.JournalExecute();
             tx->Execute();
             DLOG(INFO) << "execute (out) " << tx->id;
             if (tx->rerun_flag.load()) { continue; }
