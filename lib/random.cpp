@@ -24,7 +24,7 @@ ThreadLocalRandom::ThreadLocalRandom(
 
 size_t ThreadLocalRandom::Next() {
     size_t thread_id = std::hash<std::thread::id>{}(std::this_thread::get_id());
-    return thread_local_storage[thread_id]->Next();
+    return thread_local_storage[thread_id % thread_local_storage.size()]->Next();
 }
 
 Unif::Unif(size_t num_elements):
