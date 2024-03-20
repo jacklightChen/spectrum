@@ -9,7 +9,7 @@ sys.path.extend(['.', '..', '../..'])
 from plot.plot import MyPlot
 
 keys = 1000000
-workload = 'YCSB'
+workload = 'Smallbank'
 zipf = 0
 times_to_tun = 2
 timestamp = int(time.time())
@@ -48,7 +48,7 @@ if __name__ == '__main__':
                     'commit': commit,
                     'abort': execution - commit
                 }
-    df.to_csv('bench_results.csv')
+    df.to_csv(f'./exp_results/bench_results_{timestamp}.csv')
 
     recs = df
     X, XLABEL = "threads", "Threads"

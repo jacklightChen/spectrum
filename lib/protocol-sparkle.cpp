@@ -262,10 +262,10 @@ SparkleDispatch::SparkleDispatch(Sparkle& sparkle):
 
 /// @brief run dispatcher
 void SparkleDispatch::Run() {
-    while(!stop_flag.load()) {for (auto& queue: queue_bundle) {
-        // round-robin dispatch
-        queue.Push(std::make_unique<T>(workload.Next(), last_execute.fetch_add(1)));
-    }}
+    while(!stop_flag.load()) {
+        auto tx = std::make_unique<T>(workload.Next(), last_execute.fetch_add(1));
+        queue_bundle[tx->id % queue_bundle.size()].Push(std::move(tx));
+    }
 }
 
 /// @brief sparkle executor
@@ -282,42 +282,42 @@ SparkleExecutor::SparkleExecutor(Sparkle& sparkle, SparkleQueue& queue):
 void SparkleExecutor::Run() { while (!stop_flag.load()) {
     auto tx = queue.Pop();
     if (tx == nullptr) { continue; }
-    tx->UpdateSetStorageHandler([&](
-        const evmc::address &addr, 
-        const evmc::bytes32 &key, 
-        const evmc::bytes32 &value
-    ) {
-        DLOG(INFO) << tx->id << " set";
-        auto _key   = std::make_tuple(addr, key);
-        // just push back
-        tx->tuples_put.push_back(std::make_tuple(_key, value));
-        return evmc_storage_status::EVMC_STORAGE_MODIFIED;
-    });
-    tx->UpdateGetStorageHandler([&](
-        const evmc::address &addr, 
-        const evmc::bytes32 &key
-    ) {
-        DLOG(INFO) << tx->id << " get";
-        auto _key   = std::make_tuple(addr, key);
-        auto value  = evmc::bytes32{0};
-        auto version = size_t{0};
-        // one key from one transaction will be commited once
-        for (auto& tup: tx->tuples_put) {
-            if (std::get<0>(tup) == _key) {
-                return std::get<1>(tup);
-            }
-        }
-        for (auto& tup: tx->tuples_get) {
-            if (std::get<0>(tup) == _key) {
-                return std::get<1>(tup);
-            }
-        }
-        table.Get(tx.get(), _key, value, version);
-        tx->tuples_get.push_back(std::make_tuple(_key, value, version));
-        return value;
-    });
     // when a transaction is not runned before, execute that transaction
     if (!tx->berun_flag.load()) {
+        tx->UpdateSetStorageHandler([&](
+            const evmc::address &addr, 
+            const evmc::bytes32 &key, 
+            const evmc::bytes32 &value
+        ) {
+            DLOG(INFO) << tx->id << " set";
+            auto _key   = std::make_tuple(addr, key);
+            // just push back
+            tx->tuples_put.push_back(std::make_tuple(_key, value));
+            return evmc_storage_status::EVMC_STORAGE_MODIFIED;
+        });
+        tx->UpdateGetStorageHandler([&](
+            const evmc::address &addr, 
+            const evmc::bytes32 &key
+        ) {
+            DLOG(INFO) << tx->id << " get";
+            auto _key   = std::make_tuple(addr, key);
+            auto value  = evmc::bytes32{0};
+            auto version = size_t{0};
+            // one key from one transaction will be commited once
+            for (auto& tup: tx->tuples_put) {
+                if (std::get<0>(tup) == _key) {
+                    return std::get<1>(tup);
+                }
+            }
+            for (auto& tup: tx->tuples_get) {
+                if (std::get<0>(tup) == _key) {
+                    return std::get<1>(tup);
+                }
+            }
+            table.Get(tx.get(), _key, value, version);
+            tx->tuples_get.push_back(std::make_tuple(_key, value, version));
+            return value;
+        });
         DLOG(INFO) << "execute (in) " << tx->id;
         statistics.JournalExecute();
         tx->Execute();

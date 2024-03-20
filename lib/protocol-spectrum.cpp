@@ -275,10 +275,10 @@ SpectrumDispatch::SpectrumDispatch(Spectrum& spectrum):
 
 /// @brief run dispatcher
 void SpectrumDispatch::Run() {
-    while(!stop_flag.load()) {for (auto& queue: queue_bundle) {
-        // round-robin dispatch
-        queue.Push(std::make_unique<T>(workload.Next(), last_execute.fetch_add(1)));
-    }}
+    while(!stop_flag.load()) {
+        auto tx = std::make_unique<T>(workload.Next(), last_execute.fetch_add(1));
+        queue_bundle[tx->id % queue_bundle.size()].Push(std::move(tx));
+    }
 }
 
 /// @brief spectrum executor

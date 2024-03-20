@@ -116,5 +116,12 @@
   },
   "C_Cpp.clang_format_fallbackStyle": "{ BasedOnStyle: LLVM, IndentWidth: 4 }",
   "C_Cpp.clang_format_style": "{ BasedOnStyle: LLVM, IndentWidth: 4 }",
-  "cmake.configureOnOpen": false
+"cmake.configureOnOpen": false,
+"cmake.configureArgs": [
+    "-DDEBUG=0"
+],
+"cmake.configureEnvironment": {
+    "CC": "clang-17",
+    "CXX": "clang++-17"
+}
 }
