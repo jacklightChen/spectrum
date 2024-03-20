@@ -51,7 +51,6 @@ SparkleTable::SparkleTable(size_t partitions):
 void SparkleTable::Get(T* tx, const K& k, evmc::bytes32& v, size_t& version) {
     DLOG(INFO) << tx->id << " get";
     Table::Put(k, [&](V& _v) {
-        auto guard = std::lock_guard{_v.mu};
         auto rit = _v.entries.rbegin();
         auto end = _v.entries.rend();
         while (rit != end) {
@@ -77,7 +76,6 @@ void SparkleTable::Put(T* tx, const K& k, const evmc::bytes32& v) {
     CHECK(tx->id > 0) << "we reserve version(0) for default value";
     DLOG(INFO) << "commit " << tx->id;
     Table::Put(k, [&](V& _v) {
-        auto guard = std::lock_guard{_v.mu};
         _v.tx = nullptr;
         auto rit = _v.entries.rbegin();
         auto end = _v.entries.rend();
@@ -121,7 +119,6 @@ void SparkleTable::Put(T* tx, const K& k, const evmc::bytes32& v) {
 bool SparkleTable::Lock(T* tx, const K& k) {
     bool succeed = false;
     Table::Put(k, [&](V& _v) {
-        auto guard = std::lock_guard{_v.mu};
         succeed = _v.tx == nullptr || _v.tx->id >= tx->id;
         if (_v.tx && _v.tx->id < tx->id) {
             _v.tx->rerun_flag.store(true);
@@ -138,7 +135,6 @@ bool SparkleTable::Lock(T* tx, const K& k) {
 void SparkleTable::RegretGet(T* tx, const K& k, size_t version) {
     DLOG(INFO) << "regret get " << tx->id << std::endl;
     Table::Put(k, [&](V& _v) {
-        auto guard = std::lock_guard{_v.mu};
         auto vit = _v.entries.begin();
         auto end = _v.entries.end();
         while (vit != end) {
@@ -160,7 +156,6 @@ void SparkleTable::RegretGet(T* tx, const K& k, size_t version) {
 void SparkleTable::RegretPut(T* tx, const K& k) {
     DLOG(INFO) << "regret put" << tx->id << std::endl;
     Table::Put(k, [&](V& _v) {
-        auto guard = std::lock_guard{_v.mu};
         auto vit = _v.entries.begin();
         auto end = _v.entries.end();
         while (vit != end) {
@@ -187,7 +182,6 @@ void SparkleTable::RegretPut(T* tx, const K& k) {
 void SparkleTable::ClearGet(T* tx, const K& k, size_t version) {
     DLOG(INFO) << "clear get " << tx->id << std::endl;
     Table::Put(k, [&](V& _v) {
-        auto guard = std::lock_guard{_v.mu};
         auto vit = _v.entries.begin();
         auto end = _v.entries.end();
         while (vit != end) {
@@ -209,7 +203,6 @@ void SparkleTable::ClearGet(T* tx, const K& k, size_t version) {
 void SparkleTable::ClearPut(T* tx, const K& k) {
     DLOG(INFO) << "regret put" << tx->id << std::endl;
     Table::Put(k, [&](V& _v) {
-        auto guard = std::lock_guard{_v.mu};
         while (_v.entries.size() && _v.entries.front().version < tx->id) {
             _v.entries.pop_front();
         }
