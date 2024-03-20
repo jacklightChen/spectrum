@@ -73,4 +73,18 @@ TEST(Smallbank, JustRunWorkload) {
     std::cerr << statistics.Print() << std::endl;
 }
 
+TEST(Smallbank, JustFetchWorkload) {
+    auto workload    = spectrum::Smallbank(100000, 10.0);
+    auto stop_flag   = std::atomic<bool>{false};
+    auto statistics  = spectrum::Statistics();
+    auto handle      = std::thread([&]() { while (!stop_flag.load()) {
+        auto transaction = workload.Next();
+        statistics.JournalExecute();
+    }});
+    std::this_thread::sleep_for(2000ms);
+    stop_flag.store(true);
+    handle.join();
+    std::cerr << statistics.PrintWithDuration(2000ms) << std::endl;
+}
+
 }

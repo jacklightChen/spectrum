@@ -72,7 +72,6 @@ inline std::string to_string(uint32_t key) {
 
 Transaction Smallbank::Next() {
     DLOG(INFO) << "smallbank next" << std::endl;
-    auto guard  = std::lock_guard{mu};
     auto option = rng->Next() % 6;
     #define X to_string(rng->Next())
     auto input = spectrum::from_hex([&](){switch (option) {
