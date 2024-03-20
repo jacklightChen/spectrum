@@ -207,7 +207,7 @@ void SparkleTable::ClearGet(T* tx, const K& k, size_t version) {
 /// @param tx the transaction the previously wrote this entry
 /// @param k the key of written entry
 void SparkleTable::ClearPut(T* tx, const K& k) {
-    DLOG(INFO) << "regret put" << tx->id << std::endl;
+    DLOG(INFO) << "clear put " << tx->id << std::endl;
     Table::Put(k, [&](V& _v) {
         auto guard = std::lock_guard{_v.mu};
         while (_v.entries.size() && _v.entries.front().version < tx->id) {
@@ -332,6 +332,7 @@ void SparkleExecutor::Run() { while (!stop_flag.load()) {
             // here no previous transaction will affect the result of this transaction. 
             // therefore, we can determine inaccessible values and remove them. 
             last_finalized.fetch_add(1);
+            statistics.JournalCommit(duration_cast<microseconds>(steady_clock::now() - tx->start_time).count());
             for (auto entry: tx->tuples_get) {
                 table.ClearGet(tx.get(), std::get<0>(entry), std::get<2>(entry));
             }
@@ -339,8 +340,6 @@ void SparkleExecutor::Run() { while (!stop_flag.load()) {
                 table.ClearPut(tx.get(), std::get<0>(entry));
             }
             DLOG(INFO) << "final commit " << tx->id;
-            auto latency = duration_cast<microseconds>(steady_clock::now() - tx->start_time).count();
-            statistics.JournalCommit(latency);
             break;
         }
     }

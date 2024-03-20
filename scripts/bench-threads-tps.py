@@ -11,14 +11,15 @@ from plot.plot import MyPlot
 keys = 1000000
 workload = 'Smallbank'
 zipf = 0
-times_to_tun = 2
+times_to_tun = 6
+timestamp = int(time.time())
 
 if __name__ == '__main__':
     df = pd.DataFrame(columns=['protocol', 'threads', 'zipf', 'table_partition', 'commit', 'abort'])
     conf = {'stdout': subprocess.PIPE, 'stderr': subprocess.PIPE}
     hash = subprocess.run(["git", "rev-parse", "HEAD"], **conf).stdout.decode('utf-8').strip()
-    with open('./bench_results', 'w') as f:
-        for n_threads in [1, 2, 3, 4, 5] + (list(range(6, 42, 6))):
+    with open(f'./exp_results/bench_results_{timestamp}', 'w') as f:
+        for n_threads in (list(range(6, 42, 6))):
             table_partitions    = 9973
             n_dispatchers       = 4
             protocols       = [
@@ -64,4 +65,4 @@ if __name__ == '__main__':
     ax.set_ylim(None, p.max_y_data * 1.15)       # 折线图的Y轴上限设置为数据最大值的1.15倍
     p.set_labels(ax, XLABEL, YLABEL)
     p.legend(ax, loc="upper center", ncol=3, anchor=(0.5, 1.25))
-    p.save(f'exp_results/bench_results_{int(time.time())}.pdf')
+    p.save(f'exp_results/bench_results_{timestamp}.pdf')

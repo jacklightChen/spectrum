@@ -4,6 +4,7 @@
 #include <spectrum/protocol-aria-fb.hpp>
 #include <spectrum/protocol-serial.hpp>
 #include <spectrum/protocol-calvin.hpp>
+#include <spectrum/protocol-dummy.hpp>
 #include <spectrum/workload.hpp>
 #include <spectrum/workload-smallbank.hpp>
 #include <spectrum/workload-ycsb.hpp>
@@ -105,7 +106,8 @@ std::unique_ptr<Protocol> ParseProtocol(const char* arg, Workload& workload, Sta
     OPT(Sparkle,  INT, INT)
     OPT(Spectrum, INT, INT, INT, EVMTYPE)
     OPT(Serial,   EVMTYPE, INT)
-    OPT(Calvin,   INT, INT, INT) 
+    OPT(Calvin,   INT, INT, INT)
+    OPT(Dummy,    INT, INT, EVMTYPE)
     // Calvin n_threads, n_dispatchers(default 1), table_partitions
     #undef OPT
     // fallback to an error
