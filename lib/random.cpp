@@ -4,6 +4,7 @@
 #include <stdexcept>
 #include <algorithm>
 #include <thread>
+#include <cstdlib>
 
 /*
     To investigate high-contention rate circumstance. We have to use Zipfian distribution. 
@@ -28,7 +29,8 @@ size_t ThreadLocalRandom::Next() {
 }
 
 Unif::Unif(size_t num_elements):
-    distribution(0, std::max(size_t(1), num_elements) - 1)
+    distribution(0, std::max(size_t(1), num_elements) - 1),
+    rng(rand())
 {}
 
 size_t Unif::Next() {
@@ -70,7 +72,8 @@ double h_integral(double x, double exponent) {
 
 Zipf::Zipf(size_t num_elements, double exponent):
     num_elements{(double) num_elements},
-    exponent{exponent}
+    exponent{exponent},
+    rng(rand())
 {
     if (num_elements == 0) {
         throw std::invalid_argument("Number of elements must be greater than 0");

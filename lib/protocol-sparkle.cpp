@@ -262,7 +262,6 @@ SparkleExecutor::SparkleExecutor(Sparkle& sparkle):
 /// @brief start an executor
 void SparkleExecutor::Run() { while (!stop_flag.load()) {
     auto tx = std::make_unique<T>(workload.Next(), last_execute.fetch_add(1));
-    if (tx == nullptr) { continue; }
     tx->UpdateSetStorageHandler([&](
         const evmc::address &addr, 
         const evmc::bytes32 &key, 
