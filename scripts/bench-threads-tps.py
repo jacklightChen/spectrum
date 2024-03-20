@@ -9,9 +9,9 @@ sys.path.extend(['.', '..', '../..'])
 from plot.plot import MyPlot
 
 keys = 1000000
-workload = 'Smallbank'
+workload = 'YCSB'
 zipf = 0
-times_to_tun = 6
+times_to_tun = 2
 timestamp = int(time.time())
 
 if __name__ == '__main__':
@@ -19,7 +19,7 @@ if __name__ == '__main__':
     conf = {'stdout': subprocess.PIPE, 'stderr': subprocess.PIPE}
     hash = subprocess.run(["git", "rev-parse", "HEAD"], **conf).stdout.decode('utf-8').strip()
     with open(f'./exp_results/bench_results_{timestamp}', 'w') as f:
-        for n_threads in (list(range(6, 42, 6))):
+        for n_threads in [1, 2, 3, 4, 5] + (list(range(6, 42, 6))):
             table_partitions    = 9973
             n_dispatchers       = 4
             protocols       = [
