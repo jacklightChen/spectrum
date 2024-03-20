@@ -32,7 +32,7 @@ Aria::Aria(
     table{table_partitions},
     enable_reordering{enable_reordering}
 {
-    LOG(INFO) << fmt::format("Aria({}, {}, {}, {})", n_threads, table_partitions, batch_size, enable_reordering) << std::endl;
+    LOG(INFO) << fmt::format("Aria(n_threads={}, table_partitions={}, batch_size={}, enable_reordering={})", n_threads, table_partitions, batch_size, enable_reordering) << std::endl;
 }
 
 /// @brief execute multiple transactions in parallel
