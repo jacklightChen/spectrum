@@ -9,29 +9,26 @@
 namespace spectrum {
 
 void Statistics::JournalCommit(size_t latency) {
-    auto guard = std::lock_guard{mu};
-    count_commit+= 1;
+    count_commit.fetch_add(1);
     if (latency <= 25) {
-        count_latency_25ms+= 1;
+        count_latency_25ms.fetch_add(1);
     }
     else if (latency <= 50) {
-        count_latency_50ms+= 1;
+        count_latency_50ms.fetch_add(1);
     }
     else if (latency <= 100) {
-        count_latency_100ms+= 1;
+        count_latency_100ms.fetch_add(1);
     }
     else {
-        count_latency_100ms_above+= 1;
+        count_latency_100ms_above.fetch_add(1);
     }
 }
 
 void Statistics::JournalExecute() {
-    auto guard = std::lock_guard{mu};
-    count_execution += 1;
+    count_execution.fetch_add(1);
 }
 
 std::string Statistics::Print() {
-    auto guard = std::lock_guard{mu};
     return std::string(fmt::format(
         "@{}\n"
         "commit        {}\n"
@@ -41,18 +38,17 @@ std::string Statistics::Print() {
         "100ms         {}\n"
         ">100ms        {}\n",
         std::chrono::system_clock::now(),
-        count_commit,
-        count_execution,
-        count_latency_25ms,
-        count_latency_50ms,
-        count_latency_100ms,
-        count_latency_100ms_above
+        count_commit.load(),
+        count_execution.load(),
+        count_latency_25ms.load(),
+        count_latency_50ms.load(),
+        count_latency_100ms.load(),
+        count_latency_100ms_above.load()
     ));
 }
 
 std::string Statistics::PrintWithDuration(std::chrono::milliseconds duration) {
-    auto guard = std::lock_guard{mu};
-    #define AVG(X) ((double)(X) / (double)(duration.count()) * (double)(1000))
+    #define AVG(X) ((double)(X.load()) / (double)(duration.count()) * (double)(1000))
     return std::string(fmt::format(
         "@{}\n"
         "duration      {}\n"
