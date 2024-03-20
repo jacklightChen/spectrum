@@ -4,6 +4,7 @@
 #include <stdexcept>
 #include <algorithm>
 #include <thread>
+#include <cstdlib>
 
 /*
     To investigate high-contention rate circumstance. We have to use Zipfian distribution. 
