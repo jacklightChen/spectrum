@@ -8,10 +8,10 @@ namespace spectrum {
 
 Smallbank::Smallbank(size_t num_elements, double zipf_exponent): 
     evm_type{EVMType::STRAWMAN},
-    rng{(zipf_exponent > 0.0 ? 
+    rng{std::unique_ptr<Random>(new ThreadLocalRandom([&](){return (zipf_exponent > 0.0 ? 
         std::unique_ptr<Random>(new Zipf(num_elements, zipf_exponent)) : 
         std::unique_ptr<Random>(new Unif(num_elements))
-    )}
+    );}, std::thread::hardware_concurrency()))}
 {
     LOG(INFO) << fmt::format("Smallbank({}, {})", num_elements, zipf_exponent);
     this->code = spectrum::from_hex(std::string{

@@ -3,6 +3,7 @@
 #include <cmath>
 #include <stdexcept>
 #include <algorithm>
+#include <thread>
 
 /*
     To investigate high-contention rate circumstance. We have to use Zipfian distribution. 
@@ -12,12 +13,25 @@
 
 namespace spectrum {
 
+ThreadLocalRandom::ThreadLocalRandom(
+    std::function<std::unique_ptr<Random>()> random_fn, 
+    size_t duplication
+) {
+    for (size_t i = 0; i < duplication; ++i) {
+        thread_local_storage.push_back(random_fn());
+    }
+}
+
+size_t ThreadLocalRandom::Next() {
+    size_t thread_id = std::hash<std::thread::id>{}(std::this_thread::get_id());
+    return thread_local_storage[thread_id]->Next();
+}
+
 Unif::Unif(size_t num_elements):
     distribution(0, std::max(size_t(1), num_elements) - 1)
 {}
 
 size_t Unif::Next() {
-    auto guard = std::lock_guard{mu};
     return distribution(rng);
 }
 
@@ -56,7 +70,7 @@ double h_integral(double x, double exponent) {
 
 Zipf::Zipf(size_t num_elements, double exponent):
     num_elements{(double) num_elements},
-    exponent{exponent} 
+    exponent{exponent}
 {
     if (num_elements == 0) {
         throw std::invalid_argument("Number of elements must be greater than 0");
@@ -70,7 +84,6 @@ Zipf::Zipf(size_t num_elements, double exponent):
 }
 
 size_t Zipf::Next() {
-    auto guard = std::lock_guard{mu};
     double hnum = h_integral_num_elements;
     while (true) {
         double u = hnum + std::generate_canonical<double, std::numeric_limits<double>::digits>(rng) * (h_integral_x1 - hnum);

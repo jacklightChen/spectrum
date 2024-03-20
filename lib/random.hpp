@@ -1,6 +1,8 @@
 #pragma once
 #include <random>
 #include <mutex>
+#include <memory>
+#include <functional>
 
 namespace spectrum {
 
@@ -12,10 +14,21 @@ class Random {
 
 };
 
+class ThreadLocalRandom: public Random {
+
+    private:
+    std::vector<std::unique_ptr<Random>> thread_local_storage;
+
+    public:
+    ThreadLocalRandom(std::function<std::unique_ptr<Random>()> random_fn, size_t duplication);
+    ~ThreadLocalRandom() override = default;
+    size_t Next() override;
+
+};
+
 class Unif : public Random {
 
     private:
-    std::mutex      mu;
     std::mt19937    rng;
     std::uniform_int_distribution<size_t>   distribution;
 
@@ -29,7 +42,6 @@ class Unif : public Random {
 class Zipf : public Random {
 
     private:
-    std::mutex      mu;
     double          num_elements;
     double          exponent;
     double          h_integral_x1;
