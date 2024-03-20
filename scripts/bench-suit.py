@@ -18,8 +18,8 @@ if __name__ == '__main__':
     conf = {'stdout': subprocess.PIPE, 'stderr': subprocess.PIPE}
     hash = subprocess.run(["git", "rev-parse", "HEAD"], **conf).stdout.decode('utf-8').strip()
     for n_threads in range(6, 36, 6):
-        table_partitions    = 9973
-        n_dispatchers       = 12
+        table_partitions    = n_threads * 8
+        n_dispatchers       = 4
         protocols       = [
             f"Calvin:{n_threads}:{n_dispatchers}:{table_partitions}",
             f"Aria:{n_threads}:{table_partitions}:128:FALSE", 

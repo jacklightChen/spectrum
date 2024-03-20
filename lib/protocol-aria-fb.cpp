@@ -212,6 +212,7 @@ void AriaExecutor::Execute(T* tx, AriaTable& table) {
         const evmc::address &addr,
         const evmc::bytes32 &key
     ) {
+        DLOG(INFO) << "tx " << tx->id << " get" << std::endl;
         // if some write on this entry is issued previously, 
         //  the read dependency will be barricated from journal. 
         auto tup = std::make_tuple(addr, key);
@@ -234,6 +235,7 @@ void AriaExecutor::Execute(T* tx, AriaTable& table) {
         const evmc::bytes32 &key,
         const evmc::bytes32 &value
     ) {
+        DLOG(INFO) << "tx " << tx->id << " set" << std::endl;
         auto tup = std::make_tuple(addr, key);
         tx->local_put[tup] = value;
         return evmc_storage_status::EVMC_STORAGE_MODIFIED;
@@ -247,6 +249,7 @@ void AriaExecutor::Execute(T* tx, AriaTable& table) {
 /// @param table the aria shared table
 void AriaExecutor::Reserve(T* tx, AriaTable& table) {
     // journal all entries to the reservation table
+    DLOG(INFO) << "tx " << tx->id << " reserve" << std::endl;
     for (auto& tup: tx->local_get) {
         table.ReserveGet(tx, std::get<0>(tup));
     }
