@@ -34,11 +34,6 @@ struct Prediction {
     std::vector<K> put; // the write keys
 };
 
-struct StaticPrediction {
-    std::vector<std::string> get; // the read keys
-    std::vector<std::string> put; // the write keys
-};
-
 /// @brief the base class for evm transactions, providing COPYONWRITE, BASIC, STRAWMAN mode for mini-checkpointing
 class Transaction {
 
@@ -62,10 +57,6 @@ class Transaction {
     void Break();
     void ApplyCheckpoint(size_t checkpoint_id);
     size_t MakeCheckpoint();
-
-    // temp
-    public:
-    StaticPrediction pred;
 
 };
 
