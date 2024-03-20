@@ -17,15 +17,15 @@ if __name__ == '__main__':
     df = pd.DataFrame(columns=['protocol', 'threads', 'zipf', 'table_partition', 'commit', 'abort'])
     conf = {'stdout': subprocess.PIPE, 'stderr': subprocess.PIPE}
     hash = subprocess.run(["git", "rev-parse", "HEAD"], **conf).stdout.decode('utf-8').strip()
-    for n_threads in range(6, 36, 6):
-        table_partitions    = n_threads * 8
+    for n_threads in [1, 2, 3, 4, 5] + (list(range(6, 36, 6))):
+        table_partitions    = 1024
         n_dispatchers       = 4
         protocols       = [
-            f"Calvin:{n_threads}:{n_dispatchers}:{table_partitions}",
-            f"Aria:{n_threads}:{table_partitions}:128:FALSE", 
-            f"Aria:{n_threads}:{table_partitions}:128:TRUE",
+            # f"Calvin:{n_threads}:{n_dispatchers}:{table_partitions}",
+            # f"Aria:{n_threads}:{table_partitions}:128:FALSE", 
+            # f"Aria:{n_threads}:{table_partitions}:128:TRUE",
             f"Sparkle:{n_threads}:{n_dispatchers}:{table_partitions}", 
-            f"Spectrum:{n_threads}:{n_dispatchers}:{table_partitions}:COPYONWRITE"
+            # f"Spectrum:{n_threads}:{n_dispatchers}:{table_partitions}:COPYONWRITE"
         ]
         for cc in protocols:
             print(f"#COMMIT-{hash}",  f"CONFIG-{cc}")
@@ -61,5 +61,3 @@ if __name__ == '__main__':
     p.set_labels(ax, XLABEL, YLABEL)
     p.legend(ax, loc="upper center", ncol=3, anchor=(0.5, 1.25))
     p.save(f'exp_results/bench_results_{int(time.time())}.pdf')
-
-            
