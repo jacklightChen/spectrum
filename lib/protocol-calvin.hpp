@@ -1,9 +1,8 @@
 #include "./evm_hash.hpp"
 #include "protocol.hpp"
 #include "statistics.hpp"
-#include "table.hpp"
+#include "lock-util.hpp"
 #include "workload.hpp"
-#include "lock_queue.hpp"
 #include <atomic>
 #include <conqueue/concurrentqueue.h>
 #include <deque>
@@ -31,6 +30,7 @@ struct CalvinTransaction : public Transaction {
     void UpdateWait(size_t id);
 
 };
+
 struct CalvinLockEntry {
     T*                      tx;
     size_t                  version;

@@ -1,7 +1,7 @@
 #include <functional>
 #include <thread_pool/BS_thread_pool.hpp>
 #include <thread_pool/BS_thread_pool_utils.hpp>
-#include "table.hpp"
+#include "lock-util.hpp"
 #include "evm_hash.hpp"
 #include "evm_transaction.hpp"
 #include "workload.hpp"

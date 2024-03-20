@@ -1,4 +1,4 @@
-#include "table.hpp"
+#include "lock-util.hpp"
 #include "protocol.hpp"
 #include "workload.hpp"
 #include "statistics.hpp"

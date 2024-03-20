@@ -1,8 +1,7 @@
 #include "./workload.hpp"
-#include "./table.hpp"
+#include "lock-util.hpp"
 #include "./protocol.hpp"
 #include "./evm_hash.hpp"
-#include "./lock_queue.hpp"
 #include <list>
 #include <atomic>
 #include <tuple>

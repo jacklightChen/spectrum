@@ -1,5 +1,5 @@
 #include <gtest/gtest.h>
-#include <spectrum/table.hpp>
+#include <spectrum/lock-util.hpp>
 #include <spectrum/evm_hash.hpp>
 #include <spectrum/hex.hpp>
 #include <evmc/evmc.hpp>

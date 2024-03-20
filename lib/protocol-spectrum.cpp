@@ -1,5 +1,5 @@
 #include "./protocol-spectrum.hpp"
-#include "./table.hpp"
+#include "lock-util.hpp"
 #include "./hex.hpp"
 #include "./thread-util.hpp"
 #include <functional>
