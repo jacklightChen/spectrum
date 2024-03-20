@@ -69,7 +69,6 @@ class Sparkle: public Protocol {
 
     private:
     size_t              n_executors;
-    size_t              n_dispatchers;
     Workload&           workload;
     SparkleTable        table;
     Statistics&         statistics;
@@ -78,8 +77,6 @@ class Sparkle: public Protocol {
     std::atomic<bool>   stop_flag{false};
     std::vector<SparkleQueue>   queue_bundle;
     std::vector<std::thread>    executors{};
-    std::vector<std::thread>    dispatchers{};
-    friend class SparkleDispatch;
     friend class SparkleExecutor;
 
     public:
@@ -89,25 +86,11 @@ class Sparkle: public Protocol {
 
 };
 
-/// @brief a dispatcher that sends transactions to executors in a round-robin manner
-class SparkleDispatch {
-
-    private:
-    Workload&                   workload;
-    std::atomic<size_t>&        last_execute;
-    std::vector<SparkleQueue>&  queue_bundle;
-    std::atomic<bool>&          stop_flag;
-
-    public:
-    SparkleDispatch(Sparkle& sparkle);
-    void Run();
-
-};
-
 /// @brief an executor that fetch transactions from queue and execute them
 class SparkleExecutor {
 
     private:
+    Workload&               workload;
     SparkleQueue&           queue;
     SparkleTable&           table;
     Statistics&             statistics;
