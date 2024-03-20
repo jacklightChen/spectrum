@@ -21,13 +21,13 @@ if __name__ == '__main__':
     with open(f'./exp_results/bench_results_{timestamp}', 'w') as f:
         for n_threads in [1, 2, 3, 4, 5] + (list(range(6, 42, 6))):
             table_partitions    = 9973
-            n_dispatchers       = 4
+            n_dispatchers       = n_threads // 6 + 1
             protocols       = [
                 # f"Calvin:{n_threads}:{n_dispatchers}:{table_partitions}",
                 # f"Aria:{n_threads}:{table_partitions}:128:FALSE", 
                 # f"Aria:{n_threads}:{table_partitions}:128:TRUE",
-                f"Sparkle:{n_threads}:{table_partitions}", 
-                # f"Spectrum:{n_threads}:{n_dispatchers}:{table_partitions}:COPYONWRITE"
+                f"Sparkle:{n_threads}:{n_dispatchers}:{table_partitions}", 
+                f"Spectrum:{n_threads}:{n_dispatchers}:{table_partitions}:COPYONWRITE"
             ]
             for cc in protocols:
                 print(f"#COMMIT-{hash}",  f"CONFIG-{cc}")

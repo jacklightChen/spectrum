@@ -329,7 +329,15 @@ void SparkleExecutor::Run() { while (!stop_flag.load()) {
     }
     while (!stop_flag.load()) {
         DLOG(INFO) << "recycle " << tx->id << " finalized " << last_finalized.load();
-        if (tx->rerun_flag.load()) {
+        if (stop_flag.load()) {
+            // we add this to prevent something bad like the following:
+            // 1. some transaction ta is executing on thread A. 
+            // 2. another transaction tb is executing on thread B. 
+            // 3. on thread A, stop_flag.load() == true, we exit without reserving ta (therefore, ta is deleted). 
+            // 4. tb access a key, previously ta registered itself as a read dependency on this key, reading ta->id cause read after release. 
+            queue.Push(std::move(tx));
+            break;
+        } else if (tx->rerun_flag.load()) {
             // sweep all operations from previous execution
             for (auto entry: tx->tuples_get) {
                 table.RegretGet(tx.get(), std::get<0>(entry), std::get<2>(entry));

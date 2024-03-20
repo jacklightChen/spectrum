@@ -95,6 +95,7 @@ void SpectrumTable::Put(T* tx, const K& k, const evmc::bytes32& v) {
             for (auto _tx: rit->readers) {
                 DLOG(INFO) << KeyHasher()(k) << " has read dependency " << "(" << _tx << ")" << std::endl;
                 if (_tx->id > tx->id) {
+                    DLOG(INFO) << tx->id << " abort " << _tx->id << std::endl;
                     _tx->AddRerunKeys(k, tx->id);
                 }
             }
@@ -103,6 +104,7 @@ void SpectrumTable::Put(T* tx, const K& k, const evmc::bytes32& v) {
         for (auto _tx: _v.readers_default) {
             DLOG(INFO) << KeyHasher()(k) << " has read dependency " << "(" << _tx << ")" << std::endl;
             if (_tx->id > tx->id) {
+                DLOG(INFO) << tx->id << " abort " << _tx->id << std::endl;
                 _tx->AddRerunKeys(k, tx->id);
             }
         }
@@ -144,7 +146,7 @@ void SpectrumTable::RegretGet(T* tx, const K& k, size_t version) {
             for (auto vit = _v.entries.begin(); vit != end; ++vit) {
                 DLOG(INFO) << "spot version " << vit->version << std::endl;
                 if (vit->readers.contains(tx)) {
-                    DLOG(ERROR) << "didn't remove " << tx->id << "(" << tx << ")" << " still on version " << vit->version  << std::endl;
+                    DLOG(FATAL) << "didn't remove " << tx->id << "(" << tx << ")" << " still on version " << vit->version  << std::endl;
                 }
             }
         }
@@ -167,6 +169,7 @@ void SpectrumTable::RegretPut(T* tx, const K& k) {
             // abort transactions that read from current transaction
             for (auto _tx: vit->readers) {
                 DLOG(INFO) << KeyHasher()(k) << " has read dependency " << "(" << _tx << ")" << std::endl;
+                DLOG(INFO) << tx->id << " abort " << _tx->id << std::endl;
                 _tx->AddRerunKeys(k, tx->id);
             }
             break;
@@ -202,7 +205,7 @@ void SpectrumTable::ClearGet(T* tx, const K& k, size_t version) {
             for (auto vit = _v.entries.begin(); vit != end; ++vit) {
                 DLOG(INFO) << "spot version " << vit->version << std::endl;
                 if (vit->readers.contains(tx)) {
-                    DLOG(ERROR) << "didn't remove " << tx->id << "(" << tx << ")" << " still on version " << vit->version  << std::endl;
+                    DLOG(FATAL) << "didn't remove " << tx->id << "(" << tx << ")" << " still on version " << vit->version  << std::endl;
                 }
             }
         }
@@ -400,8 +403,11 @@ void SpectrumExecutor::ReExecute(SpectrumTransaction* tx) {
 void SpectrumExecutor::Run() {while (!stop_flag.load()) {
     auto tx = Create();
     if (tx == nullptr) continue;
-    while (!stop_flag.load()) {
-        if (tx->HasRerunKeys()) {
+    while (true) {
+        if (stop_flag.load()) {
+            queue.Push(std::move(tx));
+            break;
+        } else if (tx->HasRerunKeys()) {
             // sweep all operations from previous execution
             DLOG(INFO) << "re-execute " << tx->id;
             ReExecute(tx.get());
