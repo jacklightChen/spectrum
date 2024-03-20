@@ -1,4 +1,5 @@
 #include "protocol-dummy.hpp"
+#include <fmt/core.h>
 
 namespace spectrum {
 
@@ -10,6 +11,7 @@ Dummy::Dummy(Workload& workload, Statistics& statistics, size_t n_threads, size_
     n_threads{n_threads},
     table(table_partitions)
 {
+    LOG(INFO) << fmt::format("Dummy(n_threads={}, table_partitions={})", n_threads, table_partitions) << std::endl;
     workload.SetEVMType(evm_type);
 }
 
