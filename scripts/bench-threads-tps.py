@@ -17,32 +17,36 @@ if __name__ == '__main__':
     df = pd.DataFrame(columns=['protocol', 'threads', 'zipf', 'table_partition', 'commit', 'abort'])
     conf = {'stdout': subprocess.PIPE, 'stderr': subprocess.PIPE}
     hash = subprocess.run(["git", "rev-parse", "HEAD"], **conf).stdout.decode('utf-8').strip()
-    for n_threads in [1, 2, 3, 4, 5] + (list(range(6, 36, 6))):
-        table_partitions    = 9973
-        n_dispatchers       = 4
-        protocols       = [
-            # f"Calvin:{n_threads}:{n_dispatchers}:{table_partitions}",
-            # f"Aria:{n_threads}:{table_partitions}:128:FALSE", 
-            # f"Aria:{n_threads}:{table_partitions}:128:TRUE",
-            f"Sparkle:{n_threads}:{table_partitions}", 
-            # f"Spectrum:{n_threads}:{n_dispatchers}:{table_partitions}:COPYONWRITE"
-        ]
-        for cc in protocols:
-            print(f"#COMMIT-{hash}",  f"CONFIG-{cc}")
-            print(f'../bench {cc} {workload}:{keys}:{zipf} {times_to_tun}s')
-            result = subprocess.run(["../build/bench", cc, f"{workload}:{keys}:{zipf}", f"{times_to_tun}s"], **conf)
-            result_str = result.stderr.decode('utf-8').strip()
-            print(result_str)
-            commit = float(re.search(r'commit\s+([\d.]+)', result_str).group(1))
-            execution = float(re.search(r'execution\s+([\d.]+)', result_str).group(1))
-            df.loc[len(df)] = {
-                'protocol': cc.split(':')[0] if cc.split(':')[-1] != 'TRUE' else 'AriaRe', 
-                'threads': n_threads, 
-                'zipf': 0, 
-                'table_partition': table_partitions, 
-                'commit': commit,
-                'abort': execution - commit
-            }
+    with open('./bench_results', 'w') as f:
+        for n_threads in [1, 2, 3, 4, 5] + (list(range(6, 42, 6))):
+            table_partitions    = 9973
+            n_dispatchers       = 4
+            protocols       = [
+                # f"Calvin:{n_threads}:{n_dispatchers}:{table_partitions}",
+                # f"Aria:{n_threads}:{table_partitions}:128:FALSE", 
+                # f"Aria:{n_threads}:{table_partitions}:128:TRUE",
+                f"Sparkle:{n_threads}:{table_partitions}", 
+                # f"Spectrum:{n_threads}:{n_dispatchers}:{table_partitions}:COPYONWRITE"
+            ]
+            for cc in protocols:
+                print(f"#COMMIT-{hash}",  f"CONFIG-{cc}")
+                f.write(f"#COMMIT-{hash} CONFIG-{cc}")
+                print(f'../bench {cc} {workload}:{keys}:{zipf} {times_to_tun}s')
+                f.write(f'../bench {cc} {workload}:{keys}:{zipf} {times_to_tun}s')
+                result = subprocess.run(["../build/bench", cc, f"{workload}:{keys}:{zipf}", f"{times_to_tun}s"], **conf)
+                result_str = result.stderr.decode('utf-8').strip()
+                print(result_str)
+                f.write(result_str)
+                commit = float(re.search(r'commit\s+([\d.]+)', result_str).group(1))
+                execution = float(re.search(r'execution\s+([\d.]+)', result_str).group(1))
+                df.loc[len(df)] = {
+                    'protocol': cc.split(':')[0] if cc.split(':')[-1] != 'TRUE' else 'AriaRe', 
+                    'threads': n_threads, 
+                    'zipf': 0, 
+                    'table_partition': table_partitions, 
+                    'commit': commit,
+                    'abort': execution - commit
+                }
     df.to_csv('bench_results.csv')
 
     recs = df

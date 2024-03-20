@@ -1,0 +1,78 @@
+#COMMIT-c20b55b46f2d394923008c92dac16ac249615bf1 CONFIG-Sparkle:1:9973../bench Sparkle:1:9973 Smallbank:1000000:0 2s@2024-03-20 06:54:48.816637812
+duration      2000ms
+commit        64241.5000 tx/s
+execution     0.0000 tx/s
+25ms          63830.0000 tx/s
+50ms          91.5000 tx/s
+100ms         311.5000 tx/s
+>100ms        8.5000 tx/s#COMMIT-c20b55b46f2d394923008c92dac16ac249615bf1 CONFIG-Sparkle:2:9973../bench Sparkle:2:9973 Smallbank:1000000:0 2s@2024-03-20 06:54:50.890024079
+duration      2000ms
+commit        110295.5000 tx/s
+execution     0.0000 tx/s
+25ms          107173.0000 tx/s
+50ms          1912.0000 tx/s
+100ms         1119.5000 tx/s
+>100ms        91.0000 tx/s#COMMIT-c20b55b46f2d394923008c92dac16ac249615bf1 CONFIG-Sparkle:3:9973../bench Sparkle:3:9973 Smallbank:1000000:0 2s@2024-03-20 06:54:53.079267351
+duration      2000ms
+commit        159176.5000 tx/s
+execution     0.0000 tx/s
+25ms          153932.0000 tx/s
+50ms          2506.5000 tx/s
+100ms         2520.0000 tx/s
+>100ms        218.0000 tx/s#COMMIT-c20b55b46f2d394923008c92dac16ac249615bf1 CONFIG-Sparkle:4:9973../bench Sparkle:4:9973 Smallbank:1000000:0 2s@2024-03-20 06:54:55.302406503
+duration      2000ms
+commit        198716.5000 tx/s
+execution     0.0000 tx/s
+25ms          189648.5000 tx/s
+50ms          4616.0000 tx/s
+100ms         4022.5000 tx/s
+>100ms        429.5000 tx/s#COMMIT-c20b55b46f2d394923008c92dac16ac249615bf1 CONFIG-Sparkle:5:9973../bench Sparkle:5:9973 Smallbank:1000000:0 2s@2024-03-20 06:54:57.579993678
+duration      2001ms
+commit        237430.7846 tx/s
+execution     0.0000 tx/s
+25ms          222863.5682 tx/s
+50ms          8527.2364 tx/s
+100ms         5643.6782 tx/s
+>100ms        396.3018 tx/s#COMMIT-c20b55b46f2d394923008c92dac16ac249615bf1 CONFIG-Sparkle:6:9973../bench Sparkle:6:9973 Smallbank:1000000:0 2s@2024-03-20 06:54:59.960052306
+duration      2001ms
+commit        276234.8826 tx/s
+execution     0.0000 tx/s
+25ms          256917.0415 tx/s
+50ms          11380.8096 tx/s
+100ms         7347.8261 tx/s
+>100ms        589.2054 tx/s#COMMIT-c20b55b46f2d394923008c92dac16ac249615bf1 CONFIG-Sparkle:12:9973../bench Sparkle:12:9973 Smallbank:1000000:0 2s@2024-03-20 06:55:02.457380848
+duration      2017ms
+commit        478261.2791 tx/s
+execution     0.0000 tx/s
+25ms          432979.1770 tx/s
+50ms          21397.6202 tx/s
+100ms         21249.8761 tx/s
+>100ms        2634.6059 tx/s#COMMIT-c20b55b46f2d394923008c92dac16ac249615bf1 CONFIG-Sparkle:18:9973../bench Sparkle:18:9973 Smallbank:1000000:0 2s@2024-03-20 06:55:05.081781521
+duration      2004ms
+commit        649014.9701 tx/s
+execution     0.0000 tx/s
+25ms          537730.0399 tx/s
+50ms          73546.4072 tx/s
+100ms         35058.3832 tx/s
+>100ms        2680.1397 tx/s#COMMIT-c20b55b46f2d394923008c92dac16ac249615bf1 CONFIG-Sparkle:24:9973../bench Sparkle:24:9973 Smallbank:1000000:0 2s@2024-03-20 06:55:07.827258562
+duration      2005ms
+commit        785349.6259 tx/s
+execution     0.0000 tx/s
+25ms          601321.1970 tx/s
+50ms          128564.5885 tx/s
+100ms         50257.3566 tx/s
+>100ms        5206.4838 tx/s#COMMIT-c20b55b46f2d394923008c92dac16ac249615bf1 CONFIG-Sparkle:30:9973../bench Sparkle:30:9973 Smallbank:1000000:0 2s@2024-03-20 06:55:10.643860592
+duration      2006ms
+commit        912676.4706 tx/s
+execution     0.0000 tx/s
+25ms          666945.1645 tx/s
+50ms          169712.3629 tx/s
+100ms         67301.0967 tx/s
+>100ms        8717.8465 tx/s#COMMIT-c20b55b46f2d394923008c92dac16ac249615bf1 CONFIG-Sparkle:36:9973../bench Sparkle:36:9973 Smallbank:1000000:0 2s@2024-03-20 06:55:13.554928474
+duration      2010ms
+commit        997100.4975 tx/s
+execution     0.0000 tx/s
+25ms          606417.4129 tx/s
+50ms          292950.7463 tx/s
+100ms         82663.1841 tx/s
+>100ms        15069.1542 tx/s
