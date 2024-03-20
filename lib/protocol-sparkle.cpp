@@ -235,9 +235,8 @@ void Sparkle::Start() {
     stop_flag.store(false);
     for (size_t i = 0; i != n_executors; ++i) {
         DLOG(INFO) << "start executor " << i << std::endl;
-        auto queue = &queue_bundle[i];
-        executors.push_back(std::thread([this, queue] {
-            SparkleExecutor(*this, *queue).Run();
+        executors.push_back(std::thread([this] {
+            SparkleExecutor(*this).Run();
         }));
         PinRoundRobin(executors[i], i);
     }
@@ -246,15 +245,15 @@ void Sparkle::Start() {
 /// @brief stop sparkle protocol
 void Sparkle::Stop() {
     stop_flag.store(true);
-    for (auto& x: dispatchers)  { x.join(); }
     for (auto& x: executors)    { x.join(); }
 }
 
 /// @brief sparkle executor
 /// @param sparkle sparkle initialization paremeters
-SparkleExecutor::SparkleExecutor(Sparkle& sparkle, SparkleQueue& queue):
+SparkleExecutor::SparkleExecutor(Sparkle& sparkle):
     workload{sparkle.workload},
     table{sparkle.table},
+    last_execute{sparkle.last_execute},
     last_finalized{sparkle.last_finalized},
     statistics{sparkle.statistics},
     stop_flag{sparkle.stop_flag}
@@ -343,10 +342,6 @@ void SparkleExecutor::Run() { while (!stop_flag.load()) {
             DLOG(INFO) << "final commit " << tx->id;
             auto latency = duration_cast<microseconds>(steady_clock::now() - tx->start_time).count();
             statistics.JournalCommit(latency);
-            break;
-        }
-        else {
-            queue.Push(std::move(tx));
             break;
         }
     }

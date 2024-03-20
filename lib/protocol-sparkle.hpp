@@ -80,7 +80,7 @@ class Sparkle: public Protocol {
     friend class SparkleExecutor;
 
     public:
-    Sparkle(Workload& workload, Statistics& statistics, size_t n_executors, size_t n_dispatchers, size_t table_partitions);
+    Sparkle(Workload& workload, Statistics& statistics, size_t n_executors, size_t table_partitions);
     void Start() override;
     void Stop() override;
 
@@ -91,14 +91,14 @@ class SparkleExecutor {
 
     private:
     Workload&               workload;
-    SparkleQueue&           queue;
     SparkleTable&           table;
     Statistics&             statistics;
+    std::atomic<size_t>&    last_execute;
     std::atomic<size_t>&    last_finalized;
     std::atomic<bool>&      stop_flag;
 
     public:
-    SparkleExecutor(Sparkle& sparkle, SparkleQueue& queue);
+    SparkleExecutor(Sparkle& sparkle);
     void Run();
 
 };
