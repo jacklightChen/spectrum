@@ -62,7 +62,7 @@ if __name__ == '__main__':
         p.plot(ax, xdata=records[X], ydata=records[Y], color=None, legend_label=schema,)
     ax.set_xticks([int(t) for t in recs['threads'].unique()])
     p.format_yticks(ax, suffix='K')
-    ax.set_ylim(None, p.max_y_data * 1.15)       # 折线图的Y轴上限设置为数据最大值的1.15倍
+    # ax.set_ylim(None, p.max_y_data * 1.15)       # 折线图的Y轴上限设置为数据最大值的1.15倍
     p.set_labels(ax, XLABEL, YLABEL)
     p.legend(ax, loc="upper center", ncol=3, anchor=(0.5, 1.25))
     p.save(f'exp_results/bench_results_{timestamp}.pdf')
