@@ -41,7 +41,6 @@ struct SparkleEntry {
 };
 
 struct SparkleVersionList {
-    std::mutex  mu;
     T*          tx = nullptr;
     std::list<SparkleEntry> entries;
     // readers that read default value
