@@ -136,7 +136,7 @@ void Transaction::Execute() {
             &code[0], code.size() - 1
         );
         if (result.status_code != evmc_status_code::EVMC_SUCCESS) {
-            DLOG(ERROR) << "function hash: " << to_hex(std::span{&input[0], 4}) <<  " transaction status: " << result.status_code << std::endl;
+            LOG(ERROR) << "function hash: " << to_hex(std::span{&input[0], 4}) <<  " transaction status: " << result.status_code << std::endl;
         }
         if (result.output_data) { result.release(&result); }
         return;
@@ -151,7 +151,7 @@ void Transaction::Execute() {
             &code[0], code.size() - 1
         );
         if (result.status_code != evmc_status_code::EVMC_SUCCESS) {
-            DLOG(ERROR) << "transaction status: " << result.status_code << std::endl;
+            LOG(ERROR) << "transaction status: " << result.status_code << std::endl;
         }
         if (result.output_data) {
             result.release(&result);
