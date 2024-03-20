@@ -7,13 +7,12 @@ namespace spectrum {
 
 class Statistics {
     public:
-    std::mutex mu;
-    size_t count_commit{0};
-    double count_execution{0};
-    size_t count_latency_25ms{0};
-    size_t count_latency_50ms{0};
-    size_t count_latency_100ms{0};
-    size_t count_latency_100ms_above{0};
+    std::atomic<size_t> count_commit{0};
+    std::atomic<size_t> count_execution{0};
+    std::atomic<size_t> count_latency_25ms{0};
+    std::atomic<size_t> count_latency_50ms{0};
+    std::atomic<size_t> count_latency_100ms{0};
+    std::atomic<size_t> count_latency_100ms_above{0};
     Statistics() = default;
     Statistics(const Statistics& statistics) = delete;
     void JournalCommit(size_t latency);

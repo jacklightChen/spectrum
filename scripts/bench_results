@@ -1,0 +1,43 @@
+#COMMIT-40d5467af2ddcd7b5b69870d0195866fdc254269 CONFIG-Sparkle:6:9973../bench Sparkle:6:9973 Smallbank:1000000:0 6s@2024-03-20 08:02:34.381984501
+duration      6001ms
+commit        287435.7607 tx/s
+execution     287437.0938 tx/s
+25ms          268462.0897 tx/s
+50ms          12971.0048 tx/s
+100ms         5312.4479 tx/s
+>100ms        690.2183 tx/s#COMMIT-40d5467af2ddcd7b5b69870d0195866fdc254269 CONFIG-Sparkle:12:9973../bench Sparkle:12:9973 Smallbank:1000000:0 6s@2024-03-20 08:02:41.286093916
+duration      6002ms
+commit        539844.0520 tx/s
+execution     539848.8837 tx/s
+25ms          500859.7134 tx/s
+50ms          24753.2489 tx/s
+100ms         12770.5765 tx/s
+>100ms        1460.5132 tx/s#COMMIT-40d5467af2ddcd7b5b69870d0195866fdc254269 CONFIG-Sparkle:18:9973../bench Sparkle:18:9973 Smallbank:1000000:0 6s@2024-03-20 08:02:48.443208268
+duration      6003ms
+commit        764183.5749 tx/s
+execution     764744.9609 tx/s
+25ms          697998.0010 tx/s
+50ms          43571.8807 tx/s
+100ms         19381.9757 tx/s
+>100ms        3231.7175 tx/s#COMMIT-40d5467af2ddcd7b5b69870d0195866fdc254269 CONFIG-Sparkle:24:9973../bench Sparkle:24:9973 Smallbank:1000000:0 6s@2024-03-20 08:02:55.666019836
+duration      6005ms
+commit        981022.3147 tx/s
+execution     981304.4130 tx/s
+25ms          883755.2040 tx/s
+50ms          66864.4463 tx/s
+100ms         26286.0949 tx/s
+>100ms        4116.5695 tx/s#COMMIT-40d5467af2ddcd7b5b69870d0195866fdc254269 CONFIG-Sparkle:30:9973../bench Sparkle:30:9973 Smallbank:1000000:0 6s@2024-03-20 08:03:03.038639272
+duration      6010ms
+commit        1171951.2479 tx/s
+execution     1172114.3095 tx/s
+25ms          1054763.2280 tx/s
+50ms          78393.1780 tx/s
+100ms         32747.2546 tx/s
+>100ms        6047.5874 tx/s#COMMIT-40d5467af2ddcd7b5b69870d0195866fdc254269 CONFIG-Sparkle:36:9973../bench Sparkle:36:9973 Smallbank:1000000:0 6s@2024-03-20 08:03:10.269806210
+duration      6011ms
+commit        1210571.2860 tx/s
+execution     1211000.4991 tx/s
+25ms          983976.5430 tx/s
+50ms          179916.3201 tx/s
+100ms         38639.3279 tx/s
+>100ms        8039.0950 tx/s

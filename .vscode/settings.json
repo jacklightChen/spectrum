@@ -1,5 +1,4 @@
 {
-  "typewriterAutoScroll.enable": false,
   "C_Cpp.default.configurationProvider": "ms-vscode.cmake-tools",
   "C_Cpp.intelliSenseEngine": "Tag Parser",
   "files.associations": {
