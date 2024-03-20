@@ -9,7 +9,7 @@ class Statistics {
     public:
     std::mutex mu;
     size_t count_commit{0};
-    float  count_execution{0};
+    double count_execution{0};
     size_t count_latency_25ms{0};
     size_t count_latency_50ms{0};
     size_t count_latency_100ms{0};
