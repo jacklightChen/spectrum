@@ -38,11 +38,12 @@ struct SpectrumGetTuple {
 struct SpectrumTransaction: public Transaction {
     size_t      id;
     size_t      should_wait{0};
+    std::mutex          rerun_keys_mu;
+    std::vector<K>      rerun_keys;
+    std::atomic<bool>   berun_flag{false};
     time_point<steady_clock>            start_time;
     std::vector<SpectrumGetTuple>       tuples_get{};
     std::vector<SpectrumPutTuple>       tuples_put{};
-    std::mutex       rerun_keys_mu;
-    std::vector<K>   rerun_keys;
     SpectrumTransaction(Transaction&& inner, size_t id);
     bool HasRerunKeys();
     void AddRerunKeys(const K& key, size_t cause_id);

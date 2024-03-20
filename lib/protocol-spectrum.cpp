@@ -296,7 +296,8 @@ SpectrumExecutor::SpectrumExecutor(Spectrum& spectrum, SpectrumQueue& queue):
 /// @brief generate a transaction and execute it
 std::unique_ptr<T> SpectrumExecutor::Create() {
     auto tx = queue.Pop();
-    if (tx == nullptr) return tx;
+    if (tx == nullptr || tx->berun_flag.load()) return tx;
+    tx->berun_flag.store(true);
     auto tx_ref = tx.get();
     tx->UpdateSetStorageHandler([tx_ref](
         const evmc::address &addr, 
@@ -418,6 +419,10 @@ void SpectrumExecutor::Run() {while (!stop_flag.load()) {
             }
             auto latency = duration_cast<microseconds>(steady_clock::now() - tx->start_time).count();
             statistics.JournalCommit(latency);
+            break;
+        }
+        else {
+            queue.Push(std::move(tx));
             break;
         }
     }
