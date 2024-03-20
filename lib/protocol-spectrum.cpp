@@ -277,9 +277,7 @@ SpectrumDispatch::SpectrumDispatch(Spectrum& spectrum):
 void SpectrumDispatch::Run() {
     while(!stop_flag.load()) {for (auto& queue: queue_bundle) {
         // round-robin dispatch
-        if (queue.Size() <= 5) {
-            queue.Push(std::make_unique<T>(workload.Next(), last_execute.fetch_add(1)));
-        }
+        queue.Push(std::make_unique<T>(workload.Next(), last_execute.fetch_add(1)));
     }}
 }
 
