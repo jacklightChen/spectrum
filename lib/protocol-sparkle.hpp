@@ -8,11 +8,14 @@
 #include <tuple>
 #include <vector>
 #include <unordered_set>
+#include <chrono>
 #include <thread>
 #include <thread_pool/BS_thread_pool.hpp>
 #include <thread_pool/BS_thread_pool_utils.hpp>
 
 namespace spectrum {
+
+using namespace std::chrono;
 
 // some shorthands to prevent prohibitively long names
 #define K std::tuple<evmc::address, evmc::bytes32>
@@ -25,6 +28,7 @@ struct SparkleTransaction: public Transaction {
     std::vector<std::tuple<K, evmc::bytes32>>           tuples_put{};
     std::atomic<bool>   rerun_flag{false};
     std::atomic<bool>   berun_flag{false};
+    time_point<steady_clock>    start_time;
     SparkleTransaction(Transaction&& inner, size_t id);
     void Reset();
 };

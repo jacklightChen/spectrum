@@ -25,7 +25,8 @@ using namespace std::chrono;
 /// @param id transaction id
 SparkleTransaction::SparkleTransaction(Transaction&& inner, size_t id):
     Transaction{std::move(inner)},
-    id{id}
+    id{id},
+    start_time{steady_clock::now()}
 {}
 
 /// @brief reset the transaction (local) information
@@ -288,7 +289,6 @@ SparkleExecutor::SparkleExecutor(Sparkle& sparkle, SparkleQueue& queue):
 void SparkleExecutor::Run() { while (!stop_flag.load()) {
     auto tx = queue.Pop();
     if (tx == nullptr) { continue; }
-    auto start = steady_clock::now();
     tx->UpdateSetStorageHandler([&](
         const evmc::address &addr, 
         const evmc::bytes32 &key, 
@@ -323,7 +323,7 @@ void SparkleExecutor::Run() { while (!stop_flag.load()) {
         tx->tuples_get.push_back(std::make_tuple(_key, value, version));
         return value;
     });
-    
+    // when a transaction is not runned before, execute that transaction
     if (!tx->berun_flag.load()) {
         DLOG(INFO) << "execute (in) " << tx->id;
         statistics.JournalExecute();
@@ -334,7 +334,6 @@ void SparkleExecutor::Run() { while (!stop_flag.load()) {
         }
         tx->berun_flag.store(true);
     }
-
     while (!stop_flag.load()) {
         DLOG(INFO) << "recycle " << tx->id << " finalized " << last_finalized.load();
         if (tx->rerun_flag.load()) {
@@ -367,7 +366,7 @@ void SparkleExecutor::Run() { while (!stop_flag.load()) {
             }
             last_finalized.fetch_add(1);
             DLOG(INFO) << "final commit " << tx->id;
-            auto latency = duration_cast<microseconds>(steady_clock::now() - start).count();
+            auto latency = duration_cast<microseconds>(steady_clock::now() - tx->start_time).count();
             statistics.JournalCommit(latency);
             break;
         }
