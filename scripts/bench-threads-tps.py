@@ -18,13 +18,13 @@ if __name__ == '__main__':
     conf = {'stdout': subprocess.PIPE, 'stderr': subprocess.PIPE}
     hash = subprocess.run(["git", "rev-parse", "HEAD"], **conf).stdout.decode('utf-8').strip()
     for n_threads in [1, 2, 3, 4, 5] + (list(range(6, 36, 6))):
-        table_partitions    = 1024
+        table_partitions    = 9973
         n_dispatchers       = 4
         protocols       = [
             # f"Calvin:{n_threads}:{n_dispatchers}:{table_partitions}",
             # f"Aria:{n_threads}:{table_partitions}:128:FALSE", 
             # f"Aria:{n_threads}:{table_partitions}:128:TRUE",
-            f"Sparkle:{n_threads}:{n_dispatchers}:{table_partitions}", 
+            f"Sparkle:{n_threads}:{table_partitions}", 
             # f"Spectrum:{n_threads}:{n_dispatchers}:{table_partitions}:COPYONWRITE"
         ]
         for cc in protocols:
