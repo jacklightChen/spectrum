@@ -36,6 +36,7 @@ struct SpectrumGetTuple {
 
 struct SpectrumTransaction: public Transaction {
     size_t      id;
+    size_t      execution_count{0};
     size_t      should_wait{0};
     std::mutex          rerun_keys_mu;
     std::vector<K>      rerun_keys;
