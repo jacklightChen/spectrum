@@ -345,8 +345,8 @@ std::unique_ptr<T> SpectrumExecutor::Create() {
     DLOG(INFO) << "spectrum execute " << tx->id;
     tx->Execute();
     statistics.JournalExecute();
-    tx->execution_count += 1;
-    if(tx->execution_count >= 10) LOG(ERROR) << tx->id << " execution " << tx->execution_count << std::endl;
+    // tx->execution_count += 1;
+    // if(tx->execution_count >= 10) LOG(ERROR) << tx->id << " execution " << tx->execution_count << std::endl;
     // commit all results if possible & necessary
     for (auto entry: tx->tuples_put) {
         if (tx->HasRerunKeys()) { break; }
@@ -392,8 +392,8 @@ void SpectrumExecutor::ReExecute(SpectrumTransaction* tx) {
     tx->tuples_get.resize(back_to);
     tx->Execute();
     statistics.JournalExecute();
-    tx->execution_count += 1;
-    if(tx->execution_count >= 10) LOG(ERROR) << tx->id << " execution " << tx->execution_count << std::endl;
+    // tx->execution_count += 1;
+    // if(tx->execution_count >= 10) LOG(ERROR) << tx->id << " execution " << tx->execution_count << std::endl;
     // commit all results if possible & necessary
     for (auto entry: tx->tuples_put) {
         if (tx->HasRerunKeys()) { break; }
