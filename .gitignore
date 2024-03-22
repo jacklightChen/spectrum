@@ -1,5 +1,5 @@
 /build
 /cmake-build-*
 /.idea
-
 /scripts/exp_results
+perf*

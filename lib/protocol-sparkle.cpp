@@ -321,9 +321,11 @@ void SparkleExecutor::Run() { while (!stop_flag.load()) {
         });
         DLOG(INFO) << "execute (in) " << tx->id;
         statistics.JournalExecute();
+        tx->execution_count += 1;
+        if(tx->execution_count >= 10) DLOG(ERROR) << tx->id << " execution " << tx->execution_count << std::endl;
         tx->Execute();
         DLOG(INFO) << "execute (out) " << tx->id;
-        if (tx->rerun_flag.load()) { queue.Push(move(tx)); continue; }
+        if (tx->rerun_flag.load()) { queue.Push(std::move(tx)); continue; }
         for (auto entry: tx->tuples_put) {
             if (tx->rerun_flag.load()) { break; }
             table.Put(tx.get(), std::get<0>(entry), std::get<1>(entry));
@@ -351,6 +353,8 @@ void SparkleExecutor::Run() { while (!stop_flag.load()) {
             // execute and try to commit
             DLOG(INFO) << "execute (in) " << tx->id;
             statistics.JournalExecute();
+        tx->execution_count += 1;
+        if(tx->execution_count >= 10) DLOG(ERROR) << tx->id << " execution " << tx->execution_count << std::endl;
             tx->Execute();
             DLOG(INFO) << "execute (out) " << tx->id;
             if (tx->rerun_flag.load()) { continue; }

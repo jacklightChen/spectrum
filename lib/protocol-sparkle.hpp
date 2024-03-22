@@ -23,6 +23,7 @@ using namespace std::chrono;
 
 struct SparkleTransaction: public Transaction {
     size_t      id;
+    size_t      execution_count{0};
     std::vector<std::tuple<K, evmc::bytes32, size_t>>   tuples_get{};
     std::vector<std::tuple<K, evmc::bytes32>>           tuples_put{};
     std::atomic<bool>   rerun_flag{false};
