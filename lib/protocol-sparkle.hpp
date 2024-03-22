@@ -30,7 +30,6 @@ struct SparkleTransaction: public Transaction {
     std::atomic<bool>   berun_flag{false};
     time_point<steady_clock>    start_time;
     SparkleTransaction(Transaction&& inner, size_t id);
-    void Reset();
 };
 
 struct SparkleEntry {
@@ -115,6 +114,8 @@ class SparkleExecutor {
 
     public:
     SparkleExecutor(Sparkle& sparkle, SparkleQueue& queue);
+    std::unique_ptr<T> Create();
+    void ReExecute(SparkleTransaction* tx);
     void Run();
 
 };

@@ -30,14 +30,6 @@ SparkleTransaction::SparkleTransaction(Transaction&& inner, size_t id):
     start_time{steady_clock::now()}
 {}
 
-/// @brief reset the transaction (local) information
-void SparkleTransaction::Reset() {
-    tuples_get.resize(0);
-    tuples_put.resize(0);
-    rerun_flag.store(false);
-    Transaction::ApplyCheckpoint(0);
-}
-
 /// @brief the multi-version table for sparkle
 /// @param partitions the number of partitions
 SparkleTable::SparkleTable(size_t partitions):
@@ -311,102 +303,99 @@ SparkleExecutor::SparkleExecutor(Sparkle& sparkle, SparkleQueue& queue):
     stop_flag{sparkle.stop_flag}
 {}
 
+/// @brief generate a transaction and execute it
+std::unique_ptr<T> SparkleExecutor::Create() {
+    auto tx = queue.Pop();
+    if (tx == nullptr || tx->berun_flag.load()) return tx;
+    tx->berun_flag.store(true);
+    auto tx_ref = tx.get();
+    tx->UpdateSetStorageHandler([tx_ref](
+        const evmc::address &addr, 
+        const evmc::bytes32 &key, 
+        const evmc::bytes32 &value
+    ) {
+        DLOG(INFO) << tx_ref->id << " set";
+        auto _key   = std::make_tuple(addr, key);
+        // just push back
+        tx_ref->tuples_put.push_back(std::make_tuple(_key, value));
+        return evmc_storage_status::EVMC_STORAGE_MODIFIED;
+    });
+    tx->UpdateGetStorageHandler([tx_ref, this](
+        const evmc::address &addr, 
+        const evmc::bytes32 &key
+    ) {
+        DLOG(INFO) << tx_ref->id << " get";
+        auto _key   = std::make_tuple(addr, key);
+        auto value  = evmc::bytes32{0};
+        auto version = size_t{0};
+        // one key from one transaction will be commited once
+        for (auto& tup: tx_ref->tuples_put | std::views::reverse) {
+            if (std::get<0>(tup) == _key) {
+                return std::get<1>(tup);
+            }
+        }
+        for (auto& tup: tx_ref->tuples_get) {
+            if (std::get<0>(tup) == _key) {
+                return std::get<1>(tup);
+            }
+        }
+        table.Get(tx_ref, _key, value, version);
+        tx_ref->tuples_get.push_back(std::make_tuple(_key, value, version));
+        return value;
+    });
+    DLOG(INFO) << "sparkle execute " << tx->id;
+    tx->Execute();
+    statistics.JournalExecute();
+    // tx->execution_count += 1;
+    // if(tx->execution_count >= 10) LOG(ERROR) << tx->id << " execution " << tx->execution_count << std::endl;
+    // commit all results if possible & necessary
+    for (auto entry: tx->tuples_put) {
+        if (tx->rerun_flag.load()) { break; }
+        table.Put(tx.get(), std::get<0>(entry), std::get<1>(entry));
+    }
+    return tx;
+}
+
+/// @brief rollback transaction with given rollback signal
+/// @param tx the transaction to rollback
+void SparkleExecutor::ReExecute(SparkleTransaction* tx) {
+    DLOG(INFO) << "sparkle re-execute " << tx->id;
+    tx->rerun_flag.store(false);
+    tx->ApplyCheckpoint(0);
+    for (auto entry: tx->tuples_get) {
+        table.RegretGet(tx, std::get<0>(entry), std::get<2>(entry));
+    }
+    for (auto entry: tx->tuples_put) {
+        table.RegretPut(tx, std::get<0>(entry));
+    }
+    tx->tuples_put.resize(0);
+    tx->tuples_get.resize(0);
+    tx->Execute();
+    statistics.JournalExecute();
+    // tx->execution_count += 1;
+    // if(tx->execution_count >= 10) LOG(ERROR) << tx->id << " execution " << tx->execution_count << std::endl;
+    // commit all results if possible & necessary
+    for (auto entry: tx->tuples_put) {
+        if (tx->rerun_flag.load()) { break; }
+        table.Put(tx, std::get<0>(entry), std::get<1>(entry));
+    }
+}
+
 /// @brief start an executor
 void SparkleExecutor::Run() { while (!stop_flag.load()) {
-    auto tx = queue.Pop();
-    if (tx == nullptr) { continue; }
-    // when a transaction is not runned before, execute that transaction
-    if (!tx->berun_flag.load()) {
-        tx->berun_flag.store(true);
-        auto tx_ref = tx.get();
-        tx->UpdateSetStorageHandler([tx_ref](
-            const evmc::address &addr, 
-            const evmc::bytes32 &key, 
-            const evmc::bytes32 &value
-        ) {
-            DLOG(INFO) << tx_ref->id << " set";
-            auto _key   = std::make_tuple(addr, key);
-            // just push back
-            tx_ref->tuples_put.push_back(std::make_tuple(_key, value));
-            return evmc_storage_status::EVMC_STORAGE_MODIFIED;
-        });
-        tx->UpdateGetStorageHandler([tx_ref, this](
-            const evmc::address &addr, 
-            const evmc::bytes32 &key
-        ) {
-            DLOG(INFO) << tx_ref->id << " get";
-            auto _key   = std::make_tuple(addr, key);
-            auto value  = evmc::bytes32{0};
-            auto version = size_t{0};
-            // one key from one transaction will be commited once
-            for (auto& tup: tx_ref->tuples_put | std::views::reverse) {
-                if (std::get<0>(tup) == _key) {
-                    return std::get<1>(tup);
-                }
-            }
-            for (auto& tup: tx_ref->tuples_get) {
-                if (std::get<0>(tup) == _key) {
-                    return std::get<1>(tup);
-                }
-            }
-            table.Get(tx_ref, _key, value, version);
-            tx_ref->tuples_get.push_back(std::make_tuple(_key, value, version));
-            return value;
-        });
-        DLOG(INFO) << "execute (in) " << tx->id;
-        statistics.JournalExecute();
-        // tx->execution_count += 1;
-        // if(tx->execution_count >= 10) DLOG(ERROR) << tx->id << " execution " << tx->execution_count << std::endl;
-        tx->Execute();
-        DLOG(INFO) << "execute (out) " << tx->id;
-        if (tx->rerun_flag.load()) {
-            tx->tuples_put.resize(0);
-            queue.Push(std::move(tx));
-            continue;
-        }
-        for (auto entry: tx->tuples_put) {
-            if (tx->rerun_flag.load()) { break; }
-            table.Put(tx.get(), std::get<0>(entry), std::get<1>(entry));
-        }
-    }
+    auto tx = Create();
+    if (tx == nullptr) continue;
     while (true) {
-        DLOG(INFO) << "recycle " << tx->id << " finalized " << last_finalized.load();
         if (stop_flag.load()) {
-            // we add this to prevent something bad like the following:
-            // 1. some transaction ta is executing on thread A. 
-            // 2. another transaction tb is executing on thread B. 
-            // 3. on thread A, stop_flag.load() == true, we exit without reserving ta (therefore, ta is deleted). 
-            // 4. tb access a key, previously ta registered itself as a read dependency on this key, reading ta->id cause read after release. 
             queue.Push(std::move(tx));
             break;
         } else if (tx->rerun_flag.load()) {
             // sweep all operations from previous execution
-            for (auto entry: tx->tuples_get) {
-                table.RegretGet(tx.get(), std::get<0>(entry), std::get<2>(entry));
-            }
-            for (auto entry: tx->tuples_put) {
-                table.RegretPut(tx.get(), std::get<0>(entry));
-            }
-            tx->Reset();
-            // execute and try to commit
-            DLOG(INFO) << "execute (in) " << tx->id;
-            statistics.JournalExecute();
-            // tx->execution_count += 1;
-            // if(tx->execution_count >= 10) LOG(ERROR) << tx->id << " execution " << tx->execution_count << std::endl;
-            tx->Execute();
-            DLOG(INFO) << "execute (out) " << tx->id;
-            if (tx->rerun_flag.load()) {
-                tx->tuples_put.resize(0);
-                continue;
-            }
-            for (auto entry: tx->tuples_put) {
-                // if (tx->rerun_flag.load()) { break; }
-                table.Put(tx.get(), std::get<0>(entry), std::get<1>(entry));
-            }
+            DLOG(INFO) << "re-execute " << tx->id;
+            ReExecute(tx.get());
         }
-        else if (last_finalized.load() + 1 == tx->id) {
-            // here no previous transaction will affect the result of this transaction. 
-            // therefore, we can determine inaccessible values and remove them. 
+        else if (last_finalized.load() + 1 == tx->id && !tx->rerun_flag.load()) {
+            DLOG(INFO) << "sparkle finalize " << tx->id;
             last_finalized.fetch_add(1, std::memory_order_relaxed);
             for (auto entry: tx->tuples_get) {
                 table.ClearGet(tx.get(), std::get<0>(entry), std::get<2>(entry));
@@ -414,7 +403,6 @@ void SparkleExecutor::Run() { while (!stop_flag.load()) {
             for (auto entry: tx->tuples_put) {
                 table.ClearPut(tx.get(), std::get<0>(entry));
             }
-            DLOG(INFO) << "final commit " << tx->id;
             auto latency = duration_cast<microseconds>(steady_clock::now() - tx->start_time).count();
             statistics.JournalCommit(latency);
             break;
@@ -430,4 +418,4 @@ void SparkleExecutor::Run() { while (!stop_flag.load()) {
 #undef V
 #undef K
 
-} // namespace spectrum
+} // namespace sparkle
