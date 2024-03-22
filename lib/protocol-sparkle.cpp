@@ -354,7 +354,11 @@ void SparkleExecutor::Run() { while (!stop_flag.load()) {
         if(tx->execution_count >= 10) DLOG(ERROR) << tx->id << " execution " << tx->execution_count << std::endl;
         tx->Execute();
         DLOG(INFO) << "execute (out) " << tx->id;
-        if (tx->rerun_flag.load()) { queue.Push(std::move(tx)); continue; }
+        if (tx->rerun_flag.load()) {
+            tx->tuples_put.resize(0);
+            queue.Push(std::move(tx));
+            continue;
+        }
         for (auto entry: tx->tuples_put) {
             if (tx->rerun_flag.load()) { break; }
             table.Put(tx.get(), std::get<0>(entry), std::get<1>(entry));
@@ -386,7 +390,10 @@ void SparkleExecutor::Run() { while (!stop_flag.load()) {
             if(tx->execution_count >= 10) LOG(ERROR) << tx->id << " execution " << tx->execution_count << std::endl;
             tx->Execute();
             DLOG(INFO) << "execute (out) " << tx->id;
-            if (tx->rerun_flag.load()) { continue; }
+            if (tx->rerun_flag.load()) {
+                tx->tuples_put.resize(0);
+                continue;
+            }
             for (auto entry: tx->tuples_put) {
                 if (tx->rerun_flag.load()) { break; }
                 table.Put(tx.get(), std::get<0>(entry), std::get<1>(entry));
