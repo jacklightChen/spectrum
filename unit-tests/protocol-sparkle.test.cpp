@@ -29,9 +29,9 @@ TEST(Sparkle, TableWriteAfterRead) {
     table.Get(&t2, k0, v1, version);
     table.Put(&t0, k0, v2);
     table.Put(&t1, k0, v0);
-    ASSERT_TRUE (t2.rerun_flag.load()) << "t2 rerun_flag";
-    ASSERT_FALSE(t0.rerun_flag.load()) << "t0 rerun_flag";
-    ASSERT_FALSE(t1.rerun_flag.load()) << "t1 rerun_flag";
+    ASSERT_TRUE (t2.HasRerunFlag()) << "t2 rerun_flag";
+    ASSERT_FALSE(t0.HasRerunFlag()) << "t0 rerun_flag";
+    ASSERT_FALSE(t1.HasRerunFlag()) << "t1 rerun_flag";
 }
 
 TEST(Sparkle, TableWriteAfterWrite) {
@@ -51,9 +51,9 @@ TEST(Sparkle, TableWriteAfterWrite) {
     table.Put(&t1, k0, v0);
     table.Get(&t2, k0, v1, version);
     table.Put(&t0, k0, v2);
-    ASSERT_FALSE(t2.rerun_flag.load()) << "t2 rerun_flag";
-    ASSERT_FALSE(t0.rerun_flag.load()) << "t0 rerun_flag";
-    ASSERT_FALSE(t1.rerun_flag.load()) << "t1 rerun_flag";
+    ASSERT_FALSE(t2.HasRerunFlag()) << "t2 rerun_flag";
+    ASSERT_FALSE(t0.HasRerunFlag()) << "t0 rerun_flag";
+    ASSERT_FALSE(t1.HasRerunFlag()) << "t1 rerun_flag";
 }
 
 TEST(Sparkle, JustRunSmallbank) {

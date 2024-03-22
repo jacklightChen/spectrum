@@ -36,6 +36,20 @@ SparkleTable::SparkleTable(size_t partitions):
     Table<K, V, KeyHasher>{partitions}
 {}
 
+/// @brief determine transaction has to rerun
+/// @return if transaction has to rerun
+bool SparkleTransaction::HasRerunFlag() {
+    auto guard = std::lock_guard{rerun_flag_mu};
+    return rerun_flag;
+}
+
+/// @brief set rerun flag to true or false
+/// @param flag the value to assign to rerun_flag
+void SparkleTransaction::SetRerunFlag(bool flag) {
+    auto guard = std::lock_guard{rerun_flag_mu};
+    rerun_flag = flag;
+}
+
 /// @brief get a value
 /// @param tx the transaction that reads the value
 /// @param k the key of the read entry
@@ -81,7 +95,7 @@ void SparkleTable::Put(T* tx, const K& k, const evmc::bytes32& v) {
                 DLOG(INFO) << KeyHasher()(k) << " has read dependency " << "(" << _tx << ")" << std::endl;
                 if (_tx->id > tx->id) {
                     DLOG(INFO) << tx->id << " abort " << _tx->id;
-                    _tx->rerun_flag.store(true);
+                    _tx->SetRerunFlag(true);
                 }
             }
             break;
@@ -90,7 +104,7 @@ void SparkleTable::Put(T* tx, const K& k, const evmc::bytes32& v) {
             DLOG(INFO) << KeyHasher()(k) << " has read dependency " << "(" << _tx << ")" << std::endl;
             if (_tx->id > tx->id) {
                 DLOG(INFO) << tx->id << " abort " << _tx->id;
-                _tx->rerun_flag.store(true);
+                _tx->SetRerunFlag(true);
             }
         }
         // handle duplicated write on the same key
@@ -116,7 +130,7 @@ bool SparkleTable::Lock(T* tx, const K& k) {
     Table::Put(k, [&](V& _v) {
         succeed = _v.tx == nullptr || _v.tx->id >= tx->id;
         if (_v.tx && _v.tx->id < tx->id) {
-            _v.tx->rerun_flag.store(true);
+            _v.tx->SetRerunFlag(true);
             DLOG(INFO) << tx->id << " abort " << _v.tx->id;
         }
         if (succeed) { _v.tx = tx; }
@@ -176,7 +190,7 @@ void SparkleTable::RegretPut(T* tx, const K& k) {
             for (auto _tx: vit->readers) {
                 DLOG(INFO) << KeyHasher()(k) << " has read dependency " << "(" << _tx << ")" << std::endl;
                 DLOG(INFO) << tx->id << " abort " << _tx->id << std::endl;
-                _tx->rerun_flag.store(true);
+                _tx->SetRerunFlag(true);
             }
             break;
         }
@@ -306,8 +320,8 @@ SparkleExecutor::SparkleExecutor(Sparkle& sparkle, SparkleQueue& queue):
 /// @brief generate a transaction and execute it
 std::unique_ptr<T> SparkleExecutor::Create() {
     auto tx = queue.Pop();
-    if (tx == nullptr || tx->berun_flag.load()) return tx;
-    tx->berun_flag.store(true);
+    if (tx == nullptr || tx->berun_flag) return tx;
+    tx->berun_flag = true;
     auto tx_ref = tx.get();
     tx->UpdateSetStorageHandler([tx_ref](
         const evmc::address &addr, 
@@ -351,7 +365,7 @@ std::unique_ptr<T> SparkleExecutor::Create() {
     // commit all results if possible & necessary
     for (auto i = size_t{0}; i < tx->tuples_put.size(); ++i) {
         auto& entry = tx->tuples_put[i];
-        if (tx->rerun_flag.load()) { tx->tuples_put.resize(i); break; }
+        if (tx->HasRerunFlag()) { tx->tuples_put.resize(i); break; }
         table.Put(tx.get(), std::get<0>(entry), std::get<1>(entry));
     }
     return tx;
@@ -361,7 +375,7 @@ std::unique_ptr<T> SparkleExecutor::Create() {
 /// @param tx the transaction to rollback
 void SparkleExecutor::ReExecute(SparkleTransaction* tx) {
     DLOG(INFO) << "sparkle re-execute " << tx->id;
-    tx->rerun_flag.store(false);
+    tx->SetRerunFlag(false);
     tx->ApplyCheckpoint(0);
     for (auto entry: tx->tuples_get) {
         table.RegretGet(tx, std::get<0>(entry), std::get<2>(entry));
@@ -378,7 +392,7 @@ void SparkleExecutor::ReExecute(SparkleTransaction* tx) {
     // commit all results if possible & necessary
     for (auto i = size_t{0}; i < tx->tuples_put.size(); ++i) {
         auto& entry = tx->tuples_put[i];
-        if (tx->rerun_flag.load()) { tx->tuples_put.resize(i); break; }
+        if (tx->HasRerunFlag()) { tx->tuples_put.resize(i); break; }
         table.Put(tx, std::get<0>(entry), std::get<1>(entry));
     }
 }
@@ -391,12 +405,12 @@ void SparkleExecutor::Run() { while (!stop_flag.load()) {
         if (stop_flag.load()) {
             queue.Push(std::move(tx));
             break;
-        } else if (tx->rerun_flag.load()) {
+        } else if (tx->HasRerunFlag()) {
             // sweep all operations from previous execution
             DLOG(INFO) << "re-execute " << tx->id;
             ReExecute(tx.get());
         }
-        else if (last_finalized.load() + 1 == tx->id && !tx->rerun_flag.load()) {
+        else if (last_finalized.load() + 1 == tx->id && !tx->HasRerunFlag()) {
             DLOG(INFO) << "sparkle finalize " << tx->id;
             last_finalized.fetch_add(1, std::memory_order_relaxed);
             for (auto entry: tx->tuples_get) {

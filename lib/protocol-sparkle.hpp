@@ -26,10 +26,13 @@ struct SparkleTransaction: public Transaction {
     size_t      execution_count{0};
     std::vector<std::tuple<K, evmc::bytes32, size_t>>   tuples_get{};
     std::vector<std::tuple<K, evmc::bytes32>>           tuples_put{};
-    std::atomic<bool>   rerun_flag{false};
-    std::atomic<bool>   berun_flag{false};
+    std::mutex      rerun_flag_mu;
+    bool            rerun_flag{false};
+    bool            berun_flag{false};
     time_point<steady_clock>    start_time;
     SparkleTransaction(Transaction&& inner, size_t id);
+    bool HasRerunFlag();
+    void SetRerunFlag(bool flag);
 };
 
 struct SparkleEntry {
