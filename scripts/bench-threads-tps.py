@@ -9,8 +9,8 @@ sys.path.extend(['.', '..', '../..'])
 from plot.plot import MyPlot
 
 keys = 1000000
-workload = 'YCSB'
-zipf = 1.2
+workload = 'Smallbank'
+zipf = 0
 times_to_tun = 2
 timestamp = int(time.time())
 
@@ -21,7 +21,7 @@ if __name__ == '__main__':
     with open(f'./exp_results/bench_results_{timestamp}', 'w') as f:
         for n_threads in list(range(6, 42, 6)):
             table_partitions    = 9973
-            n_dispatchers       = n_threads // 5
+            n_dispatchers       = 6
             # spectrum_dispatcher = n_threads // 6
             protocols       = [
                 # f"Calvin:{n_threads}:{n_dispatchers}:{table_partitions}",

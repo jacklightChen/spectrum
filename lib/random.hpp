@@ -3,6 +3,7 @@
 #include <mutex>
 #include <memory>
 #include <functional>
+#include "lock-util.hpp"
 
 namespace spectrum {
 
@@ -29,6 +30,7 @@ class ThreadLocalRandom: public Random {
 class Unif : public Random {
 
     private:
+    SpinLock        mu;
     std::mt19937    rng;
     std::uniform_int_distribution<size_t>   distribution;
 
@@ -42,6 +44,7 @@ class Unif : public Random {
 class Zipf : public Random {
 
     private:
+    SpinLock        mu;
     double          num_elements;
     double          exponent;
     double          h_integral_x1;

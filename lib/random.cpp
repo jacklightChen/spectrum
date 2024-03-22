@@ -34,6 +34,7 @@ Unif::Unif(size_t num_elements):
 {}
 
 size_t Unif::Next() {
+    auto guard = Guard{mu};
     return distribution(rng);
 }
 
@@ -87,6 +88,7 @@ Zipf::Zipf(size_t num_elements, double exponent):
 }
 
 size_t Zipf::Next() {
+    auto guard = Guard{mu};
     double hnum = h_integral_num_elements;
     while (true) {
         double u = hnum + std::generate_canonical<double, std::numeric_limits<double>::digits>(rng) * (h_integral_x1 - hnum);
