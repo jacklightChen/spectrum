@@ -7,6 +7,7 @@
 #include <chrono>
 #include <glog/logging.h>
 #include <fmt/core.h>
+#include <ranges>
 
 /*
     This is a implementation of "Sparkle: Speculative Deterministic Concurrency Control for Partially Replicated Transactional Data Stores" (Zhongmiao Li, Peter Van Roy and Paolo Romano). 
@@ -333,7 +334,7 @@ void SparkleExecutor::Run() { while (!stop_flag.load()) {
             auto value  = evmc::bytes32{0};
             auto version = size_t{0};
             // one key from one transaction will be commited once
-            for (auto& tup: tx_ref->tuples_put) {
+            for (auto& tup: tx_ref->tuples_put | std::views::reverse) {
                 if (std::get<0>(tup) == _key) {
                     return std::get<1>(tup);
                 }
