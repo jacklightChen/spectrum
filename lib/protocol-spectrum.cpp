@@ -279,7 +279,7 @@ SpectrumDispatch::SpectrumDispatch(Spectrum& spectrum):
 /// @brief run dispatcher
 void SpectrumDispatch::Run() {
     while(!stop_flag.load()) {
-        auto tx = std::make_unique<T>(workload.Next(), last_execute.fetch_add(1));
+        auto tx = std::make_unique<T>(workload.Next(), last_execute.fetch_add(1, std::memory_order_relaxed));
         queue_bundle[tx->id % queue_bundle.size()].Push(std::move(tx));
     }
 }
@@ -414,7 +414,7 @@ void SpectrumExecutor::Run() {while (!stop_flag.load()) {
         }
         else if (last_finalized.load() + 1 == tx->id && !tx->HasRerunKeys()) {
             DLOG(INFO) << "spectrum finalize " << tx->id;
-            last_finalized.fetch_add(1);
+            last_finalized.fetch_add(1, std::memory_order_relaxed);
             for (auto entry: tx->tuples_get) {
                 table.ClearGet(tx.get(), entry.key, entry.version);
             }

@@ -9,23 +9,23 @@
 namespace spectrum {
 
 void Statistics::JournalCommit(size_t latency) {
-    count_commit.fetch_add(1);
+    count_commit.fetch_add(1, std::memory_order_relaxed);
     if (latency <= 25) {
-        count_latency_25ms.fetch_add(1);
+        count_latency_25ms.fetch_add(1, std::memory_order_relaxed);
     }
     else if (latency <= 50) {
-        count_latency_50ms.fetch_add(1);
+        count_latency_50ms.fetch_add(1, std::memory_order_relaxed);
     }
     else if (latency <= 100) {
-        count_latency_100ms.fetch_add(1);
+        count_latency_100ms.fetch_add(1, std::memory_order_relaxed);
     }
     else {
-        count_latency_100ms_above.fetch_add(1);
+        count_latency_100ms_above.fetch_add(1, std::memory_order_relaxed);
     }
 }
 
 void Statistics::JournalExecute() {
-    count_execution.fetch_add(1);
+    count_execution.fetch_add(1, std::memory_order_relaxed);
 }
 
 std::string Statistics::Print() {

@@ -192,7 +192,7 @@ void CalvinExecutor::Run() {while(!stop_flag.load()) {
     tx->Execute();
     statistics.JournalExecute();
     statistics.JournalCommit(duration_cast<microseconds>(steady_clock::now() - tx->start_time).count());
-    last_committed.fetch_add(1);
+    last_committed.fetch_add(1, std::memory_order_relaxed);
 }}
 
 /// @brief dispatch a transaction
@@ -210,7 +210,7 @@ CalvinDispatch::CalvinDispatch(Calvin& calvin):
 /// @brief run a calvin dispatcher
 void CalvinDispatch::Run() {while(!stop_flag.load()) {
     // generate and analyze the transaction
-    auto tx = std::make_unique<T>(workload.Next(), last_scheduled.fetch_add(1));
+    auto tx = std::make_unique<T>(workload.Next(), last_scheduled.fetch_add(1, std::memory_order_relaxed));
     // make get/put requests in lock table
     DLOG(INFO) << tx->id << " fetch locks" << std::endl;
     for (auto& k: tx->prediction.get) {
@@ -230,7 +230,7 @@ void CalvinDispatch::Run() {while(!stop_flag.load()) {
     for (auto& k: tx->prediction.put) {
         lock_table.Release(tx.get(), k);
     }
-    last_assigned.fetch_add(1);
+    last_assigned.fetch_add(1, std::memory_order_relaxed);
     // now we have the real should_wait, so we wait until it can be executed
     while (true) {
         auto guard = std::lock_guard{tx->mu}; 
