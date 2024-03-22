@@ -86,6 +86,7 @@ void SparkleTable::Put(T* tx, const K& k, const evmc::bytes32& v) {
             }
             // abort transactions that read outdated keys
             for (auto _tx: rit->readers) {
+                DLOG(INFO) << KeyHasher()(k) << " has read dependency " << "(" << _tx << ")" << std::endl;
                 if (_tx->id > tx->id) {
                     _tx->rerun_flag.store(true);
                     DLOG(INFO) << tx->id << " abort " << _tx->id;
@@ -94,6 +95,7 @@ void SparkleTable::Put(T* tx, const K& k, const evmc::bytes32& v) {
             break;
         }
         for (auto _tx: _v.readers_default) {
+            DLOG(INFO) << KeyHasher()(k) << " has read dependency " << "(" << _tx << ")" << std::endl;
             if (_tx->id > tx->id) {
                 _tx->rerun_flag.store(true);
                 DLOG(INFO) << tx->id << " abort " << _tx->id;
@@ -147,6 +149,18 @@ void SparkleTable::RegretGet(T* tx, const K& k, size_t version) {
         if (version == 0) {
             _v.readers_default.erase(tx);
         }
+        // run an extra check in debug mode
+        #if !defined(NDEBUG)
+        {
+            auto end = _v.entries.end();
+            for (auto vit = _v.entries.begin(); vit != end; ++vit) {
+                DLOG(INFO) << "spot version " << vit->version << std::endl;
+                if (vit->readers.contains(tx)) {
+                    DLOG(FATAL) << "didn't remove " << tx->id << "(" << tx << ")" << " still on version " << vit->version  << std::endl;
+                }
+            }
+        }
+        #endif
     });
 }
 
@@ -164,6 +178,7 @@ void SparkleTable::RegretPut(T* tx, const K& k) {
             }
             // abort transactions that read from current transaction
             for (auto _tx: vit->readers) {
+                DLOG(INFO) << KeyHasher()(k) << " has read dependency " << "(" << _tx << ")" << std::endl;
                 _tx->rerun_flag.store(true);
                 DLOG(INFO) << tx->id << " abort " << _tx->id;
             }
@@ -194,6 +209,18 @@ void SparkleTable::ClearGet(T* tx, const K& k, size_t version) {
         if (version == 0) {
             _v.readers_default.erase(tx);
         }
+        // run an extra check in debug mode
+        #if !defined(NDEBUG)
+        {
+            auto end = _v.entries.end();
+            for (auto vit = _v.entries.begin(); vit != end; ++vit) {
+                DLOG(INFO) << "spot version " << vit->version << std::endl;
+                if (vit->readers.contains(tx)) {
+                    DLOG(FATAL) << "didn't remove " << tx->id << "(" << tx << ")" << " still on version " << vit->version  << std::endl;
+                }
+            }
+        }
+        #endif
     });
 }
 
@@ -285,38 +312,39 @@ void SparkleExecutor::Run() { while (!stop_flag.load()) {
     // when a transaction is not runned before, execute that transaction
     if (!tx->berun_flag.load()) {
         tx->berun_flag.store(true);
-        tx->UpdateSetStorageHandler([&](
+        auto tx_ref = tx.get();
+        tx->UpdateSetStorageHandler([tx_ref](
             const evmc::address &addr, 
             const evmc::bytes32 &key, 
             const evmc::bytes32 &value
         ) {
-            DLOG(INFO) << tx->id << " set";
+            DLOG(INFO) << tx_ref->id << " set";
             auto _key   = std::make_tuple(addr, key);
             // just push back
-            tx->tuples_put.push_back(std::make_tuple(_key, value));
+            tx_ref->tuples_put.push_back(std::make_tuple(_key, value));
             return evmc_storage_status::EVMC_STORAGE_MODIFIED;
         });
-        tx->UpdateGetStorageHandler([&](
+        tx->UpdateGetStorageHandler([tx_ref, this](
             const evmc::address &addr, 
             const evmc::bytes32 &key
         ) {
-            DLOG(INFO) << tx->id << " get";
+            DLOG(INFO) << tx_ref->id << " get";
             auto _key   = std::make_tuple(addr, key);
             auto value  = evmc::bytes32{0};
             auto version = size_t{0};
             // one key from one transaction will be commited once
-            for (auto& tup: tx->tuples_put) {
+            for (auto& tup: tx_ref->tuples_put) {
                 if (std::get<0>(tup) == _key) {
                     return std::get<1>(tup);
                 }
             }
-            for (auto& tup: tx->tuples_get) {
+            for (auto& tup: tx_ref->tuples_get) {
                 if (std::get<0>(tup) == _key) {
                     return std::get<1>(tup);
                 }
             }
-            table.Get(tx.get(), _key, value, version);
-            tx->tuples_get.push_back(std::make_tuple(_key, value, version));
+            table.Get(tx_ref, _key, value, version);
+            tx_ref->tuples_get.push_back(std::make_tuple(_key, value, version));
             return value;
         });
         DLOG(INFO) << "execute (in) " << tx->id;
@@ -353,8 +381,8 @@ void SparkleExecutor::Run() { while (!stop_flag.load()) {
             // execute and try to commit
             DLOG(INFO) << "execute (in) " << tx->id;
             statistics.JournalExecute();
-        tx->execution_count += 1;
-        if(tx->execution_count >= 10) DLOG(ERROR) << tx->id << " execution " << tx->execution_count << std::endl;
+            tx->execution_count += 1;
+            if(tx->execution_count >= 10) DLOG(ERROR) << tx->id << " execution " << tx->execution_count << std::endl;
             tx->Execute();
             DLOG(INFO) << "execute (out) " << tx->id;
             if (tx->rerun_flag.load()) { continue; }
