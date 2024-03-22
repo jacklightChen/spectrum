@@ -267,7 +267,6 @@ void Spectrum::Start() {
 }
 
 /// @brief stop spectrum protocol
-/// @return statistics of this execution
 void Spectrum::Stop() {
     stop_flag.store(true);
     for (auto& x: executors) 	{ x.join(); }

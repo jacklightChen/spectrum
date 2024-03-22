@@ -234,7 +234,7 @@ void SparkleTable::ClearGet(T* tx, const K& k, size_t version) {
 /// @param tx the transaction the previously wrote this entry
 /// @param k the key of written entry
 void SparkleTable::ClearPut(T* tx, const K& k) {
-    DLOG(INFO) << "clear put " << tx->id << std::endl;
+    DLOG(INFO) << "remove write record before " << tx->id << "(" << tx << ")" << " from " << KeyHasher()(k) << std::endl;
     Table::Put(k, [&](V& _v) {
         while (_v.entries.size() && _v.entries.front().version < tx->id) {
             _v.entries.pop_front();
@@ -264,14 +264,14 @@ void Sparkle::Start() {
         DLOG(INFO) << "start executor " << i << std::endl;
         auto queue = &queue_bundle[i];
         executors.push_back(std::thread([this, queue] {
-            SparkleExecutor(*this, *queue).Run();
+            std::make_unique<SparkleExecutor>(*this, *queue)->Run();
         }));
         PinRoundRobin(executors[i], i + n_dispatchers);
     }
     for (size_t i = 0; i != n_dispatchers; ++i) {
         DLOG(INFO) << "start dispatcher " << i << std::endl;
         dispatchers.push_back(std::thread([this] {
-            SparkleDispatch(*this).Run();
+            std::make_unique<SparkleDispatch>(*this)->Run();
         }));
         PinRoundRobin(dispatchers[i], i);
     }
