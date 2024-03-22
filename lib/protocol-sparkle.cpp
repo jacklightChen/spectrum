@@ -160,6 +160,9 @@ void SparkleTable::RegretGet(T* tx, const K& k, size_t version) {
                     DLOG(FATAL) << "didn't remove " << tx->id << "(" << tx << ")" << " still on version " << vit->version  << std::endl;
                 }
             }
+            if (_v.readers_default.contains(tx)) {
+                DLOG(FATAL) << "didn't remove " << tx->id << "(" << tx << ")" << " still on version " << vit->version  << std::endl;
+            }
         }
         #endif
     });
@@ -219,6 +222,9 @@ void SparkleTable::ClearGet(T* tx, const K& k, size_t version) {
                 if (vit->readers.contains(tx)) {
                     DLOG(FATAL) << "didn't remove " << tx->id << "(" << tx << ")" << " still on version " << vit->version  << std::endl;
                 }
+            }
+            if (_v.readers_default.contains(tx)) {
+                DLOG(FATAL) << "didn't remove " << tx->id << "(" << tx << ")" << " still on version " << vit->version  << std::endl;
             }
         }
         #endif
