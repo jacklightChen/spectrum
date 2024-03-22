@@ -50,7 +50,6 @@ SparkleTable::SparkleTable(size_t partitions):
 /// @param v (mutated to be) the value of read entry
 /// @param version (mutated to be) the version of read entry
 void SparkleTable::Get(T* tx, const K& k, evmc::bytes32& v, size_t& version) {
-    DLOG(INFO) << tx->id << " get";
     Table::Put(k, [&](V& _v) {
         auto rit = _v.entries.rbegin();
         auto end = _v.entries.rend();
@@ -61,10 +60,11 @@ void SparkleTable::Get(T* tx, const K& k, evmc::bytes32& v, size_t& version) {
             v = rit->value;
             version = rit->version;
             rit->readers.insert(tx);
+            DLOG(INFO) << tx->id << "(" << tx << ")" << " read " << KeyHasher()(k) << " version " << rit->version << std::endl;
             return;
         }
-        DLOG(INFO) << "default";
         version = 0;
+        DLOG(INFO) << tx->id << "(" << tx << ")" << " read " << KeyHasher()(k) << " version 0" << std::endl;
         _v.readers_default.insert(tx);
     });
 }
@@ -77,7 +77,6 @@ void SparkleTable::Put(T* tx, const K& k, const evmc::bytes32& v) {
     CHECK(tx->id > 0) << "we reserve version(0) for default value";
     DLOG(INFO) << "commit " << tx->id;
     Table::Put(k, [&](V& _v) {
-        _v.tx = nullptr;
         auto rit = _v.entries.rbegin();
         auto end = _v.entries.rend();
         // search from insertion position
@@ -89,8 +88,8 @@ void SparkleTable::Put(T* tx, const K& k, const evmc::bytes32& v) {
             for (auto _tx: rit->readers) {
                 DLOG(INFO) << KeyHasher()(k) << " has read dependency " << "(" << _tx << ")" << std::endl;
                 if (_tx->id > tx->id) {
-                    _tx->rerun_flag.store(true);
                     DLOG(INFO) << tx->id << " abort " << _tx->id;
+                    _tx->rerun_flag.store(true);
                 }
             }
             break;
@@ -98,10 +97,11 @@ void SparkleTable::Put(T* tx, const K& k, const evmc::bytes32& v) {
         for (auto _tx: _v.readers_default) {
             DLOG(INFO) << KeyHasher()(k) << " has read dependency " << "(" << _tx << ")" << std::endl;
             if (_tx->id > tx->id) {
-                _tx->rerun_flag.store(true);
                 DLOG(INFO) << tx->id << " abort " << _tx->id;
+                _tx->rerun_flag.store(true);
             }
         }
+        // handle duplicated write on the same key
         if (rit != end && rit->version == tx->id) {
             rit->value = v;
             return;
@@ -136,7 +136,7 @@ bool SparkleTable::Lock(T* tx, const K& k) {
 /// @param tx the transaction that previously read this entry
 /// @param k the key of read entry
 void SparkleTable::RegretGet(T* tx, const K& k, size_t version) {
-    DLOG(INFO) << "regret get " << tx->id << std::endl;
+    DLOG(INFO) << "remove read record " << tx->id << "(" << tx << ")" << " from " << KeyHasher()(k) << std::endl;
     Table::Put(k, [&](V& _v) {
         auto vit = _v.entries.begin();
         auto end = _v.entries.end();
@@ -183,14 +183,12 @@ void SparkleTable::RegretPut(T* tx, const K& k) {
             // abort transactions that read from current transaction
             for (auto _tx: vit->readers) {
                 DLOG(INFO) << KeyHasher()(k) << " has read dependency " << "(" << _tx << ")" << std::endl;
+                DLOG(INFO) << tx->id << " abort " << _tx->id << std::endl;
                 _tx->rerun_flag.store(true);
-                DLOG(INFO) << tx->id << " abort " << _tx->id;
             }
             break;
         }
-        if (vit != end) {
-            _v.entries.erase(vit);
-        }
+        if (vit != end) { _v.entries.erase(vit); }
     });
 }
 
@@ -204,11 +202,12 @@ void SparkleTable::ClearGet(T* tx, const K& k, size_t version) {
         auto vit = _v.entries.begin();
         auto end = _v.entries.end();
         while (vit != end) {
-            if (vit->version == version) {
-                vit->readers.erase(tx);
-                break;
+            if (vit->version != version) {
+                ++vit; continue;
             }
-            ++vit;
+            DLOG(INFO) << "remove " << tx->id << "(" << tx << ")" << " from version " << vit->version << std::endl; 
+            vit->readers.erase(tx);
+            break;
         }
         if (version == 0) {
             _v.readers_default.erase(tx);

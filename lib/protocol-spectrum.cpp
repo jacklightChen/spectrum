@@ -140,6 +140,7 @@ void SpectrumTable::RegretGet(T* tx, const K& k, size_t version) {
         if (version == 0) {
             _v.readers_default.erase(tx);
         }
+        // run an extra check in debug mode
         #if !defined(NDEBUG)
         {
             auto end = _v.entries.end();
@@ -148,6 +149,9 @@ void SpectrumTable::RegretGet(T* tx, const K& k, size_t version) {
                 if (vit->readers.contains(tx)) {
                     DLOG(FATAL) << "didn't remove " << tx->id << "(" << tx << ")" << " still on version " << vit->version  << std::endl;
                 }
+            }
+            if (_v.readers_default.contains(tx)) {
+                DLOG(FATAL) << "didn't remove " << tx->id << "(" << tx << ")" << " still on version " << vit->version  << std::endl;
             }
         }
         #endif
@@ -174,7 +178,7 @@ void SpectrumTable::RegretPut(T* tx, const K& k) {
             }
             break;
         }
-        _v.entries.erase(vit);
+        if (vit != end) { _v.entries.erase(vit); }
     });
 }
 
@@ -207,6 +211,9 @@ void SpectrumTable::ClearGet(T* tx, const K& k, size_t version) {
                 if (vit->readers.contains(tx)) {
                     DLOG(FATAL) << "didn't remove " << tx->id << "(" << tx << ")" << " still on version " << vit->version  << std::endl;
                 }
+            }
+            if (_v.readers_default.contains(tx)) {
+                DLOG(FATAL) << "didn't remove " << tx->id << "(" << tx << ")" << " still on version " << vit->version  << std::endl;
             }
         }
         #endif
