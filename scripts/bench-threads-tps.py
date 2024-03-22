@@ -10,7 +10,7 @@ from plot.plot import MyPlot
 
 keys = 1000000
 workload = 'Smallbank'
-zipf = 0
+zipf = 1.3
 times_to_tun = 2
 timestamp = int(time.time())
 

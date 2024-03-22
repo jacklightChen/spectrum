@@ -284,6 +284,7 @@ void SparkleExecutor::Run() { while (!stop_flag.load()) {
     if (tx == nullptr) { continue; }
     // when a transaction is not runned before, execute that transaction
     if (!tx->berun_flag.load()) {
+        tx->berun_flag.store(true);
         tx->UpdateSetStorageHandler([&](
             const evmc::address &addr, 
             const evmc::bytes32 &key, 
@@ -322,10 +323,11 @@ void SparkleExecutor::Run() { while (!stop_flag.load()) {
         statistics.JournalExecute();
         tx->Execute();
         DLOG(INFO) << "execute (out) " << tx->id;
+        if (tx->rerun_flag.load()) { queue.Push(move(tx)); continue; }
         for (auto entry: tx->tuples_put) {
+            if (tx->rerun_flag.load()) { break; }
             table.Put(tx.get(), std::get<0>(entry), std::get<1>(entry));
         }
-        tx->berun_flag.store(true);
     }
     while (!stop_flag.load()) {
         DLOG(INFO) << "recycle " << tx->id << " finalized " << last_finalized.load();
@@ -353,6 +355,7 @@ void SparkleExecutor::Run() { while (!stop_flag.load()) {
             DLOG(INFO) << "execute (out) " << tx->id;
             if (tx->rerun_flag.load()) { continue; }
             for (auto entry: tx->tuples_put) {
+                if (tx->rerun_flag.load()) { break; }
                 table.Put(tx.get(), std::get<0>(entry), std::get<1>(entry));
             }
         }
