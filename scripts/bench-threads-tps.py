@@ -9,8 +9,8 @@ sys.path.extend(['.', '..', '../..'])
 from plot.plot import MyPlot
 
 keys = 1000000
-workload = 'YCSB'
-zipf = 0
+workload = 'Smallbank'
+zipf = 1.3
 times_to_tun = 2
 timestamp = int(time.time())
 
