@@ -349,8 +349,9 @@ std::unique_ptr<T> SparkleExecutor::Create() {
     // tx->execution_count += 1;
     // if(tx->execution_count >= 10) LOG(ERROR) << tx->id << " execution " << tx->execution_count << std::endl;
     // commit all results if possible & necessary
-    for (auto entry: tx->tuples_put) {
-        if (tx->rerun_flag.load()) { break; }
+    for (auto i = size_t{0}; i < tx->tuples_put.size(); ++i) {
+        auto& entry = tx->tuples_put[i];
+        if (tx->rerun_flag.load()) { tx->tuples_put.resize(i); break; }
         table.Put(tx.get(), std::get<0>(entry), std::get<1>(entry));
     }
     return tx;
@@ -375,8 +376,9 @@ void SparkleExecutor::ReExecute(SparkleTransaction* tx) {
     // tx->execution_count += 1;
     // if(tx->execution_count >= 10) LOG(ERROR) << tx->id << " execution " << tx->execution_count << std::endl;
     // commit all results if possible & necessary
-    for (auto entry: tx->tuples_put) {
-        if (tx->rerun_flag.load()) { break; }
+    for (auto i = size_t{0}; i < tx->tuples_put.size(); ++i) {
+        auto& entry = tx->tuples_put[i];
+        if (tx->rerun_flag.load()) { tx->tuples_put.resize(i); break; }
         table.Put(tx, std::get<0>(entry), std::get<1>(entry));
     }
 }
