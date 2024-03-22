@@ -359,7 +359,7 @@ void SparkleExecutor::Run() { while (!stop_flag.load()) {
             table.Put(tx.get(), std::get<0>(entry), std::get<1>(entry));
         }
     }
-    while (!stop_flag.load()) {
+    while (true) {
         DLOG(INFO) << "recycle " << tx->id << " finalized " << last_finalized.load();
         if (stop_flag.load()) {
             // we add this to prevent something bad like the following:
