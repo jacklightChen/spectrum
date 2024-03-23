@@ -33,14 +33,14 @@ SpectrumTransaction::SpectrumTransaction(Transaction&& inner, size_t id):
 /// @brief determine transaction has to rerun
 /// @return if transaction has to rerun
 bool SpectrumTransaction::HasRerunKeys() {
-    auto guard = std::lock_guard{rerun_keys_mu};
+    auto guard = Guard{rerun_keys_mu};
     return rerun_keys.size() != 0;
 }
 
 /// @brief call the transaction to rerun providing the key that caused it
 /// @param key the key that caused rerun
 void SpectrumTransaction::AddRerunKeys(const K& key, size_t cause_id) {
-    auto guard = std::lock_guard{rerun_keys_mu};
+    auto guard = Guard{rerun_keys_mu};
     rerun_keys.push_back(key);
     should_wait = std::max(should_wait, cause_id);
 }
@@ -369,7 +369,7 @@ void SpectrumExecutor::ReExecute(SpectrumTransaction* tx) {
     // get current rerun keys
     std::vector<K> rerun_keys{};
     {
-        auto guard = std::lock_guard{tx->rerun_keys_mu}; 
+        auto guard = Guard{tx->rerun_keys_mu}; 
         std::swap(tx->rerun_keys, rerun_keys);
     }
     auto back_to = ~size_t{0};

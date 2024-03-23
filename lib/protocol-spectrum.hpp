@@ -1,7 +1,7 @@
-#include "./workload.hpp"
+#include "workload.hpp"
 #include "lock-util.hpp"
-#include "./protocol.hpp"
-#include "./evm_hash.hpp"
+#include "protocol.hpp"
+#include "evm_hash.hpp"
 #include <list>
 #include <atomic>
 #include <tuple>
@@ -36,9 +36,8 @@ struct SpectrumGetTuple {
 
 struct SpectrumTransaction: public Transaction {
     size_t      id;
-    size_t      execution_count{0};
     size_t      should_wait{0};
-    std::mutex          rerun_keys_mu;
+    SpinLock            rerun_keys_mu;
     std::vector<K>      rerun_keys;
     std::atomic<bool>   berun_flag{false};
     time_point<steady_clock>            start_time;
