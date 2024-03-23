@@ -302,7 +302,7 @@ SparkleDispatch::SparkleDispatch(Sparkle& sparkle):
 /// @brief run dispatcher
 void SparkleDispatch::Run() {
     while(!stop_flag.load()) {
-        auto tx = std::make_unique<T>(workload.Next(), last_execute.fetch_add(1, std::memory_order_relaxed));
+        auto tx = std::make_unique<T>(workload.Next(), last_execute.fetch_add(1, std::memory_order_seq_cst));
         queue_bundle[tx->id % queue_bundle.size()].Push(std::move(tx));
     }
 }
@@ -412,7 +412,7 @@ void SparkleExecutor::Run() { while (!stop_flag.load()) {
         }
         else if (last_finalized.load() + 1 == tx->id && !tx->HasRerunFlag()) {
             DLOG(INFO) << "sparkle finalize " << tx->id;
-            last_finalized.fetch_add(1, std::memory_order_relaxed);
+            last_finalized.fetch_add(1, std::memory_order_seq_cst);
             for (auto entry: tx->tuples_get) {
                 table.ClearGet(tx.get(), std::get<0>(entry), std::get<2>(entry));
             }

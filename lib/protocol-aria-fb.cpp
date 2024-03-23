@@ -56,7 +56,7 @@ void Aria::ParallelEach(
 /// @brief generate a wrapped transaction with atomic incremental id
 /// @return the wrapped transactions
 std::unique_ptr<T> Aria::NextTransaction() {
-    auto id = tx_counter.fetch_add(1, std::memory_order_relaxed);
+    auto id = tx_counter.fetch_add(1, std::memory_order_seq_cst);
     DLOG(INFO) << "generate transaction " << id << std::endl;
     return std::make_unique<T>(workload.Next(), id, id / batch_size);
 }

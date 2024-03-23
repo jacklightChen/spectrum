@@ -285,7 +285,7 @@ SpectrumDispatch::SpectrumDispatch(Spectrum& spectrum):
 /// @brief run dispatcher
 void SpectrumDispatch::Run() {
     while(!stop_flag.load()) {
-        auto tx = std::make_unique<T>(workload.Next(), last_execute.fetch_add(1, std::memory_order_relaxed));
+        auto tx = std::make_unique<T>(workload.Next(), last_execute.fetch_add(1, std::memory_order_seq_cst));
         queue_bundle[tx->id % queue_bundle.size()].Push(std::move(tx));
     }
 }
@@ -350,8 +350,6 @@ std::unique_ptr<T> SpectrumExecutor::Create() {
     DLOG(INFO) << "spectrum execute " << tx->id;
     tx->Execute();
     statistics.JournalExecute();
-    // tx->execution_count += 1;
-    // if(tx->execution_count >= 10) LOG(ERROR) << tx->id << " execution " << tx->execution_count << std::endl;
     // commit all results if possible & necessary
     for (auto entry: tx->tuples_put) {
         if (tx->HasRerunKeys()) { break; }
@@ -423,7 +421,7 @@ void SpectrumExecutor::Run() {while (!stop_flag.load()) {
         }
         else if (last_finalized.load() + 1 == tx->id && !tx->HasRerunKeys()) {
             DLOG(INFO) << "spectrum finalize " << tx->id;
-            last_finalized.fetch_add(1, std::memory_order_relaxed);
+            last_finalized.fetch_add(1, std::memory_order_seq_cst);
             for (auto entry: tx->tuples_get) {
                 table.ClearGet(tx.get(), entry.key, entry.version);
             }
