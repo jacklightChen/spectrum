@@ -1,14 +1,15 @@
-# TODO
+# Implementation Roadmap
 
 - [x] Zipf
 - [x] Aria w/o Reordering
-- [ ] Calvin
-- [ ] TPC-C
+- [x] Calvin
 - [x] Serial
+- [ ] Pre-scheduling
+- [ ] TPC-C
 
-# Instructions
+# Building Instructions
 
-We use cmake as the building system.
+We use `cmake` as the building system.
 
 To configure the building plan, we use the following instruction. 
 
@@ -17,7 +18,7 @@ cmake -S . -B build
 ```
 
 Optionally, we can use debug option to generate debug logs. 
-Note that performance will deterriorate significantly if debug mode is enabled. 
+Note that performance will deteriorate significantly if debug mode is enabled. 
 
 ```sh
 cmake -S . -B build -DDEBUG=1
@@ -39,7 +40,7 @@ The executable the we use is called bench. The basic usage is:
 
 # Caution
 
-This project heavily used CXX 20 features. 
+This project heavily used CXX_20 features. 
 
 Therefore, to compile this project, you either need clang >= 17 or gcc/g++ >= 12 . 
 
@@ -49,7 +50,7 @@ If you have apt (Advanced Packaging Tool), you can use the following command to 
 wget -qO- https://apt.llvm.org/llvm.sh | sudo bash -s 17
 ```
 
-If you clang is not 17 by default, use the following command for building with clang. 
+If you clang version is not 17 by default, use the following command for building with clang. 
 
 ```sh
 CXX=clang++-17 CC=clang-17 cmake -S . -B build
@@ -57,28 +58,15 @@ CXX=clang++-17 CC=clang-17 cmake -S . -B build
 
 # Experiments
 
-Currently Aria, Sparkle and Spectrum all works properly. 
+We conduct experiments to show that Spectrum protocol is better than Sparkle protocol and Aria protocol in high-contention scenarios, and only have minor performance gap in comparison to Sparkle protocol in low-contention scenarios. 
 
-```sh
-./build/bench Aria:8:32:32:TRUE   Smallbank:1000000:2.0 5000ms
-./build/bench Aria:8:32:32:FALSE  Smallbank:1000000:1.5 5000ms
-./build/bench Sparkle:8:32        Smallbank:1000000:0.5 5000ms
-./build/bench Spectrum:8:32:32:STRAWMAN       Smallbank:1000000:0.5 5000ms
-./build/bench Spectrum:8:32:32:COPYONWRITE    Smallbank:1000000:0.5 5000ms
-```
-
-# Dev Log
+# Implementation Details
 
 ## Sparkle
 
-1. 
+There is a minor bug that we fixed previously. 
 
-## Pre-schedule
+When we send shutdown signal to sparkle executors, some of them may stop immediately and destruct its holding transaction, while its read dependencies (implemented as raw pointers) are still held inside the multi-version table (SparkleTable) and accessed by other transactions in their execution phase. 
 
-1. Only schedule hot keys -- select highest. (YCSB / Smallbank)
-
-## Re-schedule
-
-1. Detect: transaction cannot commit / don't re-execute immediately. 
-2. Wait until (pessimistic)
+The solution is to add the transaction back to idling queue. 
 
