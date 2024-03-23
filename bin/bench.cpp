@@ -34,5 +34,3 @@ int main(int argc, char* argv[]) {
     DLOG(WARNING) << "Debug Mode: don't expect good performance. " << std::endl;
     std::cerr << statistics->PrintWithDuration(duration_cast<milliseconds>(steady_clock::now() - start_time));
 }
-
-#undef THROW
