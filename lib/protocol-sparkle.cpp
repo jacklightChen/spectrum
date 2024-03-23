@@ -323,7 +323,7 @@ std::unique_ptr<T> SparkleExecutor::Create() {
     if (tx == nullptr || tx->berun_flag) return tx;
     tx->berun_flag = true;
     auto tx_ref = tx.get();
-    tx->UpdateSetStorageHandler([tx_ref](
+    tx->InstallSetStorageHandler([tx_ref](
         const evmc::address &addr, 
         const evmc::bytes32 &key, 
         const evmc::bytes32 &value
@@ -334,7 +334,7 @@ std::unique_ptr<T> SparkleExecutor::Create() {
         tx_ref->tuples_put.push_back(std::make_tuple(_key, value));
         return evmc_storage_status::EVMC_STORAGE_MODIFIED;
     });
-    tx->UpdateGetStorageHandler([tx_ref, this](
+    tx->InstallGetStorageHandler([tx_ref, this](
         const evmc::address &addr, 
         const evmc::bytes32 &key
     ) {

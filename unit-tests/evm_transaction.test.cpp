@@ -99,7 +99,7 @@ TEST(Transaction, RunBasic) {
             std::span{code},
             std::span{input}
         );
-        transaction.UpdateGetStorageHandler(
+        transaction.InstallGetStorageHandler(
             [&table](
                 const evmc::address& addr, 
                 const evmc::bytes32& key
@@ -107,7 +107,7 @@ TEST(Transaction, RunBasic) {
                 return table.GetStorage(addr, key);
             }
         );
-        transaction.UpdateSetStorageHandler(
+        transaction.InstallSetStorageHandler(
             [&table](
                 const evmc::address& addr, 
                 const evmc::bytes32& key, 
@@ -133,7 +133,7 @@ TEST(Transaction, RunStrawman) {
         std::span{input}
     );
     for (int i = 0; i < 100; ++i) {
-        transaction.UpdateGetStorageHandler(
+        transaction.InstallGetStorageHandler(
             [&](
                 const evmc::address& addr, 
                 const evmc::bytes32& key
@@ -142,7 +142,7 @@ TEST(Transaction, RunStrawman) {
                 return table.GetStorage(addr, key);
             }
         );
-        transaction.UpdateSetStorageHandler(
+        transaction.InstallSetStorageHandler(
             [&](
                 const evmc::address& addr, 
                 const evmc::bytes32& key, 
@@ -174,7 +174,7 @@ TEST(Transaction, RunCopyOnWrite) {
         std::span{input}
     );
     for (int i = 0; i < 100; ++i) {
-        transaction.UpdateGetStorageHandler(
+        transaction.InstallGetStorageHandler(
             [&](
                 const evmc::address& addr, 
                 const evmc::bytes32& key
@@ -183,7 +183,7 @@ TEST(Transaction, RunCopyOnWrite) {
                 return table.GetStorage(addr, key);
             }
         );
-        transaction.UpdateSetStorageHandler(
+        transaction.InstallSetStorageHandler(
             [&](
                 const evmc::address& addr,
                 const evmc::bytes32& key, 

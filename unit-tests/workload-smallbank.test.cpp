@@ -45,7 +45,7 @@ TEST(Smallbank, JustRunWorkload) {
     auto handle      = std::thread([&]() { while (!stop_flag.load()) {
         auto transaction = workload.Next();
         auto start_time  = steady_clock::now();
-        transaction.UpdateGetStorageHandler(
+        transaction.InstallGetStorageHandler(
             [&](
                 const evmc::address& addr, 
                 const evmc::bytes32& key
@@ -53,7 +53,7 @@ TEST(Smallbank, JustRunWorkload) {
                 return table.GetStorage(addr, key);
             }
         );
-        transaction.UpdateSetStorageHandler(
+        transaction.InstallSetStorageHandler(
             [&](
                 const evmc::address& addr, 
                 const evmc::bytes32& key, 

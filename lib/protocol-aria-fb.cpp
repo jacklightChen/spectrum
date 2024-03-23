@@ -208,7 +208,7 @@ AriaLockTable::AriaLockTable(size_t partitions):
 /// @param table the table
 void AriaExecutor::Execute(T* tx, AriaTable& table) {
     // read from the public table
-    tx->UpdateGetStorageHandler([&](
+    tx->InstallGetStorageHandler([&](
         const evmc::address &addr,
         const evmc::bytes32 &key
     ) {
@@ -230,7 +230,7 @@ void AriaExecutor::Execute(T* tx, AriaTable& table) {
         return value;
     });
     // write locally to local storage
-    tx->UpdateSetStorageHandler([&](
+    tx->InstallSetStorageHandler([&](
         const evmc::address &addr, 
         const evmc::bytes32 &key,
         const evmc::bytes32 &value
@@ -324,7 +324,7 @@ void AriaExecutor::PrepareLockTable(T* tx, AriaLockTable& table) {
 /// @param lock_table the lock table with registered lock information
 void AriaExecutor::Fallback(T* tx, AriaTable& table, AriaLockTable& lock_table) {
     // read from the public table
-    tx->UpdateGetStorageHandler([&](
+    tx->InstallGetStorageHandler([&](
         const evmc::address &addr,
         const evmc::bytes32 &key
     ) {
@@ -336,7 +336,7 @@ void AriaExecutor::Fallback(T* tx, AriaTable& table, AriaLockTable& lock_table) 
         return value;
     });
     // write directly into the public table
-    tx->UpdateSetStorageHandler([&](
+    tx->InstallSetStorageHandler([&](
         const evmc::address &addr, 
         const evmc::bytes32 &key,
         const evmc::bytes32 &value

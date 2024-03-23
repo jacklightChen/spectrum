@@ -61,12 +61,12 @@ Transaction::Transaction(
 }
 
 // update set_storage handler
-void Transaction::UpdateSetStorageHandler(spectrum::SetStorage&& handler) {
+void Transaction::InstallSetStorageHandler(spectrum::SetStorage&& handler) {
     host.set_storage_inner = handler;
 }
 
 // update get_storage handler
-void Transaction::UpdateGetStorageHandler(spectrum::GetStorage&& handler) {
+void Transaction::InstallGetStorageHandler(spectrum::GetStorage&& handler) {
     host.get_storage_inner = handler;
 }
 
@@ -166,11 +166,11 @@ void Transaction::Analyze(Prediction& prediction) {
     // store current get storage and set storage handler
     auto _get_storage_handler = host.get_storage_inner;
     auto _set_storage_handler = host.set_storage_inner;
-    this->UpdateGetStorageHandler([&prediction](auto& address, auto& key) {
+    this->InstallGetStorageHandler([&prediction](auto& address, auto& key) {
         prediction.get.push_back({address, key});
         return evmc::bytes32{0};
     });
-    this->UpdateSetStorageHandler([&prediction](auto& address, auto& key, auto& /* value */) {
+    this->InstallSetStorageHandler([&prediction](auto& address, auto& key, auto& /* value */) {
         prediction.put.push_back({address, key});
         return evmc_storage_status::EVMC_STORAGE_MODIFIED;
     });

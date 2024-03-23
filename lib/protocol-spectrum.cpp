@@ -306,7 +306,7 @@ std::unique_ptr<T> SpectrumExecutor::Create() {
     if (tx == nullptr || tx->berun_flag.load()) return tx;
     tx->berun_flag.store(true);
     auto tx_ref = tx.get();
-    tx->UpdateSetStorageHandler([tx_ref](
+    tx->InstallSetStorageHandler([tx_ref](
         const evmc::address &addr, 
         const evmc::bytes32 &key, 
         const evmc::bytes32 &value
@@ -321,7 +321,7 @@ std::unique_ptr<T> SpectrumExecutor::Create() {
         if (tx->HasRerunKeys()) { tx->Break(); }
         return evmc_storage_status::EVMC_STORAGE_MODIFIED;
     });
-    tx->UpdateGetStorageHandler([tx_ref, this](
+    tx->InstallGetStorageHandler([tx_ref, this](
         const evmc::address &addr, 
         const evmc::bytes32 &key
     ) {

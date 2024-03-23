@@ -50,8 +50,8 @@ class Transaction {
     public:
     Transaction(EVMType evm_type, evmc::address from, evmc::address to,
                 std::span<uint8_t> code, std::span<uint8_t> input);
-    void UpdateSetStorageHandler(spectrum::SetStorage &&handler);
-    void UpdateGetStorageHandler(spectrum::GetStorage &&handler);
+    void InstallSetStorageHandler(spectrum::SetStorage &&handler);
+    void InstallGetStorageHandler(spectrum::GetStorage &&handler);
     void Analyze(Prediction& prediction);
     void Execute();
     void Break();

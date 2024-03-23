@@ -97,10 +97,10 @@ int main(int argc, char* argv[]) {
         while (!stop_flag.load()) {
             auto transaction = workload->Next();
             auto start_time  = steady_clock::now();
-            transaction.UpdateGetStorageHandler([&](auto addr, auto key){
+            transaction.InstallGetStorageHandler([&](auto addr, auto key){
                 return mock_table.GetStorage(tx_count, addr, key);
             });
-            transaction.UpdateSetStorageHandler([&](auto addr, auto key, auto value){
+            transaction.InstallSetStorageHandler([&](auto addr, auto key, auto value){
                 mock_table.SetStorage(tx_count, addr, key, value);
                 return evmc_storage_status::EVMC_STORAGE_ASSIGNED;
             });

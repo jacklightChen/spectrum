@@ -19,11 +19,11 @@ void Dummy::Start() {
     for (size_t i = 0; i < n_threads; ++i) {executors.push_back(std::thread([this]() {while(!stop_flag.load()) {
         auto tx         = workload.Next();
         auto start_time = steady_clock::now();
-        tx.UpdateGetStorageHandler([&](auto& address, auto& key) {
+        tx.InstallGetStorageHandler([&](auto& address, auto& key) {
             evmc::bytes32 v; table.Get({address, key}, [&](auto& _v) { v = _v; });
             return v;
         });
-        tx.UpdateSetStorageHandler([&](auto& address, auto& key, auto& v) {
+        tx.InstallSetStorageHandler([&](auto& address, auto& key, auto& v) {
             table.Put({address, key}, [&](auto& _v) { _v = v; });
             return evmc_storage_status::EVMC_STORAGE_MODIFIED;
         });

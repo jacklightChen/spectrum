@@ -181,11 +181,11 @@ void CalvinExecutor::Run() {while(!stop_flag.load()) {
     auto tx = queue.Pop();
     if (tx == nullptr) { continue; }
     DLOG(INFO) << "execute " << tx->id << std::endl;
-    tx->UpdateGetStorageHandler([&](auto& address, auto& key) {
+    tx->InstallGetStorageHandler([&](auto& address, auto& key) {
         V v; table.Get({address, key}, [&](auto& _v) { v = _v; });
         return v;
     });
-    tx->UpdateSetStorageHandler([&](auto& address, auto& key, auto& v) {
+    tx->InstallSetStorageHandler([&](auto& address, auto& key, auto& v) {
         table.Put({address, key}, [&](auto& _v) { _v = v; });
         return evmc_storage_status::EVMC_STORAGE_MODIFIED;
     });
