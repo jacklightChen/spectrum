@@ -17,48 +17,22 @@ using namespace std::chrono;
 /// @brief initialize aria protocol
 /// @param workload an evm transaction workload
 /// @param batch_size batch size
-/// @param n_threads the number of threads in thread pool
+/// @param num_threads the number of threads in thread pool
 /// @param table_partitions the number of partitions in table
 Aria::Aria(
     Workload& workload, Statistics& statistics,
-    size_t n_threads, size_t table_partitions,
-    size_t batch_size, bool enable_reordering
+    size_t num_threads, size_t table_partitions,
+    bool enable_reordering
 ):
     workload{workload},
     statistics{statistics},
-    batch_size{batch_size},
-    // table_partitions{table_partitions},
-    pool{(unsigned int) n_threads},
+    barrier(num_threads, []{}),
     table{table_partitions},
-    enable_reordering{enable_reordering}
+    lock_table{table_partitions},
+    enable_reordering{enable_reordering},
+    num_threads{num_threads}
 {
-    LOG(INFO) << fmt::format("Aria(n_threads={}, table_partitions={}, batch_size={}, enable_reordering={})", n_threads, table_partitions, batch_size, enable_reordering) << std::endl;
-}
-
-/// @brief execute multiple transactions in parallel
-/// @param map the function to execute
-/// @param batch the current aria batch to work on
-void Aria::ParallelEach(
-    std::function<void(T*)>             map, 
-    std::vector<std::unique_ptr<T>>&    batch
-) {
-    pool.submit_sequence(
-        size_t{0}, batch.size(), 
-        [&](size_t i) {
-            if (batch[i] == nullptr) {
-                batch[i] = this->NextTransaction();
-            }
-            map(batch[i].get());
-        }
-    ).wait();
-}
-
-/// @brief generate a wrapped transaction with atomic incremental id
-/// @return the wrapped transactions
-std::unique_ptr<T> Aria::NextTransaction() {
-    auto id = tx_counter.fetch_add(1, std::memory_order_seq_cst);
-    DLOG(INFO) << "generate transaction " << id << std::endl;
-    return std::make_unique<T>(workload.Next(), id, id / batch_size);
+    LOG(INFO) << fmt::format("Aria(num_threads={}, table_partitions={}, enable_reordering={})", num_threads, table_partitions, enable_reordering) << std::endl;
 }
 
 /// @brief start aria protocol
@@ -66,51 +40,6 @@ void Aria::Start() {
     DLOG(INFO) << "aria start";
     // this macro computes the latency of one transaction
     #define LATENCY duration_cast<microseconds>(steady_clock::now() - tx->start_time).count()
-    pool.detach_task([&]() {
-        while(!stop_flag.load()) {
-            // -- construct an empty batch
-            auto batch = std::vector<std::unique_ptr<T>>();
-            for (size_t i = 0; i < batch_size; ++i) {
-                batch.push_back(nullptr);
-            }
-            DLOG(INFO) << "generate batch" << std::endl;
-            // -- execution stage
-            ParallelEach([this](auto tx) {
-                AriaExecutor::Execute(tx, table);
-                AriaExecutor::Reserve(tx, table);
-                statistics.JournalExecute();
-            }, batch);
-            DLOG(INFO) << "execute batch" << std::endl;
-            // -- first commit stage
-            auto has_conflict = std::atomic<bool>{false};
-            ParallelEach([this, &has_conflict](auto tx) {
-                AriaExecutor::Verify(tx, table, enable_reordering);
-                if (tx->flag_conflict) {
-                    has_conflict.store(true);
-                    return;
-                }
-                AriaExecutor::Commit(tx, table);
-                statistics.JournalCommit(LATENCY);
-            }, batch);
-            DLOG(INFO) << "verify and commit batch" << std::endl;
-            // -- prepare fallback, analyze dependencies
-            if (!has_conflict.load()) { continue; }
-            auto lock_table = AriaLockTable(batch_size);
-            ParallelEach([&lock_table](auto tx) {
-                if (!tx->flag_conflict) { return; }
-                AriaExecutor::PrepareLockTable(tx, lock_table);
-            }, batch);
-            DLOG(INFO) << "prepare fallback batch" << std::endl;
-            // -- run fallback strategy
-            ParallelEach([this, &lock_table](auto tx) {
-                if (!tx->flag_conflict) { return; }
-                AriaExecutor::Fallback(tx, table, lock_table);
-                statistics.JournalExecute();
-                statistics.JournalCommit(LATENCY);
-            }, batch);
-            DLOG(INFO) << "execute fallback batch" << std::endl;
-        }
-    });
     #undef LATENCY
 }
 
@@ -118,7 +47,6 @@ void Aria::Start() {
 /// @return statistics of current execution
 void Aria::Stop() {
     stop_flag.store(true);
-    pool.wait();
     DLOG(INFO) << "aria stop";
 }
 
@@ -203,10 +131,62 @@ AriaLockTable::AriaLockTable(size_t partitions):
     Table::Table(partitions)
 {}
 
+/// @brief initialize an aria executor
+/// @param aria the aria configuration object
+AriaExecutor::AriaExecutor(Aria& aria):
+    statistics{aria.statistics},
+    workload{aria.workload},
+    table{aria.table},
+    lock_table{aria.lock_table},
+    enable_reordering{aria.enable_reordering},
+    stop_flag{aria.stop_flag},
+    barrier{aria.barrier},
+    counter{aria.counter},
+    has_conflict{aria.has_conflict},
+    num_threads{aria.num_threads}
+{}
+
+/// @brief run transactions
+void AriaExecutor::Run() { while(!stop_flag.load()) {
+    #define LATENCY duration_cast<microseconds>(steady_clock::now() - tx->start_time).count()
+    auto id = counter.fetch_add(1);
+    auto tx = std::make_unique<T>(workload.Next(), id, id / num_threads);
+    has_conflict.store(false);
+    barrier.arrive_and_wait();
+    // -- stage 1: execute and reserve
+    this->Execute(tx.get());
+    this->Reserve(tx.get());
+    statistics.JournalExecute();
+    barrier.arrive_and_wait();
+    // -- stage 2: verify + commit (or prepare fallback)
+    this->Verify(tx.get());
+    if (tx->flag_conflict) {
+        has_conflict.store(true);
+        this->PrepareLockTable(tx.get());
+    }
+    else {
+        this->Commit(tx.get());
+        statistics.JournalCommit(LATENCY);
+    }
+    barrier.arrive_and_wait();
+    // -- stage 3: fallback (skipped if no conflicts occur)
+    if (!has_conflict.load()) { continue; }
+    if (tx->flag_conflict) {
+        this->Fallback(tx.get());
+        statistics.JournalExecute();
+        statistics.JournalCommit(LATENCY);
+    }
+    barrier.arrive_and_wait();
+    // -- stage 4: clean up lock table
+    this->CleanLockTable(tx.get());
+    barrier.arrive_and_wait();
+    #undef LATENCY
+}}
+
 /// @brief execute a transaction and journal write operations locally
 /// @param tx the transaction
 /// @param table the table
-void AriaExecutor::Execute(T* tx, AriaTable& table) {
+void AriaExecutor::Execute(T* tx) {
     // read from the public table
     tx->InstallGetStorageHandler([&](
         const evmc::address &addr,
@@ -246,8 +226,7 @@ void AriaExecutor::Execute(T* tx, AriaTable& table) {
 
 /// @brief journal the smallest reader/writer transaction to table
 /// @param tx the transaction
-/// @param table the aria shared table
-void AriaExecutor::Reserve(T* tx, AriaTable& table) {
+void AriaExecutor::Reserve(T* tx) {
     // journal all entries to the reservation table
     DLOG(INFO) << "tx " << tx->id << " reserve" << std::endl;
     for (auto& tup: tx->local_get) {
@@ -260,8 +239,7 @@ void AriaExecutor::Reserve(T* tx, AriaTable& table) {
 
 /// @brief verify transaction by checking dependencies
 /// @param tx the transaction, flag_conflict will be altered
-/// @param table the aria shared table
-void AriaExecutor::Verify(T* tx, AriaTable& table, bool enable_reordering) {
+void AriaExecutor::Verify(T* tx) {
     // conceptually, we take a snapshot on the database before we execute a batch
     //  , and all transactions are executed viewing the snapshot. 
     // however, we want the global state transitioned 
@@ -293,8 +271,7 @@ void AriaExecutor::Verify(T* tx, AriaTable& table, bool enable_reordering) {
 
 /// @brief commit written values into table
 /// @param tx the transaction
-/// @param table the aria shared table
-void AriaExecutor::Commit(T* tx, AriaTable& table) {
+void AriaExecutor::Commit(T* tx) {
     for (auto& tup: tx->local_put) {
         table.Put(std::get<0>(tup), [&](auto& entry) {
             entry.value = std::get<1>(tup);
@@ -304,15 +281,14 @@ void AriaExecutor::Commit(T* tx, AriaTable& table) {
 
 /// @brief put transaction id (local id) into table
 /// @param tx the transaction
-/// @param table the aria lock table
-void AriaExecutor::PrepareLockTable(T* tx, AriaLockTable& table) {
+void AriaExecutor::PrepareLockTable(T* tx) {
     for (auto& tup: tx->local_get) {
-        table.Put(std::get<0>(tup), [&](auto& entry) {
+        lock_table.Put(std::get<0>(tup), [&](auto& entry) {
             entry.deps_get.push_back(tx);
         });
     }
     for (auto& tup: tx->local_put) {
-        table.Put(std::get<0>(tup), [&](auto& entry) {
+        lock_table.Put(std::get<0>(tup), [&](auto& entry) {
             entry.deps_put.push_back(tx);
         });
     }
@@ -320,9 +296,7 @@ void AriaExecutor::PrepareLockTable(T* tx, AriaLockTable& table) {
 
 /// @brief fallback execution without constant
 /// @param tx the transaction
-/// @param table the aria table
-/// @param lock_table the lock table with registered lock information
-void AriaExecutor::Fallback(T* tx, AriaTable& table, AriaLockTable& lock_table) {
+void AriaExecutor::Fallback(T* tx) {
     // read from the public table
     tx->InstallGetStorageHandler([&](
         const evmc::address &addr,
@@ -367,6 +341,21 @@ void AriaExecutor::Fallback(T* tx, AriaTable& table, AriaLockTable& lock_table) 
     }
     tx->Execute();
     tx->commited.store(true);
+}
+
+/// @brief clean up the lock table
+/// @param tx the transaction to clean up
+void AriaExecutor::CleanLockTable(T* tx) {
+    for (auto& tup: tx->local_put) {
+        lock_table.Put(std::get<0>(tup), [&](auto& entry) {
+            entry.deps_put.clear();
+        });
+    }
+    for (auto& tup: tx->local_get) {
+        lock_table.Put(std::get<0>(tup), [&](auto& entry) {
+            entry.deps_get.clear();
+        });
+    }
 }
 
 #undef K

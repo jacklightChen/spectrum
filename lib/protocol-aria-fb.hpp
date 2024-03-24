@@ -14,6 +14,7 @@
 #include <atomic>
 #include <memory>
 #include <chrono>
+#include <barrier>
 
 namespace spectrum
 {
@@ -65,36 +66,51 @@ struct AriaLockTable: public Table<K, AriaLockEntry, KeyHasher> {
 class Aria: public Protocol {
 
     private:
-    Statistics&         statistics;
-    Workload&           workload;
-    size_t              batch_size;
-    // size_t              table_partitions;
-    AriaTable           table;
-    bool                enable_reordering;
-    volatile std::atomic<bool>      stop_flag{false};
-    volatile std::atomic<size_t>    tx_counter{0};
-    BS::thread_pool     pool;
-    void ParallelEach(
-        std::function<void(T*)>             map, 
-        std::vector<std::unique_ptr<T>>&    batch
-    );
-    std::unique_ptr<T> NextTransaction();
+    Statistics&                         statistics;
+    Workload&                           workload;
+    AriaTable                           table;
+    AriaLockTable                       lock_table;
+    size_t                              num_threads;
+    bool                                enable_reordering;
+    std::atomic<bool>                   stop_flag{false};
+    std::barrier<std::function<void()>> barrier;
+    std::atomic<size_t>                 counter{0};
+    std::atomic<bool>                   has_conflict{false};
+    friend class AriaExecutor;
 
     public:
-    Aria(Workload& workload, Statistics& statistics, size_t n_threads, size_t table_partitions, size_t batch_size, bool enable_reordering);
+    Aria(Workload& workload, Statistics& statistics, size_t num_threads, size_t table_partitions, bool enable_reordering);
     void Start() override;
     void Stop() override;
 
 };
 
 /// @brief routines to be executed in various execution stages
-struct AriaExecutor {
-    static void Execute(T* tx, AriaTable& table);
-    static void Reserve(T* tx, AriaTable& table);
-    static void Verify(T* tx, AriaTable& table, bool enable_reordering);
-    static void Commit(T* tx, AriaTable& table);
-    static void PrepareLockTable(T* tx, AriaLockTable& lock_table);
-    static void Fallback(T* tx, AriaTable& table, AriaLockTable& lock_table);
+class AriaExecutor {
+
+    private:
+    Statistics&                             statistics;
+    Workload&                               workload;
+    AriaTable&                              table;
+    AriaLockTable&                          lock_table;
+    bool                                    enable_reordering;
+    size_t                                  num_threads;
+    std::atomic<bool>&                      stop_flag;
+    std::barrier<std::function<void()>>&    barrier;
+    std::atomic<size_t>&                    counter;
+    std::atomic<bool>&                      has_conflict;
+
+    public:
+    AriaExecutor(Aria& aria);
+    void Run();
+    void Execute(T* tx);
+    void Reserve(T* tx);
+    void Verify(T* tx);
+    void Commit(T* tx);
+    void PrepareLockTable(T* tx);
+    void Fallback(T* tx);
+    void CleanLockTable(T* tx);
+
 };
 
 #undef K

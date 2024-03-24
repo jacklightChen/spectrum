@@ -19,12 +19,12 @@ class Dummy: public Protocol {
     DummyTable                  table;
     std::atomic<bool>           stop_flag{false};
     Workload&                   workload;
-    size_t                      n_threads;
+    size_t                      num_threads;
     Statistics&                 statistics;
     std::vector<std::thread>    executors;
 
     public:
-    Dummy(Workload& workload, Statistics& statistics, size_t n_threads, size_t table_partitions, EVMType evm_type);
+    Dummy(Workload& workload, Statistics& statistics, size_t num_threads, size_t table_partitions, EVMType evm_type);
     void Start() override;
     void Stop()  override;
 

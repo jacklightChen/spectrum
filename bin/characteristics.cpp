@@ -54,14 +54,14 @@ class MockTable {
         inner[std::make_tuple(addr, key)] = value;
     }
 
-    std::unordered_map<K, std::string, spectrum::KeyHasher> Report(size_t tx_count) {
+    std::unordered_map<K, std::string, spectrum::KeyHasher> Report(size_t counter) {
         auto collector_map = std::unordered_map<K, std::string, spectrum::KeyHasher>();
         for (const auto& entry: histogram) {
             auto j = size_t{0};
             auto k = std::get<0>(entry);
             auto v = std::get<1>(entry);
             auto collector = std::string();
-            for (size_t i = 0; i != tx_count; i += 1) {
+            for (size_t i = 0; i != counter; i += 1) {
                 if (j < v.size() && std::get<0>(v[j]) == i) {
                     auto op = std::get<1>(v[j]);
                     collector.push_back(op == 'g' ? '?' : (op == 'p' ? '!' : 'x'));
@@ -92,22 +92,22 @@ int main(int argc, char* argv[]) {
     auto duration   = to<milliseconds>(argv[2]);
     auto stop_flag  = std::atomic<bool>();
     auto start_time = steady_clock::now();
-    auto tx_count   = size_t{0};
+    auto counter   = size_t{0};
     auto handle     = std::thread([&]() {
         while (!stop_flag.load()) {
             auto transaction = workload->Next();
             auto start_time  = steady_clock::now();
             transaction.InstallGetStorageHandler([&](auto addr, auto key){
-                return mock_table.GetStorage(tx_count, addr, key);
+                return mock_table.GetStorage(counter, addr, key);
             });
             transaction.InstallSetStorageHandler([&](auto addr, auto key, auto value){
-                mock_table.SetStorage(tx_count, addr, key, value);
+                mock_table.SetStorage(counter, addr, key, value);
                 return evmc_storage_status::EVMC_STORAGE_ASSIGNED;
             });
             transaction.Execute();
             statistics->JournalExecute();
             statistics->JournalCommit(duration_cast<milliseconds>(steady_clock::now() - start_time).count());
-            ++tx_count;
+            ++counter;
         }
     });
     // wait for a given duration, stop running, and print statistics
@@ -115,7 +115,7 @@ int main(int argc, char* argv[]) {
     stop_flag.store(true); handle.join();
     std::cerr << "'?' represents get, '!' represents put, 'x' represents both, '-' represents no-operation" << std::endl;
     std::cerr << statistics->PrintWithDuration(duration_cast<milliseconds>(steady_clock::now() - start_time));
-    for (auto& entry: mock_table.Report(tx_count)) {
+    for (auto& entry: mock_table.Report(counter)) {
         auto& addr  = std::get<0>(std::get<0>(entry));
         auto& key   = std::get<1>(std::get<0>(entry));
         auto& hist  = std::get<1>(entry);

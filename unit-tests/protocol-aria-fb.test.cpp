@@ -14,8 +14,7 @@ TEST(Aria, JustRunSmallbank) {
     auto statistics = Statistics();
     auto workload = Smallbank(10000, 0.0);
     auto protocol = Aria(
-        workload, statistics, 128 /* batch */, 
-        8 /* threads */, 32 /* table partitions */,
+        workload, statistics, 8 /* threads */, 32 /* table partitions */,
         true /* enable reordering */
     );
     protocol.Start();

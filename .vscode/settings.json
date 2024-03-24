@@ -112,8 +112,9 @@
     "format": "cpp",
     "charconv": "cpp",
     "*.ipp": "cpp",
-    "valarray": "cpp"
-  },
+    "valarray": "cpp",
+    "barrier": "cpp"
+},
   "C_Cpp.clang_format_fallbackStyle": "{ BasedOnStyle: LLVM, IndentWidth: 4 }",
   "C_Cpp.clang_format_style": "{ BasedOnStyle: LLVM, IndentWidth: 4 }",
 "cmake.configureOnOpen": false,
@@ -123,5 +124,6 @@
 "cmake.configureEnvironment": {
     "CC": "clang-17",
     "CXX": "clang++-17"
-}
+},
+"typewriterAutoScroll.enable": false
 }

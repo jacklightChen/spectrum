@@ -5,18 +5,18 @@ namespace spectrum {
 
 using namespace std::chrono;
 
-Dummy::Dummy(Workload& workload, Statistics& statistics, size_t n_threads, size_t table_partitions, EVMType evm_type):
+Dummy::Dummy(Workload& workload, Statistics& statistics, size_t num_threads, size_t table_partitions, EVMType evm_type):
     workload{workload},
     statistics{statistics},
-    n_threads{n_threads},
+    num_threads{num_threads},
     table(table_partitions)
 {
-    LOG(INFO) << fmt::format("Dummy(n_threads={}, table_partitions={})", n_threads, table_partitions) << std::endl;
+    LOG(INFO) << fmt::format("Dummy(num_threads={}, table_partitions={})", num_threads, table_partitions) << std::endl;
     workload.SetEVMType(evm_type);
 }
 
 void Dummy::Start() {
-    for (size_t i = 0; i < n_threads; ++i) {executors.push_back(std::thread([this]() {while(!stop_flag.load()) {
+    for (size_t i = 0; i < num_threads; ++i) {executors.push_back(std::thread([this]() {while(!stop_flag.load()) {
         auto tx         = workload.Next();
         auto start_time = steady_clock::now();
         tx.InstallGetStorageHandler([&](auto& address, auto& key) {

@@ -102,13 +102,13 @@ std::unique_ptr<Protocol> ParseProtocol(const char* arg, Workload& workload, Sta
         if (dist != n) THROW("protocol {} has {} args -- ({}), but we found {} args", #X, n, #Y, dist); \
         return static_cast<std::unique_ptr<Protocol>>(std::make_unique<X>(workload, statistics, Y));  \
     };
-    OPT(Aria,     INT, INT, INT, BOOL)
+    OPT(Aria,     INT, INT, BOOL)
     OPT(Sparkle,  INT, INT, INT)
     OPT(Spectrum, INT, INT, INT, EVMTYPE)
     OPT(Serial,   EVMTYPE, INT)
     OPT(Calvin,   INT, INT, INT)
     OPT(Dummy,    INT, INT, EVMTYPE)
-    // Calvin n_threads, n_dispatchers(default 1), table_partitions
+    // Calvin num_threads, n_dispatchers(default 1), table_partitions
     #undef OPT
     // fallback to an error
     THROW("unknown protocol option ({})", std::string{name});
