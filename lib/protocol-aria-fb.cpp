@@ -106,7 +106,7 @@ void AriaTable::ReservePut(T* tx, const K& k) {
 bool AriaTable::CompareReservedGet(T* tx, const K& k) {
     bool eq = true;
     Table::Get(k, [&](auto entry) {
-        eq = entry.batch_id_get == tx->batch_id && (
+        eq = entry.batch_id_get != tx->batch_id || (
             entry.reserved_get_tx == nullptr || 
             entry.reserved_get_tx->id == tx->id
         );
@@ -121,7 +121,7 @@ bool AriaTable::CompareReservedGet(T* tx, const K& k) {
 bool AriaTable::CompareReservedPut(T* tx, const K& k) {
     bool eq = true;
     Table::Get(k, [&](auto entry) {
-        eq = entry.batch_id_put == tx->batch_id && (
+        eq = entry.batch_id_put != tx->batch_id || (
             entry.reserved_put_tx == nullptr || 
             entry.reserved_put_tx->id == tx->id
         );
