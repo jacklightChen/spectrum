@@ -26,7 +26,7 @@ Aria::Aria(
 ):
     workload{workload},
     statistics{statistics},
-    barrier(num_threads, []{}),
+    barrier(num_threads, []{ DLOG(INFO) << "batch complete" << std::endl; }),
     table{table_partitions},
     lock_table{table_partitions},
     enable_reordering{enable_reordering},
@@ -155,17 +155,19 @@ AriaExecutor::AriaExecutor(Aria& aria):
 {}
 
 /// @brief run transactions
-void AriaExecutor::Run() { while(!stop_flag.load()) {
+void AriaExecutor::Run() { while(true) {
     #define LATENCY duration_cast<microseconds>(steady_clock::now() - tx->start_time).count()
+    #define BARRIER if (!stop_flag.load()) { barrier.arrive_and_wait(); } else { barrier.arrive(); break; }
+    // -- stage 0: generate transactions
     auto id = counter.fetch_add(1);
     auto tx = std::make_unique<T>(workload.Next(), id, id / num_threads);
     has_conflict.store(false);
-    barrier.arrive_and_wait();
+    BARRIER;
     // -- stage 1: execute and reserve
     this->Execute(tx.get());
     this->Reserve(tx.get());
     statistics.JournalExecute();
-    barrier.arrive_and_wait();
+    BARRIER;
     // -- stage 2: verify + commit (or prepare fallback)
     this->Verify(tx.get());
     if (tx->flag_conflict) {
@@ -176,7 +178,7 @@ void AriaExecutor::Run() { while(!stop_flag.load()) {
         this->Commit(tx.get());
         statistics.JournalCommit(LATENCY);
     }
-    barrier.arrive_and_wait();
+    BARRIER;
     // -- stage 3: fallback (skipped if no conflicts occur)
     if (!has_conflict.load()) { continue; }
     if (tx->flag_conflict) {
@@ -184,10 +186,10 @@ void AriaExecutor::Run() { while(!stop_flag.load()) {
         statistics.JournalExecute();
         statistics.JournalCommit(LATENCY);
     }
-    barrier.arrive_and_wait();
+    BARRIER;
     // -- stage 4: clean up lock table
     this->CleanLockTable(tx.get());
-    barrier.arrive_and_wait();
+    BARRIER;
     #undef LATENCY
 }}
 
@@ -344,9 +346,7 @@ void AriaExecutor::Fallback(T* tx) {
         });
     }
     #undef COND
-    while(should_wait && !should_wait->commited.load()) {
-        std::this_thread::yield();
-    }
+    while(should_wait && !should_wait->commited.load()) {}
     tx->Execute();
     tx->commited.store(true);
 }
