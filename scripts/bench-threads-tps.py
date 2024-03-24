@@ -24,9 +24,9 @@ if __name__ == '__main__':
             n_dispatchers       = 6
             # spectrum_dispatcher = num_threads // 6
             protocols       = [
-                # f"Calvin:{num_threads}:{n_dispatchers}:{table_partitions}",
-                # f"Aria:{num_threads}:{table_partitions}:128:FALSE", 
-                # f"Aria:{num_threads}:{table_partitions}:128:TRUE",
+                f"Calvin:{num_threads}:{n_dispatchers}:{table_partitions}",
+                f"Aria:{num_threads}:{table_partitions}:FALSE", 
+                f"Aria:{num_threads}:{table_partitions}:TRUE",
                 f"Sparkle:{num_threads}:{n_dispatchers}:{table_partitions}", 
                 f"Spectrum:{num_threads}:{n_dispatchers}:{table_partitions}:COPYONWRITE"
             ]

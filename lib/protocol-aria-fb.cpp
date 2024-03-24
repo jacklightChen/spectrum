@@ -1,4 +1,5 @@
 #include "./protocol-aria-fb.hpp"
+#include "thread-util.hpp"
 #include <fmt/core.h>
 
 /*
@@ -42,6 +43,7 @@ void Aria::Start() {
         workers.push_back(std::thread([this]() {
             AriaExecutor(*this).Run();
         }));
+	PinRoundRobin(workers[i], i);
     }
 }
 
