@@ -38,14 +38,11 @@ Aria::Aria(
 /// @brief start aria protocol
 void Aria::Start() {
     DLOG(INFO) << "aria start";
-    // this macro computes the latency of one transaction
-    #define LATENCY duration_cast<microseconds>(steady_clock::now() - tx->start_time).count()
     for (size_t i = 0; i < num_threads; ++i) {
         workers.push_back(std::thread([this]() {
             AriaExecutor(*this).Run();
         }));
     }
-    #undef LATENCY
 }
 
 /// @brief stop aria protocol and return statistics
@@ -156,41 +153,40 @@ AriaExecutor::AriaExecutor(Aria& aria):
 
 /// @brief run transactions
 void AriaExecutor::Run() { while(true) {
-    #define LATENCY duration_cast<microseconds>(steady_clock::now() - tx->start_time).count()
-    #define BARRIER if (!stop_flag.load()) { barrier.arrive_and_wait(); } else { barrier.arrive(); break; }
-    // -- stage 0: generate transactions
-    auto id = counter.fetch_add(1);
-    auto tx = std::make_unique<T>(workload.Next(), id, id / num_threads);
-    has_conflict.store(false);
-    BARRIER;
+    #define LATENCY duration_cast<microseconds>(steady_clock::now() - tx.start_time).count()
+    #define BARRIER if (!stop_flag.load()) { barrier.arrive_and_wait(); } else { auto _ = barrier.arrive(); break; }
     // -- stage 1: execute and reserve
-    this->Execute(tx.get());
-    this->Reserve(tx.get());
+    auto id = counter.fetch_add(1);
+    auto tx = T(workload.Next(), id, id / num_threads);
+    has_conflict.store(false);
+    this->Execute(&tx);
+    this->Reserve(&tx);
     statistics.JournalExecute();
     BARRIER;
     // -- stage 2: verify + commit (or prepare fallback)
-    this->Verify(tx.get());
-    if (tx->flag_conflict) {
+    this->Verify(&tx);
+    if (tx.flag_conflict) {
         has_conflict.store(true);
-        this->PrepareLockTable(tx.get());
+        this->PrepareLockTable(&tx);
     }
     else {
-        this->Commit(tx.get());
+        this->Commit(&tx);
         statistics.JournalCommit(LATENCY);
     }
     BARRIER;
     // -- stage 3: fallback (skipped if no conflicts occur)
     if (!has_conflict.load()) { continue; }
-    if (tx->flag_conflict) {
-        this->Fallback(tx.get());
+    if (tx.flag_conflict) {
+        this->Fallback(&tx);
         statistics.JournalExecute();
         statistics.JournalCommit(LATENCY);
     }
     BARRIER;
     // -- stage 4: clean up lock table
-    this->CleanLockTable(tx.get());
+    this->CleanLockTable(&tx);
     BARRIER;
     #undef LATENCY
+    #undef BARRIER
 }}
 
 /// @brief execute a transaction and journal write operations locally
