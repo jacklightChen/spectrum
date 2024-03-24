@@ -40,6 +40,11 @@ void Aria::Start() {
     DLOG(INFO) << "aria start";
     // this macro computes the latency of one transaction
     #define LATENCY duration_cast<microseconds>(steady_clock::now() - tx->start_time).count()
+    for (size_t i = 0; i < num_threads; ++i) {
+        workers.push_back(std::thread([this]() {
+            AriaExecutor(*this).Run();
+        }));
+    }
     #undef LATENCY
 }
 
@@ -47,6 +52,9 @@ void Aria::Start() {
 /// @return statistics of current execution
 void Aria::Stop() {
     stop_flag.store(true);
+    for (size_t i = 0; i < num_threads; ++i) {
+        workers[i].join();
+    }
     DLOG(INFO) << "aria stop";
 }
 

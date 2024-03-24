@@ -76,6 +76,7 @@ class Aria: public Protocol {
     std::barrier<std::function<void()>> barrier;
     std::atomic<size_t>                 counter{0};
     std::atomic<bool>                   has_conflict{false};
+    std::vector<std::thread>            workers;
     friend class AriaExecutor;
 
     public:
