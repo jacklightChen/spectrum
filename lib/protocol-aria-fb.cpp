@@ -40,7 +40,7 @@ Aria::Aria(
 void Aria::Start() {
     DLOG(INFO) << "aria start";
     for (size_t i = 0; i < num_threads; ++i) {
-        workers.push_back(std::thread([this]() {
+        workers.push_back(std::jthread([this]() {
             AriaExecutor(*this).Run();
         }));
 	PinRoundRobin(workers[i], i);
@@ -51,9 +51,6 @@ void Aria::Start() {
 /// @return statistics of current execution
 void Aria::Stop() {
     stop_flag.store(true);
-    for (size_t i = 0; i < num_threads; ++i) {
-        workers[i].join();
-    }
     DLOG(INFO) << "aria stop";
 }
 
