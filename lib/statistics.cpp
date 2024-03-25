@@ -24,7 +24,7 @@ void Statistics::JournalCommit(size_t latency) {
     }
     // substitute the closest value in percentile
     auto guard = Guard{percentile_latency_lock};
-    if (percentile_latency.size() == 100) {
+    if (percentile_latency.size() < 100) {
         percentile_latency.insert(latency);
         return;
     }
@@ -63,10 +63,10 @@ std::string Statistics::Print() {
         "50ms               {}\n"
         "100ms              {}\n"
         ">100ms             {}\n"
-        "latency {}ms (50%)\n"
-        "latency {}ms (75%)\n"
-        "latency {}ms (95%)\n"
-        "latency {}ms (99%)\n",
+        "latency(50%)       {}ms\n"
+        "latency(75%)       {}ms\n"
+        "latency(95%)       {}ms\n"
+        "latency(99%)       {}ms\n",
         std::chrono::system_clock::now(),
         count_commit.load(),
         count_execution.load(),
@@ -92,10 +92,10 @@ std::string Statistics::PrintWithDuration(std::chrono::milliseconds duration) {
         "50ms          {:.4f} tx/s\n"
         "100ms         {:.4f} tx/s\n"
         ">100ms        {:.4f} tx/s\n"
-        "latency {}ms (50%)\n"
-        "latency {}ms (75%)\n"
-        "latency {}ms (95%)\n"
-        "latency {}ms (99%)\n",
+        "latency(50%)  {}ms\n"
+        "latency(75%)  {}ms\n"
+        "latency(95%)  {}ms\n"
+        "latency(99%)  {}ms\n",
         std::chrono::system_clock::now(),
         duration,
         AVG(count_commit),
