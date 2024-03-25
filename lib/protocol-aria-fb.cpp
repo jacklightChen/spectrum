@@ -147,42 +147,55 @@ AriaExecutor::AriaExecutor(Aria& aria):
     barrier{aria.barrier},
     counter{aria.counter},
     has_conflict{aria.has_conflict},
-    num_threads{aria.num_threads}
+    num_threads{aria.num_threads},
+    repeat{aria.repeat}
 {}
 
 /// @brief run transactions
 void AriaExecutor::Run() { while(true) {
-    #define LATENCY duration_cast<microseconds>(steady_clock::now() - tx.start_time).count()
+    #define LATENCY duration_cast<microseconds>(steady_clock::now() - tx->start_time).count()
     #define BARRIER if (!stop_flag.load()) { barrier.arrive_and_wait(); } else { auto _ = barrier.arrive(); break; }
+    #define REPEAT_START    for (int i = 0; i < repeat; ++i) { auto tx = batch[i].get();
+    #define REPEAT_END      }
     // -- stage 1: execute and reserve
-    auto id = counter.fetch_add(1);
-    auto tx = T(workload.Next(), id, id / num_threads);
-    has_conflict.store(false);
-    this->Execute(&tx);
-    this->Reserve(&tx);
-    statistics.JournalExecute();
-    BARRIER;
+    auto batch = std::vector<std::unique_ptr<T>>();
+    for (int i = 0; i < repeat; ++i) {
+        auto id = counter.fetch_add(1);
+        auto tx = std::make_unique<T>(workload.Next(), id, id / num_threads);
+        has_conflict.store(false);
+        this->Execute(&*tx);
+        this->Reserve(&*tx);
+        statistics.JournalExecute();
+        batch.push_back(std::move(tx));
+    }
+    BARRIER
     // -- stage 2: verify + commit (or prepare fallback)
-    this->Verify(&tx);
-    if (tx.flag_conflict) {
+    REPEAT_START
+    this->Verify(&*tx);
+    if (tx->flag_conflict) {
         has_conflict.store(true);
-        this->PrepareLockTable(&tx);
+        this->PrepareLockTable(&*tx);
     }
     else {
-        this->Commit(&tx);
+        this->Commit(&*tx);
         statistics.JournalCommit(LATENCY);
     }
+    REPEAT_END
     BARRIER;
     // -- stage 3: fallback (skipped if no conflicts occur)
+    REPEAT_START
     if (!has_conflict.load()) { continue; }
-    if (tx.flag_conflict) {
-        this->Fallback(&tx);
+    if (tx->flag_conflict) {
+        this->Fallback(&*tx);
         statistics.JournalExecute();
         statistics.JournalCommit(LATENCY);
     }
+    REPEAT_END
     BARRIER;
     // -- stage 4: clean up lock table
-    this->CleanLockTable(&tx);
+    REPEAT_START
+    this->CleanLockTable(&*tx);
+    REPEAT_END
     BARRIER;
     #undef LATENCY
     #undef BARRIER

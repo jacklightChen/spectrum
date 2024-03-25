@@ -70,6 +70,7 @@ class Aria: public Protocol {
     Workload&                           workload;
     AriaTable                           table;
     AriaLockTable                       lock_table;
+    size_t                              repeat;
     size_t                              num_threads;
     bool                                enable_reordering;
     std::atomic<bool>                   stop_flag{false};
@@ -100,6 +101,7 @@ class AriaExecutor {
     std::barrier<std::function<void()>>&    barrier;
     std::atomic<size_t>&                    counter;
     std::atomic<bool>&                      has_conflict;
+    size_t                                  repeat;
 
     public:
     AriaExecutor(Aria& aria);
