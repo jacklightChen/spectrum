@@ -2,6 +2,7 @@
 #include <atomic>
 #include <chrono>
 #include <mutex>
+#include "./percentile.hpp"
 
 namespace spectrum {
 
@@ -13,6 +14,7 @@ class Statistics {
     std::atomic<size_t> count_latency_50ms{0};
     std::atomic<size_t> count_latency_100ms{0};
     std::atomic<size_t> count_latency_100ms_above{0};
+    // Percentile<size_t> percentile;
     Statistics() = default;
     Statistics(const Statistics& statistics) = delete;
     void JournalCommit(size_t latency);
