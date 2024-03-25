@@ -54,6 +54,7 @@ void Statistics::JournalExecute() {
 
 std::string Statistics::Print() {
     #define nth(i) (*std::next(percentile_latency.begin(), i * (percentile_latency.size()-1) / 100))
+    auto guard = Guard{percentile_latency_lock};
     return std::string(fmt::format(
         "@{}\n"
         "commit             {}\n"
@@ -81,6 +82,7 @@ std::string Statistics::Print() {
 std::string Statistics::PrintWithDuration(std::chrono::milliseconds duration) {
     #define AVG(X) ((double)(X.load()) / (double)(duration.count()) * (double)(1000))
     #define nth(i) (*std::next(percentile_latency.begin(), i * (percentile_latency.size()-1) / 100))
+    auto guard = Guard{percentile_latency_lock};
     return std::string(fmt::format(
         "@{}\n"
         "duration      {}\n"
