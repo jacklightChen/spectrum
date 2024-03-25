@@ -102,7 +102,7 @@ std::unique_ptr<Protocol> ParseProtocol(const char* arg, Workload& workload, Sta
         if (dist != n) THROW("protocol {} has {} args -- ({}), but we found {} args", #X, n, #Y, dist); \
         return static_cast<std::unique_ptr<Protocol>>(std::make_unique<X>(workload, statistics, Y));  \
     };
-    OPT(Aria,     INT, INT, BOOL)
+    OPT(Aria,     INT, INT, INT, BOOL)
     OPT(Sparkle,  INT, INT, INT)
     OPT(Spectrum, INT, INT, INT, EVMTYPE)
     OPT(Serial,   EVMTYPE, INT)

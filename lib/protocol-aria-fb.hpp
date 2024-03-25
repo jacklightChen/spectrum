@@ -81,7 +81,7 @@ class Aria: public Protocol {
     friend class AriaExecutor;
 
     public:
-    Aria(Workload& workload, Statistics& statistics, size_t num_threads, size_t table_partitions, bool enable_reordering);
+    Aria(Workload& workload, Statistics& statistics, size_t num_threads, size_t table_partitions, size_t repeat, bool enable_reordering);
     void Start() override;
     void Stop() override;
 
