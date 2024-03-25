@@ -152,7 +152,7 @@ AriaExecutor::AriaExecutor(Aria& aria):
 
 /// @brief run transactions
 void AriaExecutor::Run() { while(true) {
-    #define LATENCY duration_cast<milliseconds>(steady_clock::now() - tx.start_time).count()
+    #define LATENCY duration_cast<microseconds>(steady_clock::now() - tx.start_time).count()
     #define BARRIER if (!stop_flag.load()) { barrier.arrive_and_wait(); } else { auto _ = barrier.arrive(); break; }
     // -- stage 1: execute and reserve
     auto id = counter.fetch_add(1);
