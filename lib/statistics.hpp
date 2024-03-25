@@ -3,6 +3,9 @@
 #include <chrono>
 #include <mutex>
 #include "./percentile.hpp"
+#include "./lock-util.hpp"
+#include <set>
+#include <iterator>
 
 namespace spectrum {
 
@@ -14,7 +17,8 @@ class Statistics {
     std::atomic<size_t> count_latency_50ms{0};
     std::atomic<size_t> count_latency_100ms{0};
     std::atomic<size_t> count_latency_100ms_above{0};
-    // Percentile<size_t> percentile;
+    SpinLock            percentile_latency_lock;
+    std::set<size_t>    percentile_latency;
     Statistics() = default;
     Statistics(const Statistics& statistics) = delete;
     void JournalCommit(size_t latency);
