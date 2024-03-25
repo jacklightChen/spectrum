@@ -22,7 +22,7 @@ using namespace std::chrono;
 /// @param table_partitions the number of partitions in table
 Aria::Aria(
     Workload& workload, Statistics& statistics,
-    size_t num_threads, size_t table_partitions,
+    size_t num_threads, size_t table_partitions, size_t repeat,
     bool enable_reordering
 ):
     workload{workload},
@@ -31,9 +31,10 @@ Aria::Aria(
     table{table_partitions},
     lock_table{table_partitions},
     enable_reordering{enable_reordering},
-    num_threads{num_threads}
+    num_threads{num_threads},
+    repeat{repeat}
 {
-    LOG(INFO) << fmt::format("Aria(num_threads={}, table_partitions={}, enable_reordering={})", num_threads, table_partitions, enable_reordering) << std::endl;
+    LOG(INFO) << fmt::format("Aria(num_threads={}, table_partitions={}, repeat={}, enable_reordering={})", num_threads, table_partitions, repeat, enable_reordering) << std::endl;
 }
 
 /// @brief start aria protocol
