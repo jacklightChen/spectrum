@@ -10,7 +10,7 @@ from plot.plot import MyPlot
 
 keys = 1000000
 workload = 'Smallbank'
-zipf = 1.1
+threads = 30
 times_to_tun = 2
 timestamp = int(time.time())
 
@@ -19,16 +19,16 @@ if __name__ == '__main__':
     conf = {'stdout': subprocess.PIPE, 'stderr': subprocess.PIPE}
     hash = subprocess.run(["git", "rev-parse", "HEAD"], **conf).stdout.decode('utf-8').strip()
     with open(f'./exp_results/bench_results_{timestamp}', 'w') as f:
-        for num_threads in list(range(6, 42, 6)):
+        for zipf in [0.7, 0.8, 0.9, 1.0, 1.1, 1.2, 1.3]:
             table_partitions    = 9973
             n_dispatchers       = 6
             # spectrum_dispatcher = num_threads // 6
             protocols       = [
-                f"Calvin:{num_threads}:{n_dispatchers}:{table_partitions}",
-                f"Aria:{num_threads}:{table_partitions}:FALSE", 
-                f"Aria:{num_threads}:{table_partitions}:TRUE",
-                f"Sparkle:{num_threads}:{n_dispatchers}:{table_partitions}", 
-                f"Spectrum:{num_threads}:{n_dispatchers}:{table_partitions}:COPYONWRITE"
+                f"Calvin:{threads}:{n_dispatchers}:{table_partitions}",
+                f"Aria:{threads}:{table_partitions}:FALSE", 
+                f"Aria:{threads}:{table_partitions}:TRUE",
+                f"Sparkle:{threads}:{n_dispatchers}:{table_partitions}", 
+                f"Spectrum:{threads}:{n_dispatchers}:{table_partitions}:COPYONWRITE"
             ]
             for cc in protocols:
                 print(f"#COMMIT-{hash}",  f"CONFIG-{cc}")
@@ -43,8 +43,8 @@ if __name__ == '__main__':
                 execution = float(re.search(r'execution\s+([\d.]+)', result_str).group(1))
                 df.loc[len(df)] = {
                     'protocol': cc.split(':')[0] if cc.split(':')[-1] != 'TRUE' else 'AriaRe', 
-                    'threads': num_threads, 
-                    'zipf': 0, 
+                    'threads': threads, 
+                    'zipf': zipf, 
                     'table_partition': table_partitions, 
                     'commit': commit,
                     'abort': execution - commit
@@ -52,7 +52,7 @@ if __name__ == '__main__':
     df.to_csv(f'./exp_results/bench_results_{timestamp}.csv')
 
     recs = df
-    X, XLABEL = "threads", "Threads"
+    X, XLABEL = "zipf", "Contention"
     Y, YLABEL = "commit", "Troughput(Txn/s)"
     p = MyPlot(1, 1)
     ax: plt.Axes = p.axes
@@ -61,7 +61,7 @@ if __name__ == '__main__':
     for idx, schema in enumerate(recs['protocol'].unique()):
         records = recs[recs['protocol'] == schema]
         p.plot(ax, xdata=records[X], ydata=records[Y], color=None, legend_label=schema,)
-    ax.set_xticks([int(t) for t in recs['threads'].unique()])
+    ax.set_xticks(recs['zipf'].unique(), [str(t) for t in recs['zipf'].unique()])
     p.format_yticks(ax, suffix='K')
     # ax.set_ylim(None, p.max_y_data * 1.15)       # 折线图的Y轴上限设置为数据最大值的1.15倍
     p.set_labels(ax, XLABEL, YLABEL)

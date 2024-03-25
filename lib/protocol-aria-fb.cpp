@@ -1,4 +1,5 @@
 #include "./protocol-aria-fb.hpp"
+#include "thread-util.hpp"
 #include <fmt/core.h>
 
 /*
@@ -26,7 +27,7 @@ Aria::Aria(
 ):
     workload{workload},
     statistics{statistics},
-    barrier(num_threads, []{}),
+    barrier(num_threads, []{ DLOG(INFO) << "batch complete" << std::endl; }),
     table{table_partitions},
     lock_table{table_partitions},
     enable_reordering{enable_reordering},
@@ -38,23 +39,18 @@ Aria::Aria(
 /// @brief start aria protocol
 void Aria::Start() {
     DLOG(INFO) << "aria start";
-    // this macro computes the latency of one transaction
-    #define LATENCY duration_cast<microseconds>(steady_clock::now() - tx->start_time).count()
     for (size_t i = 0; i < num_threads; ++i) {
-        workers.push_back(std::thread([this]() {
+        workers.push_back(std::jthread([this]() {
             AriaExecutor(*this).Run();
         }));
+	PinRoundRobin(workers[i], i);
     }
-    #undef LATENCY
 }
 
 /// @brief stop aria protocol and return statistics
 /// @return statistics of current execution
 void Aria::Stop() {
     stop_flag.store(true);
-    for (size_t i = 0; i < num_threads; ++i) {
-        workers[i].join();
-    }
     DLOG(INFO) << "aria stop";
 }
 
@@ -110,7 +106,7 @@ void AriaTable::ReservePut(T* tx, const K& k) {
 bool AriaTable::CompareReservedGet(T* tx, const K& k) {
     bool eq = true;
     Table::Get(k, [&](auto entry) {
-        eq = entry.batch_id_get == tx->batch_id && (
+        eq = entry.batch_id_get != tx->batch_id || (
             entry.reserved_get_tx == nullptr || 
             entry.reserved_get_tx->id == tx->id
         );
@@ -125,7 +121,7 @@ bool AriaTable::CompareReservedGet(T* tx, const K& k) {
 bool AriaTable::CompareReservedPut(T* tx, const K& k) {
     bool eq = true;
     Table::Get(k, [&](auto entry) {
-        eq = entry.batch_id_put == tx->batch_id && (
+        eq = entry.batch_id_put != tx->batch_id || (
             entry.reserved_put_tx == nullptr || 
             entry.reserved_put_tx->id == tx->id
         );
@@ -155,40 +151,41 @@ AriaExecutor::AriaExecutor(Aria& aria):
 {}
 
 /// @brief run transactions
-void AriaExecutor::Run() { while(!stop_flag.load()) {
-    #define LATENCY duration_cast<microseconds>(steady_clock::now() - tx->start_time).count()
-    auto id = counter.fetch_add(1);
-    auto tx = std::make_unique<T>(workload.Next(), id, id / num_threads);
-    has_conflict.store(false);
-    barrier.arrive_and_wait();
+void AriaExecutor::Run() { while(true) {
+    #define LATENCY duration_cast<microseconds>(steady_clock::now() - tx.start_time).count()
+    #define BARRIER if (!stop_flag.load()) { barrier.arrive_and_wait(); } else { auto _ = barrier.arrive(); break; }
     // -- stage 1: execute and reserve
-    this->Execute(tx.get());
-    this->Reserve(tx.get());
+    auto id = counter.fetch_add(1);
+    auto tx = T(workload.Next(), id, id / num_threads);
+    has_conflict.store(false);
+    this->Execute(&tx);
+    this->Reserve(&tx);
     statistics.JournalExecute();
-    barrier.arrive_and_wait();
+    BARRIER;
     // -- stage 2: verify + commit (or prepare fallback)
-    this->Verify(tx.get());
-    if (tx->flag_conflict) {
+    this->Verify(&tx);
+    if (tx.flag_conflict) {
         has_conflict.store(true);
-        this->PrepareLockTable(tx.get());
+        this->PrepareLockTable(&tx);
     }
     else {
-        this->Commit(tx.get());
+        this->Commit(&tx);
         statistics.JournalCommit(LATENCY);
     }
-    barrier.arrive_and_wait();
+    BARRIER;
     // -- stage 3: fallback (skipped if no conflicts occur)
     if (!has_conflict.load()) { continue; }
-    if (tx->flag_conflict) {
-        this->Fallback(tx.get());
+    if (tx.flag_conflict) {
+        this->Fallback(&tx);
         statistics.JournalExecute();
         statistics.JournalCommit(LATENCY);
     }
-    barrier.arrive_and_wait();
+    BARRIER;
     // -- stage 4: clean up lock table
-    this->CleanLockTable(tx.get());
-    barrier.arrive_and_wait();
+    this->CleanLockTable(&tx);
+    BARRIER;
     #undef LATENCY
+    #undef BARRIER
 }}
 
 /// @brief execute a transaction and journal write operations locally
@@ -344,9 +341,7 @@ void AriaExecutor::Fallback(T* tx) {
         });
     }
     #undef COND
-    while(should_wait && !should_wait->commited.load()) {
-        std::this_thread::yield();
-    }
+    while(should_wait && !should_wait->commited.load()) {}
     tx->Execute();
     tx->commited.store(true);
 }

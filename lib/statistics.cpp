@@ -22,6 +22,7 @@ void Statistics::JournalCommit(size_t latency) {
     else {
         count_latency_100ms_above.fetch_add(1, std::memory_order_seq_cst);
     }
+    // percentile.add(latency);
 }
 
 void Statistics::JournalExecute() {
@@ -31,12 +32,16 @@ void Statistics::JournalExecute() {
 std::string Statistics::Print() {
     return std::string(fmt::format(
         "@{}\n"
-        "commit        {}\n"
-        "execution     {}\n"
-        "25ms          {}\n"
-        "50ms          {}\n"
-        "100ms         {}\n"
-        ">100ms        {}\n",
+        "commit             {}\n"
+        "execution          {}\n"
+        "25ms               {}\n"
+        "50ms               {}\n"
+        "100ms              {}\n"
+        ">100ms             {}\n",
+        // "latency {} us(50%)\n"
+        // "latency {} us(75%)\n"
+        // "latency {} us(95%)\n"
+        // "latency {} us(99%)\n",
         std::chrono::system_clock::now(),
         count_commit.load(),
         count_execution.load(),
@@ -44,6 +49,10 @@ std::string Statistics::Print() {
         count_latency_50ms.load(),
         count_latency_100ms.load(),
         count_latency_100ms_above.load()
+        // percentile.nth(50),
+        // percentile.nth(75),
+        // percentile.nth(95),
+        // percentile.nth(99)
     ));
 }
 
@@ -58,6 +67,10 @@ std::string Statistics::PrintWithDuration(std::chrono::milliseconds duration) {
         "50ms          {:.4f} tx/s\n"
         "100ms         {:.4f} tx/s\n"
         ">100ms        {:.4f} tx/s\n",
+        // "latency {} us(50%)\n"
+        // "latency {} us(75%)\n"
+        // "latency {} us(95%)\n"
+        // "latency {} us(99%)\n",
         std::chrono::system_clock::now(),
         duration,
         AVG(count_commit),
@@ -66,6 +79,10 @@ std::string Statistics::PrintWithDuration(std::chrono::milliseconds duration) {
         AVG(count_latency_50ms),
         AVG(count_latency_100ms),
         AVG(count_latency_100ms_above)
+        // percentile.nth(50),
+        // percentile.nth(75),
+        // percentile.nth(95),
+        // percentile.nth(99)
     ));
     #undef AVG
 }
