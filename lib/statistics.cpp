@@ -22,6 +22,7 @@ void Statistics::JournalCommit(size_t latency) {
     else {
         count_latency_100ms_above.fetch_add(1, std::memory_order_seq_cst);
     }
+    DLOG(INFO) << "latency: " << latency << std::endl;
     // substitute the closest value in percentile
     auto guard = Guard{percentile_latency_lock};
     if (percentile_latency.size() < 100) {
