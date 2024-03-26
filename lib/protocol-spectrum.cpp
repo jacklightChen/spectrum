@@ -304,6 +304,7 @@ SpectrumExecutor::SpectrumExecutor(Spectrum& spectrum, SpectrumQueue& queue):
 std::unique_ptr<T> SpectrumExecutor::Create() {
     auto tx = queue.Pop();
     if (tx == nullptr || tx->berun_flag.load()) return tx;
+    tx->start_time = steady_clock::now();
     tx->berun_flag.store(true);
     auto tx_ref = tx.get();
     tx->InstallSetStorageHandler([tx_ref](
