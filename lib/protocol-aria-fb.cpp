@@ -162,6 +162,7 @@ AriaExecutor::AriaExecutor(Aria& aria, size_t worker_id):
 void AriaExecutor::Run() {
     auto batch_id = size_t{0};
     auto batch = std::vector<T>();
+    batch.reserve(repeat);
     while(true) {
         #define LATENCY duration_cast<microseconds>(steady_clock::now() - tx.start_time).count()
         // -- stage 0: check stop flags

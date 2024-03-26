@@ -9,12 +9,6 @@
 
 namespace spectrum {
 
-Statistics::Statistics() {
-    for (size_t i = 0; i < percentile_latency.size(); ++i) {
-        percentile_latency[i] = 0;
-    }
-}
-
 void Statistics::JournalCommit(size_t latency) {
     count_commit.fetch_add(1, std::memory_order_seq_cst);
     if (latency <= 25) {
@@ -29,21 +23,21 @@ void Statistics::JournalCommit(size_t latency) {
     else {
         count_latency_100us_above.fetch_add(1, std::memory_order_seq_cst);
     }
+    DLOG(INFO) << "latency: " << latency << std::endl;
+    if (rand() % 500 != 0) { return; }
     // substitute the closest value in percentile
-    if (percentile_populated.load() && rand() % 100 != 0) { return; }
     auto guard = Guard{percentile_latency_mu};
-    if (latency < percentile_latency[0]) {
+    if (latency <= percentile_latency[0]) {
         percentile_latency[0] = latency;
         return;
     }
-    for (size_t i = 0; i < percentile_latency.size() - 1; ++i) {
-        if (latency >= percentile_latency[i+1]) { continue; }
-        percentile_latency[i]   = latency;
-        percentile_latency[i+1] = latency;
-        if (i == 0) percentile_populated.store(true);
-        return;
+    for (size_t i = 0; i < 99; ++i) {
+        if (latency >= percentile_latency[i] && latency <= percentile_latency[i+1]) {
+            percentile_latency[i+rand()%2] = latency;
+            return;
+        }
     }
-    percentile_latency[percentile_latency.size()-1] = latency;
+    percentile_latency[99] = latency;
 }
 
 void Statistics::JournalExecute() {
@@ -70,10 +64,10 @@ std::string Statistics::Print() {
         count_latency_50us.load(),
         count_latency_100us.load(),
         count_latency_100us_above.load(),
-        percentile_latency[49], 
-        percentile_latency[74], 
-        percentile_latency[94], 
-        percentile_latency[98]
+        percentile_latency[50], 
+        percentile_latency[75], 
+        percentile_latency[95], 
+        percentile_latency[99]
     ));
     #undef nth
 }
@@ -101,10 +95,10 @@ std::string Statistics::PrintWithDuration(std::chrono::milliseconds duration) {
         AVG(count_latency_50us),
         AVG(count_latency_100us),
         AVG(count_latency_100us_above),
-        percentile_latency[49], 
-        percentile_latency[74], 
-        percentile_latency[94], 
-        percentile_latency[98]
+        percentile_latency[50], 
+        percentile_latency[75], 
+        percentile_latency[95], 
+        percentile_latency[99]
     ));
     #undef AVG
     #undef nth
