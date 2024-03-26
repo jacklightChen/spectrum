@@ -4,7 +4,6 @@
 #include "lock-util.hpp"
 #include "workload.hpp"
 #include <atomic>
-#include <conqueue/concurrentqueue.h>
 #include <deque>
 #include <chrono>
 #include <functional>

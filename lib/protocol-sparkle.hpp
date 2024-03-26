@@ -9,8 +9,6 @@
 #include <unordered_set>
 #include <chrono>
 #include <thread>
-#include <thread_pool/BS_thread_pool.hpp>
-#include <thread_pool/BS_thread_pool_utils.hpp>
 
 namespace spectrum {
 

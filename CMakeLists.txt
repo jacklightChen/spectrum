@@ -12,90 +12,116 @@ option(DEBUG OFF)
 option(EVM_PRINT_INSTRUCTIONS "print each evm instruction on instruction start" 0)
 
 # -- Manage External Dependencies
-include(FetchContent)
-FetchContent_Declare(
-    evmc
-    GIT_REPOSITORY      "https://github.com/ethereum/evmc"
-    GIT_TAG             "v11.0.1"
-)
-FetchContent_Declare(
-    thread_pool
-    GIT_REPOSITORY      "https://github.com/bshoshany/thread-pool"
-    GIT_TAG             "v4.0.1"
-)
-FetchContent_Declare(
-    fmt
-    GIT_REPOSITORY      "https://github.com/fmtlib/fmt"
-    GIT_TAG             "10.2.1"
-)
-FetchContent_Declare(
-    gtest
-    GIT_REPOSITORY      "https://github.com/google/googletest"
-    GIT_TAG             "v1.14.0"
-)
-FetchContent_Declare(
-    ethash
-    GIT_REPOSITORY      "https://github.com/chfast/ethash"
-    GIT_TAG             "v1.0.1"
-)
-FetchContent_Declare(
-    intx
-    GIT_REPOSITORY      "https://github.com/chfast/intx"
-    GIT_TAG             "v0.10.1"
-)
-FetchContent_Declare(
-    conqueue
-    GIT_REPOSITORY      "https://github.com/cameron314/concurrentqueue"
-    GIT_TAG             "v1.0.4"
-)
-FetchContent_MakeAvailable(gtest ethash intx fmt evmc thread_pool conqueue)
-set(gtest_force_shared_crt ON CACHE BOOL "" FORCE)
 find_package(Threads REQUIRED)
+function(GitHub)
+    cmake_parse_arguments(GH "SQUASH" "USER;REPO;BRANCH;WITH;PACK;CONFIG;DIR" "" "${ARGV}")
+    message(STATUS ${GH_USER}/${GH_REPO}/${GH_BRANCH})
+    if (EXISTS "${CMAKE_BINARY_DIR}/_deps/${GH_USER}/${GH_REPO}/.git")
+        message("        + download skipped")
+    else()
+        message("        + download finish")
+        execute_process(
+            COMMAND                 git clone --quiet --branch "${GH_BRANCH}" "https://github.com/${GH_USER}/${GH_REPO}" "${CMAKE_BINARY_DIR}/_deps/${GH_USER}/${GH_REPO}"
+            WORKING_DIRECTORY       ${CMAKE_BINARY_DIR}
+            COMMAND_ERROR_IS_FATAL  ANY
+            OUTPUT_QUIET ERROR_QUIET
+        )
+    endif()
+    if(${GH_WITH} STREQUAL "CMAKE SUBDIR")
+        set(CMAKE_MESSAGE_LOG_LEVEL__ ${CMAKE_MESSAGE_LOG_LEVEL})
+        set(CMAKE_MESSAGE_LOG_LEVEL NOTICE)
+        add_subdirectory(${CMAKE_BINARY_DIR}/_deps/${GH_USER}/${GH_REPO})
+        set(CMAKE_MESSAGE_LOG_LEVEL ${CMAKE_MESSAGE_LOG_LEVEL__})
+        message("        + configuration finish (SUBDIR)")
+    else()
+        execute_process(
+            COMMAND                 cmake -S . -B build ${GH_CONFIG} -DCMAKE_INSTALL_PREFIX=${CMAKE_BINARY_DIR}/_deps/${GH_USER}/${GH_REPO}/install
+            WORKING_DIRECTORY       ${CMAKE_BINARY_DIR}/_deps/${GH_USER}/${GH_REPO}
+            COMMAND_ERROR_IS_FATAL  ANY
+            OUTPUT_QUIET ERROR_QUIET
+        )
+        message("        + configuration finish")
+        execute_process(
+            COMMAND                 cmake --build build -j
+            WORKING_DIRECTORY       ${CMAKE_BINARY_DIR}/_deps/${GH_USER}/${GH_REPO}
+            COMMAND_ERROR_IS_FATAL  ANY
+            OUTPUT_QUIET ERROR_QUIET
+        )
+        message("        + build finish")
+        execute_process(
+            COMMAND                 cmake --build build --target install
+            WORKING_DIRECTORY       ${CMAKE_BINARY_DIR}/_deps/${GH_USER}/${GH_REPO}
+            COMMAND_ERROR_IS_FATAL  ANY
+            OUTPUT_QUIET ERROR_QUIET
+        )
+        message("        + install finish")
+        set(CMAKE_PREFIX_PATH "${CMAKE_BINARY_DIR}/_deps/${GH_USER}/${GH_REPO}/install")
+        if("${GH_PACK}" STREQUAL "")
+            set(GH_PACK ${GH_REPO})
+        endif()
+        if(${GH_WITH} STREQUAL "CMAKE INSTALL")
+            find_package(${GH_PACK} REQUIRED QUIET)
+            message("        + find package finish")
+        elseif(${GH_WITH} STREQUAL "CMAKE SCANLIB")
+            include_directories(${CMAKE_BINARY_DIR}/_deps/${GH_USER}/${GH_REPO}/install/include)
+            link_directories(${CMAKE_BINARY_DIR}/_deps/${GH_USER}/${GH_REPO}/install/lib)
+        endif()
+    endif()
+endfunction()
 
-# -- download and build gflags
-execute_process(
-    COMMAND             git clone --branch "v2.2.2" "https://github.com/gflags/gflags" "_deps/gflags"
-    WORKING_DIRECTORY   ${CMAKE_BINARY_DIR}
+GitHub(
+    USER    "ethereum"
+    REPO    "evmc"
+    BRANCH  "v11.0.1"
+    WITH    "CMAKE SUBDIR"
 )
-execute_process(
-    COMMAND
-        cmake -S . -B build
-        -DBUILD_SHARED_LIBS=ON
-        -DCMAKE_INSTALL_PREFIX=${CMAKE_BINARY_DIR}/_deps/gflags/build
-    WORKING_DIRECTORY       ${CMAKE_BINARY_DIR}/_deps/gflags
-    COMMAND_ERROR_IS_FATAL  ANY
+GitHub(
+    USER    "fmtlib"
+    REPO    "fmt"
+    BRANCH  "10.2.1"
+    WITH    "CMAKE SUBDIR"
 )
-execute_process(
-    COMMAND                 cmake --build build --target install
-    WORKING_DIRECTORY       ${CMAKE_BINARY_DIR}/_deps/gflags
-    COMMAND_ERROR_IS_FATAL  ANY
+GitHub(
+    USER    "chfast"
+    REPO    "ethash"
+    BRANCH  "v1.0.1"
+    WITH    "CMAKE INSTALL"
 )
-set(gflags_DIR ${CMAKE_BINARY_DIR}/_deps/gflags/build)
-find_package(gflags)
-unset(gflags_DIR)
+GitHub(
+    USER    "chfast"
+    REPO    "intx"
+    BRANCH  "v0.10.1"
+    WITH    "CMAKE INSTALL"
+)
+GitHub(
+    USER    "gflags"
+    REPO    "gflags"
+    BRANCH  "v2.2.2"
+    WITH    "CMAKE INSTALL"
+    CONFIG  "-DBUILD_SHARED_LIBS=ON"
+)
+GitHub(
+    USER    "google"
+    REPO    "glog"
+    BRANCH  "v0.7.0"
+    WITH    "CMAKE INSTALL"
+    CONFIG  "-Dgflags_DIR=${gflags_DIR}"
+)
+GitHub(
+    USER    "google"
+    REPO    "googletest"
+    BRANCH  "v1.14.0"
+    PACK    "GTest"
+    WITH    "CMAKE SUBDIR"
+)
+GitHub(
+    USER    "gperftools"
+    REPO    "gperftools"
+    BRANCH  "gperftools-2.15"
+    WITH    "CMAKE SCANLIB"
+)
 
-# -- download and build glog
-execute_process(
-    COMMAND                 git clone --branch "v0.7.0" "https://github.com/google/glog" "_deps/glog"
-    WORKING_DIRECTORY       ${CMAKE_BINARY_DIR}
-)
-execute_process(
-    COMMAND
-        cmake -S . -B build
-        -Dgflags_DIR=${CMAKE_BINARY_DIR}/_deps/gflags/build
-        -DCMAKE_INSTALL_PREFIX=${CMAKE_BINARY_DIR}/_deps/glog/build
-    WORKING_DIRECTORY       ${CMAKE_BINARY_DIR}/_deps/glog
-    COMMAND_ERROR_IS_FATAL  ANY
-)
-execute_process(
-    COMMAND                cmake --build build --target install
-    WORKING_DIRECTORY       ${CMAKE_BINARY_DIR}/_deps/glog
-    COMMAND_ERROR_IS_FATAL  ANY
-)
-
-set(glog_DIR ${CMAKE_BINARY_DIR}/_deps/glog/build)
-find_package(glog)
-unset(glog_DIR)
+# -- compile options
 
 if(DEBUG)
     add_compile_options(-fsanitize=address)
@@ -114,23 +140,6 @@ else()
         -DEVMONE_X86_64_ARCH_LEVEL=2
     )
 endif()
-
-# -- handle header-only dependencies
-file(GLOB INC ${CMAKE_BINARY_DIR}/_deps/thread_pool-src/include/*.hpp ${CMAKE_BINARY_DIR}/_deps/thread_pool-src/include/*.h)
-
-foreach(F ${INC})
-    file(RELATIVE_PATH REL ${CMAKE_BINARY_DIR}/_deps/thread_pool-src/include ${F})
-    configure_file(${F} include/thread_pool/${REL} COPYONLY)
-    unset(REL)
-endforeach()
-
-file(GLOB INC ${CMAKE_BINARY_DIR}/_deps/conqueue-src/*.hpp ${CMAKE_BINARY_DIR}/_deps/conqueue-src/*.h)
-
-foreach(F ${INC})
-    file(RELATIVE_PATH REL ${CMAKE_BINARY_DIR}/_deps/conqueue-src ${F})
-    configure_file(${F} include/conqueue/${REL} COPYONLY)
-    unset(REL)
-endforeach()
 
 # -- add the main library
 
@@ -178,7 +187,7 @@ endforeach()
 
 unset(SRC)
 
-# -- add the bench
+# -- add executables
 
 file(GLOB_RECURSE SRC bin/*.cpp)
 
