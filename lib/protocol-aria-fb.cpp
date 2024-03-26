@@ -195,7 +195,10 @@ void AriaExecutor::Run() {
         }
         // -- stage 3: fallback (skipped if no conflicts occur)
         barrier.arrive_and_wait();
-        if (!has_conflict.load()) { continue; }
+        if (!has_conflict.load()) {
+            batch.clear();
+            continue;
+        }
         for (auto& tx: batch) {
             if (tx.flag_conflict) {
                 this->Fallback(&tx);
