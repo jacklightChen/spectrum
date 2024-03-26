@@ -41,8 +41,8 @@ Aria::Aria(
 void Aria::Start() {
     DLOG(INFO) << "aria start";
     for (size_t i = 0; i < num_threads; ++i) {
-        workers.push_back(std::thread([this]() {
-            AriaExecutor(*this).Run();
+        workers.push_back(std::thread([this, i]() {
+            AriaExecutor(*this, i).Run();
         }));
         PinRoundRobin(workers[i], i);
     }
@@ -82,10 +82,7 @@ AriaTransaction::AriaTransaction(AriaTransaction&& tx):
 void AriaTable::ReserveGet(T* tx, const K& k) {
     Table::Put(k, [&](AriaEntry& entry) {
         DLOG(INFO) << tx->batch_id << ":" <<  tx->id << " reserve get, current tx(" << entry.batch_id_get << ":" << entry.reserved_get_tx << ")" << std::endl;
-        if (entry.batch_id_get != tx->batch_id) {
-            entry.reserved_get_tx = tx;
-            entry.batch_id_get = tx->batch_id;
-        } else if (entry.reserved_get_tx == nullptr || entry.reserved_get_tx->id > tx->id) {
+        if (entry.batch_id_get != tx->batch_id || entry.reserved_get_tx == nullptr || entry.reserved_get_tx->id > tx->id) {
             entry.reserved_get_tx = tx;
             entry.batch_id_get = tx->batch_id;
             DLOG(INFO) << tx->batch_id << ":" << tx->id << " reserve get ok" << std::endl;
@@ -99,13 +96,10 @@ void AriaTable::ReserveGet(T* tx, const K& k) {
 void AriaTable::ReservePut(T* tx, const K& k) {
     Table::Put(k, [&](AriaEntry& entry) {
         DLOG(INFO) << tx->batch_id << ":" <<  tx->id << " reserve put, current tx(" << entry.batch_id_put << ":" << entry.reserved_put_tx << ")" << std::endl;
-        if (entry.batch_id_put != tx->batch_id) {
+        if (entry.batch_id_put != tx->batch_id || entry.reserved_put_tx == nullptr || entry.reserved_put_tx->id > tx->id) {
             entry.reserved_put_tx = tx;
             entry.batch_id_put = tx->batch_id;
-        } else if (entry.reserved_put_tx == nullptr || entry.reserved_put_tx->id > tx->id) {
-            entry.reserved_put_tx = tx;
-            entry.batch_id_put = tx->batch_id;
-            DLOG(INFO) << tx->batch_id << ":" << tx->id << " reserve put ok" << std::endl; 
+            DLOG(INFO) << tx->batch_id << ":" << tx->id << " reserve put ok" << std::endl;
         }
     });
 }
@@ -148,7 +142,7 @@ AriaLockTable::AriaLockTable(size_t partitions):
 
 /// @brief initialize an aria executor
 /// @param aria the aria configuration object
-AriaExecutor::AriaExecutor(Aria& aria):
+AriaExecutor::AriaExecutor(Aria& aria, size_t worker_id):
     statistics{aria.statistics},
     workload{aria.workload},
     table{aria.table},
@@ -159,64 +153,63 @@ AriaExecutor::AriaExecutor(Aria& aria):
     counter{aria.counter},
     has_conflict{aria.has_conflict},
     num_threads{aria.num_threads},
-    repeat{aria.repeat}
+    repeat{aria.repeat},
+    confirm_exit{aria.confirm_exit},
+    worker_id{worker_id}
 {}
 
 /// @brief run transactions
 void AriaExecutor::Run() {
-    auto batch = std::vector<T>();
-    batch.reserve(repeat);
     auto batch_id = size_t{0};
+    auto batch = std::vector<T>();
     while(true) {
-        #define LATENCY duration_cast<microseconds>(steady_clock::now() - tx->start_time).count()
-        #define BARRIER if (!stop_flag.load()) { barrier.arrive_and_wait(); } else { (void)barrier.arrive(); break; }
-        #define REPEAT_START    for (size_t i = 0; i < repeat; ++i) { auto tx = &batch[i];
-        #define REPEAT_END      }
-        // -- stage 0: generate transaction
+        #define LATENCY duration_cast<microseconds>(steady_clock::now() - tx.start_time).count()
+        // -- stage 0: check stop flags
+        auto _stop = confirm_exit.load() == num_threads;
+        barrier.arrive_and_wait();
+        if (_stop) { return; }
+        if (stop_flag.load()) { confirm_exit.compare_exchange_weak(worker_id, worker_id + 1); }
+        // -- stage 1: generate and execute
+        barrier.arrive_and_wait();
+        batch_id += 1;
         has_conflict.store(false);
         batch.clear();
-        batch_id += 1;
         for (size_t i = 0; i < repeat; ++i) {
-            auto id = counter.fetch_add(1);
-            batch.emplace_back(workload.Next(), id, batch_id);
+            batch.emplace_back(workload.Next(), counter.fetch_add(1), batch_id);
         }
-        BARRIER
-        // -- stage 1: execute and reserve
-        REPEAT_START
-        this->Execute(tx);
-        this->Reserve(tx);
-        statistics.JournalExecute();
-        REPEAT_END
-        BARRIER
-        continue;
-        // -- stage 2: verify + commit (or prepare fallback)
-        REPEAT_START
-        this->Verify(tx);
-        if (tx->flag_conflict) {
-            has_conflict.store(true);
-            this->PrepareLockTable(tx);
-        }
-        else {
-            this->Commit(tx);
-            statistics.JournalCommit(LATENCY);
-        }
-        REPEAT_END
-        BARRIER;
-        // -- stage 3: fallback (skipped if no conflicts occur)
-        if (!has_conflict.load()) { continue; }
-        REPEAT_START
-        if (tx->flag_conflict) {
-            this->Fallback(tx);
+        for (auto& tx: batch) {
+            this->Execute(&tx);
+            this->Reserve(&tx);
             statistics.JournalExecute();
-            statistics.JournalCommit(LATENCY);
         }
-        REPEAT_END
-        BARRIER;
+        // -- stage 2: verify + commit (or prepare fallback)
+        barrier.arrive_and_wait();
+        for (auto& tx: batch) {
+            this->Verify(&tx);
+            if (tx.flag_conflict) {
+                has_conflict.store(true);
+                this->PrepareLockTable(&tx);
+            }
+            else {
+                this->Commit(&tx);
+                statistics.JournalCommit(LATENCY);
+            }
+        }
+        // -- stage 3: fallback (skipped if no conflicts occur)
+        barrier.arrive_and_wait();
+        if (!has_conflict.load()) { continue; }
+        for (auto& tx: batch) {
+            if (tx.flag_conflict) {
+                this->Fallback(&tx);
+                statistics.JournalExecute();
+                statistics.JournalCommit(LATENCY);
+            }
+        }
         // -- stage 4: clean up lock table
-        REPEAT_START
-        this->CleanLockTable(tx);
-        REPEAT_END
-        BARRIER;
+        barrier.arrive_and_wait();
+        for (auto& tx: batch) {
+            this->CleanLockTable(&tx);
+        }
         #undef LATENCY
         #undef BARRIER
     }

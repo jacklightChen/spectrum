@@ -74,6 +74,7 @@ class Aria: public Protocol {
     bool                                enable_reordering;
     std::atomic<bool>                   stop_flag{false};
     std::barrier<std::function<void()>> barrier;
+    std::atomic<size_t>                 confirm_exit{0};
     std::atomic<size_t>                 counter{0};
     std::atomic<bool>                   has_conflict{false};
     std::vector<std::thread>            workers;
@@ -96,14 +97,16 @@ class AriaExecutor {
     AriaLockTable&                          lock_table;
     bool                                    enable_reordering;
     size_t                                  num_threads;
+    std::atomic<size_t>&                    confirm_exit;
     std::atomic<bool>&                      stop_flag;
     std::barrier<std::function<void()>>&    barrier;
     std::atomic<size_t>&                    counter;
     std::atomic<bool>&                      has_conflict;
     size_t                                  repeat;
+    size_t                                  worker_id;
 
     public:
-    AriaExecutor(Aria& aria);
+    AriaExecutor(Aria& aria, size_t worker_id);
     void Run();
     void Execute(T* tx);
     void Reserve(T* tx);
