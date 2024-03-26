@@ -86,7 +86,6 @@ class Spectrum: public Protocol {
     Workload&           workload;
     SpectrumTable       table;
     Statistics&         statistics;
-    EVMType             evm_type;
     std::atomic<size_t> last_execute{1};
     std::atomic<size_t> last_finalized{0};
     std::atomic<bool>   stop_flag{false};

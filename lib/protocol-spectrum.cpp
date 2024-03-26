@@ -241,8 +241,7 @@ Spectrum::Spectrum(Workload& workload, Statistics& statistics, size_t n_executor
     n_executors{n_executors},
     n_dispatchers{n_dispatchers},
     queue_bundle(n_executors),
-    table{table_partitions},
-    evm_type{evm_type}
+    table{table_partitions}
 {
     LOG(INFO) << fmt::format("Spectrum(n_executors={}, n_dispatchers={}, table_partitions={}, evm_type={})", n_executors, n_dispatchers, table_partitions, evm_type);
     workload.SetEVMType(evm_type);

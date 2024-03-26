@@ -25,7 +25,7 @@ using namespace std::chrono;
 
 bool reverse() {
     auto i = int(0);
-    auto x = std::make_tuple(++i, ++i);
+    auto x = std::make_tuple(i++, i++);
     return std::get<0>(x) == 1;
 }
 
