@@ -24,38 +24,27 @@ void Statistics::JournalCommit(size_t latency) {
         count_latency_100us_above.fetch_add(1, std::memory_order_seq_cst);
     }
     DLOG(INFO) << "latency: " << latency << std::endl;
-    if (rand() % 50000 != 0) { return; }
+    if (rand() % 500 != 0) { return; }
     // substitute the closest value in percentile
-    auto guard = Guard{percentile_latency_lock};
+    auto guard = Guard{percentile_latency_mu};
     if (latency <= percentile_latency[0]) {
         percentile_latency[0] = latency;
         return;
     }
-    else if (latency >= percentile_latency[99]) {
-        percentile_latency[99] = latency;
-        return;
-    }
     for (size_t i = 0; i < 99; ++i) {
-        if (latency <= percentile_latency[i] || latency >= percentile_latency[i+1]) {
-            continue;
+        if (latency >= percentile_latency[i] && latency <= percentile_latency[i+1]) {
+            percentile_latency[i+rand()%2] = latency;
+            return;
         }
-        if (2 * latency <= percentile_latency[i+1] + percentile_latency[i]) {
-            percentile_latency[i] = latency;
-        }
-        else {
-            percentile_latency[i+1] = latency;
-        }
-        break;
     }
+    percentile_latency[99] = latency;
 }
 
 void Statistics::JournalExecute() {
     count_execution.fetch_add(1, std::memory_order_seq_cst);
 }
 
-
 std::string Statistics::Print() {
-    auto guard = Guard{percentile_latency_lock};
     return std::string(fmt::format(
         "@{}\n"
         "commit             {}\n"
@@ -85,7 +74,6 @@ std::string Statistics::Print() {
 
 std::string Statistics::PrintWithDuration(std::chrono::milliseconds duration) {
     #define AVG(X) ((double)(X.load()) / (double)(duration.count()) * (double)(1000))
-    auto guard = Guard{percentile_latency_lock};
     return std::string(fmt::format(
         "@{}\n"
         "duration      {}\n"

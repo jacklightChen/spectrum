@@ -18,7 +18,7 @@ int main(int argc, char* argv[]) {
     google::InstallPrefixFormatter(PrefixFormatter);
     google::InitGoogleLogging(argv[0]);
     // check if the rest arguments have the correct number
-    CHECK(argc == 4) << "Except google logging flags, we only expect 3 flags. ";
+    CHECK(argc == 4) << "Except google logging flags, we expect 3 arguments. " << "But we got " << argc - 1 << " ." << std::endl;
     DLOG(WARNING) << "Debug Mode: don't expect good performance. " << std::endl;
     // parse args and allocate resources
     auto statistics = std::make_unique<Statistics>();

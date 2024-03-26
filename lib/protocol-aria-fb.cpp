@@ -193,8 +193,11 @@ void AriaExecutor::Run() {
         REPEAT_END
         BARRIER;
         // -- stage 3: fallback (skipped if no conflicts occur)
+        if (!has_conflict.load()) {    
+            batch.clear();
+            continue;
+        }
         REPEAT_START
-        if (!has_conflict.load()) { continue; }
         if (tx->flag_conflict) {
             this->Fallback(&*tx);
             statistics.JournalExecute();
@@ -205,9 +208,9 @@ void AriaExecutor::Run() {
         // -- stage 4: clean up lock table
         REPEAT_START
         this->CleanLockTable(&*tx);
-        batch.clear();
         REPEAT_END
         BARRIER;
+        batch.clear();
         #undef LATENCY
         #undef BARRIER
     }

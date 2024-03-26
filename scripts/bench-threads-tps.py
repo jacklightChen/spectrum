@@ -18,17 +18,18 @@ if __name__ == '__main__':
     df = pd.DataFrame(columns=['protocol', 'threads', 'zipf', 'table_partition', 'commit', 'abort'])
     conf = {'stdout': subprocess.PIPE, 'stderr': subprocess.PIPE}
     hash = subprocess.run(["git", "rev-parse", "HEAD"], **conf).stdout.decode('utf-8').strip()
+    batch_size = 128
     with open(f'./exp_results/bench_results_{timestamp}', 'w') as f:
         for num_threads in list(range(6, 42, 6)):
             table_partitions    = 9973
             n_dispatchers       = 6
             # spectrum_dispatcher = num_threads // 6
             protocols       = [
-                f"Calvin:{num_threads}:{n_dispatchers}:{table_partitions}",
-                f"Aria:{num_threads}:{table_partitions}:FALSE", 
-                f"Aria:{num_threads}:{table_partitions}:TRUE",
-                f"Sparkle:{num_threads}:{n_dispatchers}:{table_partitions}", 
-                f"Spectrum:{num_threads}:{n_dispatchers}:{table_partitions}:COPYONWRITE"
+                # f"Calvin:{num_threads}:{n_dispatchers}:{table_partitions}",
+                f"Aria:{num_threads}:{table_partitions}:{batch_size // num_threads}:FALSE", 
+                f"Aria:{num_threads}:{table_partitions}:{batch_size // num_threads}:TRUE",
+                # f"Sparkle:{num_threads}:{n_dispatchers}:{table_partitions}", 
+                # f"Spectrum:{num_threads}:{n_dispatchers}:{table_partitions}:COPYONWRITE"
             ]
             for cc in protocols:
                 print(f"#COMMIT-{hash}",  f"CONFIG-{cc}")
