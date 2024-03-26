@@ -1,4 +1,5 @@
 /build
+/build-dbg
 /cmake-build-*
 /.idea
 /scripts/exp_results

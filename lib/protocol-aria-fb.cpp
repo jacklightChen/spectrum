@@ -41,10 +41,10 @@ Aria::Aria(
 void Aria::Start() {
     DLOG(INFO) << "aria start";
     for (size_t i = 0; i < num_threads; ++i) {
-        workers.push_back(std::jthread([this]() {
+        workers.push_back(std::thread([this]() {
             AriaExecutor(*this).Run();
         }));
-	PinRoundRobin(workers[i], i);
+        PinRoundRobin(workers[i], i);
     }
 }
 
@@ -52,6 +52,9 @@ void Aria::Start() {
 /// @return statistics of current execution
 void Aria::Stop() {
     stop_flag.store(true);
+    for (size_t i = 0; i < num_threads; ++i) {
+        workers[i].join();
+    }
     DLOG(INFO) << "aria stop";
 }
 
@@ -78,13 +81,13 @@ AriaTransaction::AriaTransaction(AriaTransaction&& tx):
 /// @param k the reserved key
 void AriaTable::ReserveGet(T* tx, const K& k) {
     Table::Put(k, [&](AriaEntry& entry) {
-        DLOG(INFO) << tx->id << " reserve get" << std::endl;
+        DLOG(INFO) << tx->batch_id << ":" <<  tx->id << " reserve get, current tx(" << entry.batch_id_get << ":" << entry.reserved_get_tx << ")" << std::endl;
         if (entry.batch_id_get != tx->batch_id) {
-            entry.reserved_get_tx = nullptr;
-            entry.batch_id_get = tx->batch_id;
-        }
-        if (entry.reserved_get_tx == nullptr || entry.reserved_get_tx->id > tx->id) {
             entry.reserved_get_tx = tx;
+            entry.batch_id_get = tx->batch_id;
+        } else if (entry.reserved_get_tx == nullptr || entry.reserved_get_tx->id > tx->id) {
+            entry.reserved_get_tx = tx;
+            entry.batch_id_get = tx->batch_id;
             DLOG(INFO) << tx->batch_id << ":" << tx->id << " reserve get ok" << std::endl;
         }
     });
@@ -95,13 +98,13 @@ void AriaTable::ReserveGet(T* tx, const K& k) {
 /// @param k the reserved key
 void AriaTable::ReservePut(T* tx, const K& k) {
     Table::Put(k, [&](AriaEntry& entry) {
-        DLOG(INFO) << tx->id << " reserve put" << std::endl; 
+        DLOG(INFO) << tx->batch_id << ":" <<  tx->id << " reserve put, current tx(" << entry.batch_id_put << ":" << entry.reserved_put_tx << ")" << std::endl;
         if (entry.batch_id_put != tx->batch_id) {
-            entry.reserved_put_tx = nullptr;
-            entry.batch_id_put = tx->batch_id;
-        }
-        if (entry.reserved_put_tx == nullptr || entry.reserved_put_tx->id > tx->id) {
             entry.reserved_put_tx = tx;
+            entry.batch_id_put = tx->batch_id;
+        } else if (entry.reserved_put_tx == nullptr || entry.reserved_put_tx->id > tx->id) {
+            entry.reserved_put_tx = tx;
+            entry.batch_id_put = tx->batch_id;
             DLOG(INFO) << tx->batch_id << ":" << tx->id << " reserve put ok" << std::endl; 
         }
     });
@@ -163,43 +166,47 @@ AriaExecutor::AriaExecutor(Aria& aria):
 void AriaExecutor::Run() {
     auto batch = std::vector<T>();
     batch.reserve(repeat);
+    auto batch_id = size_t{0};
     while(true) {
         #define LATENCY duration_cast<microseconds>(steady_clock::now() - tx->start_time).count()
         #define BARRIER if (!stop_flag.load()) { barrier.arrive_and_wait(); } else { (void)barrier.arrive(); break; }
         #define REPEAT_START    for (size_t i = 0; i < repeat; ++i) { auto tx = &batch[i];
         #define REPEAT_END      }
-        // -- stage 1: execute and reserve
+        // -- stage 0: generate transaction
+        has_conflict.store(false);
+        batch.clear();
+        batch_id += 1;
         for (size_t i = 0; i < repeat; ++i) {
             auto id = counter.fetch_add(1);
-            batch.emplace_back(workload.Next(), id, id / num_threads);
-            auto tx = &batch[i];
-            has_conflict.store(false);
-            this->Execute(&*tx);
-            this->Reserve(&*tx);
-            statistics.JournalExecute();
+            batch.emplace_back(workload.Next(), id, batch_id);
         }
         BARRIER
+        // -- stage 1: execute and reserve
+        REPEAT_START
+        this->Execute(tx);
+        this->Reserve(tx);
+        statistics.JournalExecute();
+        REPEAT_END
+        BARRIER
+        continue;
         // -- stage 2: verify + commit (or prepare fallback)
         REPEAT_START
-        this->Verify(&*tx);
+        this->Verify(tx);
         if (tx->flag_conflict) {
             has_conflict.store(true);
-            this->PrepareLockTable(&*tx);
+            this->PrepareLockTable(tx);
         }
         else {
-            this->Commit(&*tx);
+            this->Commit(tx);
             statistics.JournalCommit(LATENCY);
         }
         REPEAT_END
         BARRIER;
         // -- stage 3: fallback (skipped if no conflicts occur)
-        if (!has_conflict.load()) {    
-            batch.clear();
-            continue;
-        }
+        if (!has_conflict.load()) { continue; }
         REPEAT_START
         if (tx->flag_conflict) {
-            this->Fallback(&*tx);
+            this->Fallback(tx);
             statistics.JournalExecute();
             statistics.JournalCommit(LATENCY);
         }
@@ -207,10 +214,9 @@ void AriaExecutor::Run() {
         BARRIER;
         // -- stage 4: clean up lock table
         REPEAT_START
-        this->CleanLockTable(&*tx);
+        this->CleanLockTable(tx);
         REPEAT_END
         BARRIER;
-        batch.clear();
         #undef LATENCY
         #undef BARRIER
     }
