@@ -30,6 +30,7 @@ struct AriaTransaction: public Transaction {
     std::unordered_map<K, evmc::bytes32, KeyHasher>  local_put;
     std::unordered_map<K, evmc::bytes32, KeyHasher>  local_get;
     AriaTransaction(Transaction&& inner, size_t id, size_t batch_id);
+    AriaTransaction(AriaTransaction&& tx);
 };
 
 /// @brief aria table entry for first round execution

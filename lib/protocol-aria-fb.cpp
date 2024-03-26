@@ -66,6 +66,13 @@ AriaTransaction::AriaTransaction(
     start_time{std::chrono::steady_clock::now()}
 {}
 
+AriaTransaction::AriaTransaction(AriaTransaction&& tx):
+    Transaction{std::move(tx)},
+    id{tx.id},
+    batch_id{tx.batch_id},
+    start_time{tx.start_time}
+{}
+
 /// @brief reserved a get entry
 /// @param tx the transaction
 /// @param k the reserved key
@@ -153,54 +160,58 @@ AriaExecutor::AriaExecutor(Aria& aria):
 {}
 
 /// @brief run transactions
-void AriaExecutor::Run() { while(true) {
-    #define LATENCY duration_cast<microseconds>(steady_clock::now() - tx->start_time).count()
-    #define BARRIER if (!stop_flag.load()) { barrier.arrive_and_wait(); } else { (void)barrier.arrive(); break; }
-    #define REPEAT_START    for (size_t i = 0; i < repeat; ++i) { auto tx = batch[i].get();
-    #define REPEAT_END      }
-    // -- stage 1: execute and reserve
-    auto batch = std::vector<std::unique_ptr<T>>();
-    for (size_t i = 0; i < repeat; ++i) {
-        auto id = counter.fetch_add(1);
-        auto tx = std::make_unique<T>(workload.Next(), id, id / num_threads);
-        has_conflict.store(false);
-        this->Execute(&*tx);
-        this->Reserve(&*tx);
-        statistics.JournalExecute();
-        batch.push_back(std::move(tx));
+void AriaExecutor::Run() {
+    auto batch = std::vector<T>();
+    batch.reserve(repeat);
+    while(true) {
+        #define LATENCY duration_cast<microseconds>(steady_clock::now() - tx->start_time).count()
+        #define BARRIER if (!stop_flag.load()) { barrier.arrive_and_wait(); } else { (void)barrier.arrive(); break; }
+        #define REPEAT_START    for (size_t i = 0; i < repeat; ++i) { auto tx = &batch[i];
+        #define REPEAT_END      }
+        // -- stage 1: execute and reserve
+        for (size_t i = 0; i < repeat; ++i) {
+            auto id = counter.fetch_add(1);
+            batch.emplace_back(workload.Next(), id, id / num_threads);
+            auto tx = &batch[i];
+            has_conflict.store(false);
+            this->Execute(&*tx);
+            this->Reserve(&*tx);
+            statistics.JournalExecute();
+        }
+        BARRIER
+        // -- stage 2: verify + commit (or prepare fallback)
+        REPEAT_START
+        this->Verify(&*tx);
+        if (tx->flag_conflict) {
+            has_conflict.store(true);
+            this->PrepareLockTable(&*tx);
+        }
+        else {
+            this->Commit(&*tx);
+            statistics.JournalCommit(LATENCY);
+        }
+        REPEAT_END
+        BARRIER;
+        // -- stage 3: fallback (skipped if no conflicts occur)
+        REPEAT_START
+        if (!has_conflict.load()) { continue; }
+        if (tx->flag_conflict) {
+            this->Fallback(&*tx);
+            statistics.JournalExecute();
+            statistics.JournalCommit(LATENCY);
+        }
+        REPEAT_END
+        BARRIER;
+        // -- stage 4: clean up lock table
+        REPEAT_START
+        this->CleanLockTable(&*tx);
+        batch.clear();
+        REPEAT_END
+        BARRIER;
+        #undef LATENCY
+        #undef BARRIER
     }
-    BARRIER
-    // -- stage 2: verify + commit (or prepare fallback)
-    REPEAT_START
-    this->Verify(&*tx);
-    if (tx->flag_conflict) {
-        has_conflict.store(true);
-        this->PrepareLockTable(&*tx);
-    }
-    else {
-        this->Commit(&*tx);
-        statistics.JournalCommit(LATENCY);
-    }
-    REPEAT_END
-    BARRIER;
-    // -- stage 3: fallback (skipped if no conflicts occur)
-    REPEAT_START
-    if (!has_conflict.load()) { continue; }
-    if (tx->flag_conflict) {
-        this->Fallback(&*tx);
-        statistics.JournalExecute();
-        statistics.JournalCommit(LATENCY);
-    }
-    REPEAT_END
-    BARRIER;
-    // -- stage 4: clean up lock table
-    REPEAT_START
-    this->CleanLockTable(&*tx);
-    REPEAT_END
-    BARRIER;
-    #undef LATENCY
-    #undef BARRIER
-}}
+}
 
 /// @brief execute a transaction and journal write operations locally
 /// @param tx the transaction

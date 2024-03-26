@@ -168,7 +168,7 @@ target_compile_features(
 )
 target_link_libraries(
     spectrum
-    PUBLIC evmc intx::intx fmt tcmalloc
+    PUBLIC evmc intx::intx fmt
     PRIVATE gflags ethash::keccak glog::glog Threads::Threads
 )
 
