@@ -165,16 +165,13 @@ void AriaExecutor::Run() {
     batch.reserve(repeat);
     while(true) {
         #define LATENCY duration_cast<microseconds>(steady_clock::now() - tx.start_time).count()
-        // -- stage 0: check stop flags
+        // -- stage 1: generate and execute
         auto _stop = confirm_exit.load() == num_threads;
         barrier.arrive_and_wait();
         if (_stop) { return; }
         if (stop_flag.load()) { confirm_exit.compare_exchange_weak(worker_id, worker_id + 1); }
-        // -- stage 1: generate and execute
-        barrier.arrive_and_wait();
         batch_id += 1;
         has_conflict.store(false);
-        batch.clear();
         for (size_t i = 0; i < repeat; ++i) {
             batch.emplace_back(workload.Next(), counter.fetch_add(1), batch_id);
         }
@@ -198,7 +195,10 @@ void AriaExecutor::Run() {
         }
         // -- stage 3: fallback (skipped if no conflicts occur)
         barrier.arrive_and_wait();
-        if (!has_conflict.load()) { continue; }
+        if (!has_conflict.load()) {
+            batch.clear();
+            continue;
+        }
         for (auto& tx: batch) {
             if (tx.flag_conflict) {
                 this->Fallback(&tx);
@@ -211,6 +211,7 @@ void AriaExecutor::Run() {
         for (auto& tx: batch) {
             this->CleanLockTable(&tx);
         }
+        batch.clear();
         #undef LATENCY
         #undef BARRIER
     }

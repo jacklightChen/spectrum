@@ -321,6 +321,7 @@ SparkleExecutor::SparkleExecutor(Sparkle& sparkle, SparkleQueue& queue):
 std::unique_ptr<T> SparkleExecutor::Create() {
     auto tx = queue.Pop();
     if (tx == nullptr || tx->berun_flag) return tx;
+    tx->start_time = steady_clock::now();
     tx->berun_flag = true;
     auto tx_ref = tx.get();
     tx->InstallSetStorageHandler([tx_ref](
