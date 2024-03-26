@@ -24,7 +24,7 @@ CalvinTransaction::CalvinTransaction(Transaction&& inner, size_t id):
 }
 
 void CalvinTransaction::UpdateWait(size_t _id) {
-    auto guard = std::lock_guard{mu};
+    auto guard = Guard{mu};
     if (_id < id) { 
         should_wait = std::max(_id, should_wait);
     }
@@ -233,7 +233,7 @@ void CalvinDispatch::Run() {while(!stop_flag.load()) {
     }
     // now we have the real should_wait, so we wait until it can be executed
     while (true) {
-        auto guard = std::lock_guard{tx->mu}; 
+        auto guard = Guard{tx->mu}; 
         DLOG(INFO) << tx->id << " wait " << tx->should_wait << std::endl;
         if (tx->should_wait <= last_committed.load()) break;
     }

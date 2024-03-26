@@ -39,14 +39,14 @@ SparkleTable::SparkleTable(size_t partitions):
 /// @brief determine transaction has to rerun
 /// @return if transaction has to rerun
 bool SparkleTransaction::HasRerunFlag() {
-    auto guard = std::lock_guard{rerun_flag_mu};
+    auto guard = Guard{rerun_flag_mu};
     return rerun_flag;
 }
 
 /// @brief set rerun flag to true or false
 /// @param flag the value to assign to rerun_flag
 void SparkleTransaction::SetRerunFlag(bool flag) {
-    auto guard = std::lock_guard{rerun_flag_mu};
+    auto guard = Guard{rerun_flag_mu};
     rerun_flag = flag;
 }
 

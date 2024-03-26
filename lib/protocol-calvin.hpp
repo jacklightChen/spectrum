@@ -20,7 +20,7 @@ namespace spectrum {
 
 struct CalvinTransaction : public Transaction {
 
-    std::mutex          mu;
+    SpinLock            mu;
     size_t              id;
     size_t              should_wait{0};
     Prediction          prediction{};

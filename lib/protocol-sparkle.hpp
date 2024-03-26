@@ -24,7 +24,7 @@ struct SparkleTransaction: public Transaction {
     size_t      execution_count{0};
     std::vector<std::tuple<K, evmc::bytes32, size_t>>   tuples_get{};
     std::vector<std::tuple<K, evmc::bytes32>>           tuples_put{};
-    std::mutex      rerun_flag_mu;
+    SpinLock        rerun_flag_mu;
     bool            rerun_flag{false};
     bool            berun_flag{false};
     time_point<steady_clock>    start_time;

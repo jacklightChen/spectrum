@@ -24,18 +24,28 @@ void Statistics::JournalCommit(size_t latency) {
         count_latency_100us_above.fetch_add(1, std::memory_order_seq_cst);
     }
     DLOG(INFO) << "latency: " << latency << std::endl;
-    if (rand() % 10000 != 0) { return; }
+    if (rand() % 50000 != 0) { return; }
     // substitute the closest value in percentile
     auto guard = Guard{percentile_latency_lock};
     if (latency <= percentile_latency[0]) {
         percentile_latency[0] = latency;
         return;
     }
-    for (size_t i = 0; i < 100; ++i) {
-        if (latency >= percentile_latency[i]) {
-            percentile_latency[i] = latency;
-            return;
+    else if (latency >= percentile_latency[99]) {
+        percentile_latency[99] = latency;
+        return;
+    }
+    for (size_t i = 0; i < 99; ++i) {
+        if (latency <= percentile_latency[i] || latency >= percentile_latency[i+1]) {
+            continue;
         }
+        if (2 * latency <= percentile_latency[i+1] + percentile_latency[i]) {
+            percentile_latency[i] = latency;
+        }
+        else {
+            percentile_latency[i+1] = latency;
+        }
+        break;
     }
 }
 

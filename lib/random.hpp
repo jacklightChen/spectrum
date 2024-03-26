@@ -1,6 +1,5 @@
 #pragma once
 #include <random>
-#include <mutex>
 #include <memory>
 #include <functional>
 #include "lock-util.hpp"
