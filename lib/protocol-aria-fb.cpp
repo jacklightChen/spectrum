@@ -155,12 +155,12 @@ AriaExecutor::AriaExecutor(Aria& aria):
 /// @brief run transactions
 void AriaExecutor::Run() { while(true) {
     #define LATENCY duration_cast<microseconds>(steady_clock::now() - tx->start_time).count()
-    #define BARRIER if (!stop_flag.load()) { barrier.arrive_and_wait(); } else { auto _ = barrier.arrive(); break; }
-    #define REPEAT_START    for (int i = 0; i < repeat; ++i) { auto tx = batch[i].get();
+    #define BARRIER if (!stop_flag.load()) { barrier.arrive_and_wait(); } else { (void)barrier.arrive(); break; }
+    #define REPEAT_START    for (size_t i = 0; i < repeat; ++i) { auto tx = batch[i].get();
     #define REPEAT_END      }
     // -- stage 1: execute and reserve
     auto batch = std::vector<std::unique_ptr<T>>();
-    for (int i = 0; i < repeat; ++i) {
+    for (size_t i = 0; i < repeat; ++i) {
         auto id = counter.fetch_add(1);
         auto tx = std::make_unique<T>(workload.Next(), id, id / num_threads);
         has_conflict.store(false);

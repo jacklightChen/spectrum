@@ -2,70 +2,74 @@ cmake_minimum_required(VERSION 3.16...3.27)
 
 # -- Configure project compiler options
 project(spectrum LANGUAGES CXX C)
-cmake_policy(SET CMP0077 NEW)
 set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_EXPORT_COMPILE_COMMANDS true)
-set(WITH_GFLAGS OFF)
+set(ENV{CC}     ${CMAKE_C_COMPILER})
+set(ENV{CXX}    ${CMAKE_CXX_COMPILER})
 
 option(DEBUG OFF)
 option(EVM_PRINT_INSTRUCTIONS "print each evm instruction on instruction start" 0)
+find_package(Threads REQUIRED)
 
 # -- Manage External Dependencies
-find_package(Threads REQUIRED)
 function(GitHub)
-    cmake_parse_arguments(GH "SQUASH" "USER;REPO;BRANCH;WITH;PACK;CONFIG;DIR" "" "${ARGV}")
+    cmake_parse_arguments(GH "" "USER;REPO;BRANCH;AS;PACK;FLAGS;DIR" "" "${ARGV}")
     message(STATUS ${GH_USER}/${GH_REPO}/${GH_BRANCH})
+    # download package from github
     if (EXISTS "${CMAKE_BINARY_DIR}/_deps/${GH_USER}/${GH_REPO}/.git")
-        message("        + download skipped")
+        message("      + download skipped")
     else()
-        message("        + download finish")
         execute_process(
             COMMAND                 git clone --quiet --branch "${GH_BRANCH}" "https://github.com/${GH_USER}/${GH_REPO}" "${CMAKE_BINARY_DIR}/_deps/${GH_USER}/${GH_REPO}"
             WORKING_DIRECTORY       ${CMAKE_BINARY_DIR}
             COMMAND_ERROR_IS_FATAL  ANY
             OUTPUT_QUIET ERROR_QUIET
         )
+        message("      + download finish")
     endif()
-    if(${GH_WITH} STREQUAL "CMAKE SUBDIR")
+    # configure how this package is added to current project
+    if(${GH_AS} STREQUAL "CMAKE SUBDIR")
         set(CMAKE_MESSAGE_LOG_LEVEL__ ${CMAKE_MESSAGE_LOG_LEVEL})
-        set(CMAKE_MESSAGE_LOG_LEVEL NOTICE)
-        add_subdirectory(${CMAKE_BINARY_DIR}/_deps/${GH_USER}/${GH_REPO})
+        set(CMAKE_MESSAGE_LOG_LEVEL ERROR)
+        add_subdirectory(${CMAKE_BINARY_DIR}/_deps/${GH_USER}/${GH_REPO} EXCLUDE_FROM_ALL)
         set(CMAKE_MESSAGE_LOG_LEVEL ${CMAKE_MESSAGE_LOG_LEVEL__})
-        message("        + configuration finish (SUBDIR)")
-    else()
+        message("      + configuration finish (add_subdirecotry)")
+    elseif(${GH_AS} STREQUAL "CMAKE INSTALL" OR ${GH_AS} STREQUAL "CMAKE SCANLIB")
         execute_process(
-            COMMAND                 cmake -S . -B build ${GH_CONFIG} -DCMAKE_INSTALL_PREFIX=${CMAKE_BINARY_DIR}/_deps/${GH_USER}/${GH_REPO}/install
+            COMMAND                 cmake -S . -B build ${GH_FLAGS} -DCMAKE_INSTALL_PREFIX=${CMAKE_BINARY_DIR}/_deps/${GH_USER}/${GH_REPO}/install
             WORKING_DIRECTORY       ${CMAKE_BINARY_DIR}/_deps/${GH_USER}/${GH_REPO}
             COMMAND_ERROR_IS_FATAL  ANY
             OUTPUT_QUIET ERROR_QUIET
         )
-        message("        + configuration finish")
+        message("      + configuration finish")
         execute_process(
             COMMAND                 cmake --build build -j
             WORKING_DIRECTORY       ${CMAKE_BINARY_DIR}/_deps/${GH_USER}/${GH_REPO}
             COMMAND_ERROR_IS_FATAL  ANY
             OUTPUT_QUIET ERROR_QUIET
         )
-        message("        + build finish")
+        message("      + build finish")
         execute_process(
             COMMAND                 cmake --build build --target install
             WORKING_DIRECTORY       ${CMAKE_BINARY_DIR}/_deps/${GH_USER}/${GH_REPO}
             COMMAND_ERROR_IS_FATAL  ANY
             OUTPUT_QUIET ERROR_QUIET
         )
-        message("        + install finish")
+        message("      + install finish")
         set(CMAKE_PREFIX_PATH "${CMAKE_BINARY_DIR}/_deps/${GH_USER}/${GH_REPO}/install")
         if("${GH_PACK}" STREQUAL "")
             set(GH_PACK ${GH_REPO})
         endif()
-        if(${GH_WITH} STREQUAL "CMAKE INSTALL")
+        if(${GH_AS} STREQUAL "CMAKE INSTALL")
             find_package(${GH_PACK} REQUIRED QUIET)
-            message("        + find package finish")
-        elseif(${GH_WITH} STREQUAL "CMAKE SCANLIB")
+            message("      + find package finish")
+        elseif(${GH_AS} STREQUAL "CMAKE SCANLIB")
             include_directories(${CMAKE_BINARY_DIR}/_deps/${GH_USER}/${GH_REPO}/install/include)
             link_directories(${CMAKE_BINARY_DIR}/_deps/${GH_USER}/${GH_REPO}/install/lib)
         endif()
+    else()
+        message(FATAL_ERROR "UNKNOWN \"AUTOFIND OPTION\"")
     endif()
 endfunction()
 
@@ -73,52 +77,52 @@ GitHub(
     USER    "ethereum"
     REPO    "evmc"
     BRANCH  "v11.0.1"
-    WITH    "CMAKE SUBDIR"
+    AS      "CMAKE SUBDIR"
 )
 GitHub(
     USER    "fmtlib"
     REPO    "fmt"
     BRANCH  "10.2.1"
-    WITH    "CMAKE SUBDIR"
+    AS      "CMAKE SUBDIR"
 )
 GitHub(
     USER    "chfast"
     REPO    "ethash"
     BRANCH  "v1.0.1"
-    WITH    "CMAKE INSTALL"
+    AS      "CMAKE INSTALL"
 )
 GitHub(
     USER    "chfast"
     REPO    "intx"
     BRANCH  "v0.10.1"
-    WITH    "CMAKE INSTALL"
+    AS      "CMAKE INSTALL"
 )
 GitHub(
     USER    "gflags"
     REPO    "gflags"
     BRANCH  "v2.2.2"
-    WITH    "CMAKE INSTALL"
-    CONFIG  "-DBUILD_SHARED_LIBS=ON"
+    AS      "CMAKE INSTALL"
+    FLAGS   "-DBUILD_SHARED_LIBS=ON"
 )
 GitHub(
     USER    "google"
     REPO    "glog"
     BRANCH  "v0.7.0"
-    WITH    "CMAKE INSTALL"
-    CONFIG  "-Dgflags_DIR=${gflags_DIR}"
+    AS      "CMAKE INSTALL"
+    FLAGS   "-Dgflags_DIR=${gflags_DIR}"
 )
 GitHub(
     USER    "google"
     REPO    "googletest"
     BRANCH  "v1.14.0"
     PACK    "GTest"
-    WITH    "CMAKE SUBDIR"
+    AS      "CMAKE SUBDIR"
 )
 GitHub(
     USER    "gperftools"
     REPO    "gperftools"
     BRANCH  "gperftools-2.15"
-    WITH    "CMAKE SCANLIB"
+    AS      "CMAKE SCANLIB"
 )
 
 # -- compile options
@@ -164,7 +168,7 @@ target_compile_features(
 )
 target_link_libraries(
     spectrum
-    PUBLIC evmc intx::intx fmt
+    PUBLIC evmc intx::intx fmt tcmalloc
     PRIVATE gflags ethash::keccak glog::glog Threads::Threads
 )
 
