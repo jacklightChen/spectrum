@@ -2,7 +2,6 @@
 #include <atomic>
 #include <chrono>
 #include <mutex>
-#include "./percentile.hpp"
 #include "./lock-util.hpp"
 #include <set>
 #include <iterator>
