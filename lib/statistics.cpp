@@ -67,9 +67,9 @@ std::string Statistics::Print() {
         count_latency_50us.load(),
         count_latency_100us.load(),
         count_latency_100us_above.load(),
-        PERCENTILE(1),
-        PERCENTILE(25),
+        PERCENTILE(50),
         PERCENTILE(75),
+        PERCENTILE(95),
         PERCENTILE(99)
     ));
     #undef PERCENTILE
@@ -107,9 +107,9 @@ std::string Statistics::PrintWithDuration(std::chrono::milliseconds duration) {
         AVG(count_latency_50us),
         AVG(count_latency_100us),
         AVG(count_latency_100us_above),
-        PERCENTILE(1),
-        PERCENTILE(25),
+        PERCENTILE(50),
         PERCENTILE(75),
+        PERCENTILE(95),
         PERCENTILE(99)
     ));
     #undef AVG
