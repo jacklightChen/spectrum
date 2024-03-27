@@ -22,14 +22,14 @@ if __name__ == '__main__':
     with open(f'./exp_results/bench_results_{timestamp}', 'w') as f:
         for num_threads in list(range(6, 42, 6)):
             table_partitions    = 9973
-            n_dispatchers       = 18
+            num_dispatchers       = 18
             # spectrum_dispatcher = num_threads // 6
             protocols       = [
-                # f"Calvin:{num_threads}:{n_dispatchers}:{table_partitions}",
+                # f"Calvin:{num_threads}:{num_dispatchers}:{table_partitions}",
                 f"Aria:{num_threads}:{table_partitions}:{batch_size // num_threads}:FALSE", 
                 f"Aria:{num_threads}:{table_partitions}:{batch_size // num_threads}:TRUE",
-                f"Sparkle:{num_threads}:{n_dispatchers}:{table_partitions}", 
-                f"Spectrum:{num_threads}:{n_dispatchers}:{table_partitions}:COPYONWRITE",
+                f"Sparkle:{num_threads}:{num_dispatchers}:{table_partitions}", 
+                f"Spectrum:{num_threads}:{num_dispatchers}:{table_partitions}:COPYONWRITE",
                 # f"Serial:BASIC:{1}",
             ]
             for cc in protocols:

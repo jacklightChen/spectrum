@@ -10,21 +10,20 @@
 namespace spectrum {
 
 void Statistics::JournalCommit(size_t latency) {
-    auto _count_commit = count_commit.fetch_add(1, std::memory_order_seq_cst);
+    auto _count_commit = count_commit.fetch_add(1, std::memory_order_relaxed);
     if (latency <= 25) {
-        count_latency_25us.fetch_add(1, std::memory_order_seq_cst);
+        count_latency_25us.fetch_add(1, std::memory_order_relaxed);
     }
     else if (latency <= 50) {
-        count_latency_50us.fetch_add(1, std::memory_order_seq_cst);
+        count_latency_50us.fetch_add(1, std::memory_order_relaxed);
     }
     else if (latency <= 100) {
-        count_latency_100us.fetch_add(1, std::memory_order_seq_cst);
+        count_latency_100us.fetch_add(1, std::memory_order_relaxed);
     }
     else {
-        count_latency_100us_above.fetch_add(1, std::memory_order_seq_cst);
+        count_latency_100us_above.fetch_add(1, std::memory_order_relaxed);
     }
     DLOG(INFO) << "latency: " << latency << std::endl;
-
     // Reservoir Sampling
     if (_count_commit < sample_size) {
         latency_array[_count_commit] = latency;
@@ -36,7 +35,7 @@ void Statistics::JournalCommit(size_t latency) {
 }
 
 void Statistics::JournalExecute() {
-    count_execution.fetch_add(1, std::memory_order_seq_cst);
+    count_execution.fetch_add(1, std::memory_order_relaxed);
 }
 
 void Statistics::SortLatency() {

@@ -125,16 +125,16 @@ void CalvinLockTable::Put(T* tx, const K& k) {
     });
 }
 
-Calvin::Calvin(Workload& workload, Statistics& statistics, size_t n_executors, size_t n_dispatchers, size_t table_partitions):
+Calvin::Calvin(Workload& workload, Statistics& statistics, size_t n_executors, size_t num_dispatchers, size_t table_partitions):
     workload{workload},
     statistics{statistics},
     n_executors{n_executors},
-    n_dispatchers{n_dispatchers},
+    num_dispatchers{num_dispatchers},
     queue_bundle(n_executors),
     table{table_partitions},
     lock_table{table_partitions}
 {
-    LOG(INFO) << fmt::format("Calvin(n_executors={}, n_dispatchers={}, n_table_partitions={})", n_executors, n_dispatchers, table_partitions);
+    LOG(INFO) << fmt::format("Calvin(n_executors={}, num_dispatchers={}, n_table_partitions={})", n_executors, num_dispatchers, table_partitions);
     workload.SetEVMType(EVMType::BASIC);
 }
 
@@ -147,9 +147,9 @@ void Calvin::Start() {
         executors.push_back(std::thread([this, queue] {
             CalvinExecutor(*this, *queue).Run();
         }));
-        PinRoundRobin(executors[i], i + n_dispatchers);
+        PinRoundRobin(executors[i], i + num_dispatchers);
     }
-    for (size_t i = 0; i != n_dispatchers; ++i) {
+    for (size_t i = 0; i != num_dispatchers; ++i) {
         DLOG(INFO) << "start dispatcher " << i << std::endl;
         dispatchers.push_back(std::thread([this] {
             CalvinDispatch(*this).Run();

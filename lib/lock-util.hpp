@@ -101,7 +101,7 @@ template<typename K, typename V, typename Hasher>
 class Table {
 
     private:
-    size_t                  n_partitions;
+    size_t                  num_partitions;
     std::vector<SpinLock>   locks;
     std::vector<std::unordered_map<K, V, Hasher>> partitions;
 
@@ -116,12 +116,12 @@ template<typename K, typename V, typename Hasher>
 Table<K, V, Hasher>::Table(size_t partitions)
     : locks(partitions),
       partitions(partitions),
-      n_partitions{partitions}
+      num_partitions{partitions}
 {}
 
 template<typename K, typename V, typename Hasher>
 void Table<K, V, Hasher>::Get(const K& k, std::function<void(const V& v)>&& vmap) {
-    auto partition_id = ((size_t)Hasher()(k)) % n_partitions;
+    auto partition_id = ((size_t)Hasher()(k)) % num_partitions;
     DLOG(INFO) << "at partition " << partition_id;
     auto guard = Guard{locks[partition_id]};
     auto& partition = this->partitions[partition_id];
@@ -130,7 +130,7 @@ void Table<K, V, Hasher>::Get(const K& k, std::function<void(const V& v)>&& vmap
 
 template<typename K, typename V, typename Hasher>
 void Table<K, V, Hasher>::Put(const K& k, std::function<void(V& v)>&& vmap) {
-    auto partition_id = ((size_t)Hasher()(k)) % n_partitions;
+    auto partition_id = ((size_t)Hasher()(k)) % num_partitions;
     DLOG(INFO) << "at partition " << partition_id;
     auto guard = Guard{locks[partition_id]};
     auto& partition = this->partitions[partition_id];

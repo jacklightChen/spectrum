@@ -108,7 +108,7 @@ std::unique_ptr<Protocol> ParseProtocol(const char* arg, Workload& workload, Sta
     OPT(Serial,   EVMTYPE, INT)
     OPT(Calvin,   INT, INT, INT)
     OPT(Dummy,    INT, INT, EVMTYPE)
-    // Calvin num_threads, n_dispatchers(default 1), table_partitions
+    // Calvin num_threads, num_dispatchers(default 1), table_partitions
     #undef OPT
     // fallback to an error
     THROW("unknown protocol option ({})", std::string{name});

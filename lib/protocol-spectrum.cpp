@@ -235,15 +235,15 @@ void SpectrumTable::ClearPut(T* tx, const K& k) {
 /// @brief spectrum initialization parameters
 /// @param workload the transaction generator
 /// @param table_partitions the number of parallel partitions to use in the hash table
-Spectrum::Spectrum(Workload& workload, Statistics& statistics, size_t n_executors, size_t n_dispatchers, size_t table_partitions, EVMType evm_type):
+Spectrum::Spectrum(Workload& workload, Statistics& statistics, size_t n_executors, size_t num_dispatchers, size_t table_partitions, EVMType evm_type):
     workload{workload},
     statistics{statistics},
     n_executors{n_executors},
-    n_dispatchers{n_dispatchers},
+    num_dispatchers{num_dispatchers},
     queue_bundle(n_executors),
     table{table_partitions}
 {
-    LOG(INFO) << fmt::format("Spectrum(n_executors={}, n_dispatchers={}, table_partitions={}, evm_type={})", n_executors, n_dispatchers, table_partitions, evm_type);
+    LOG(INFO) << fmt::format("Spectrum(n_executors={}, num_dispatchers={}, table_partitions={}, evm_type={})", n_executors, num_dispatchers, table_partitions, evm_type);
     workload.SetEVMType(evm_type);
 }
 
@@ -256,9 +256,9 @@ void Spectrum::Start() {
         executors.push_back(std::thread([this, queue]{
             std::make_unique<SpectrumExecutor>(*this, *queue)->Run();
         }));
-        PinRoundRobin(executors[i], i + n_dispatchers);
+        PinRoundRobin(executors[i], i + num_dispatchers);
     }
-    for (size_t i = 0; i != n_dispatchers; ++i) {
+    for (size_t i = 0; i != num_dispatchers; ++i) {
         dispatchers.push_back(std::thread([this]{
             std::make_unique<SpectrumDispatch>(*this)->Run();
         }));

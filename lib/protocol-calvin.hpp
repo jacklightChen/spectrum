@@ -64,7 +64,7 @@ class Calvin : public Protocol {
     Statistics&                 statistics;
     CalvinTable                 table;
     CalvinLockTable             lock_table;
-    size_t                      n_dispatchers;
+    size_t                      num_dispatchers;
     size_t                      n_executors;
     std::atomic<bool>           stop_flag{false};
     std::atomic<size_t>         last_scheduled{1};
@@ -78,7 +78,7 @@ class Calvin : public Protocol {
     friend class CalvinDispatch;
 
     public:
-    Calvin(Workload& workload, Statistics& statistics, size_t n_executors, size_t n_dispatchers, size_t table_partitions);
+    Calvin(Workload& workload, Statistics& statistics, size_t n_executors, size_t num_dispatchers, size_t table_partitions);
     void Start() override;
     void Stop() override;
 

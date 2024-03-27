@@ -21,14 +21,14 @@ if __name__ == '__main__':
     with open(f'./exp_results/bench_results_{timestamp}', 'w') as f:
         for zipf in [0.7, 0.8, 0.9, 1.0, 1.1, 1.2, 1.3]:
             table_partitions    = 9973
-            n_dispatchers       = 6
+            num_dispatchers       = 6
             # spectrum_dispatcher = num_threads // 6
             protocols       = [
-                f"Calvin:{threads}:{n_dispatchers}:{table_partitions}",
+                f"Calvin:{threads}:{num_dispatchers}:{table_partitions}",
                 f"Aria:{threads}:{table_partitions}:FALSE", 
                 f"Aria:{threads}:{table_partitions}:TRUE",
-                f"Sparkle:{threads}:{n_dispatchers}:{table_partitions}", 
-                f"Spectrum:{threads}:{n_dispatchers}:{table_partitions}:COPYONWRITE"
+                f"Sparkle:{threads}:{num_dispatchers}:{table_partitions}", 
+                f"Spectrum:{threads}:{num_dispatchers}:{table_partitions}:COPYONWRITE"
             ]
             for cc in protocols:
                 print(f"#COMMIT-{hash}",  f"CONFIG-{cc}")
