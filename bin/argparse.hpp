@@ -80,7 +80,7 @@ std::unique_ptr<Workload> ParseWorkload(const char* arg) {
     auto iter = args.begin();
     // map each option to an argparser
     #define OPT(X, Y...) if (name == #X) { \
-        auto n = (size_t) NUMARGS(Y);      \
+        auto n = (size_t) COUNT(Y);      \
         ASSGIN_ARGS(Y);                    \
         DLOG(INFO) << #Y << std::endl;     \
         if (dist != n) THROW("workload {} has {} args -- ({}), but we found {} args", #X, n, #Y, dist); \
@@ -100,7 +100,7 @@ std::unique_ptr<Protocol> ParseProtocol(const char* arg, Workload& workload, Sta
     auto iter = args.begin();
     // map each option to an argparser
     #define OPT(X, Y...) if (name == #X) { \
-        auto n = (size_t) NUMARGS(Y);      \
+        auto n = (size_t) COUNT(Y);      \
         ASSGIN_ARGS(Y);                    \
         if (dist != n) THROW("protocol {} has {} args -- ({}), but we found {} args", #X, n, #Y, dist); \
         return static_cast<std::unique_ptr<Protocol>>(std::make_unique<X>(workload, statistics, FILLIN_ARGS(Y)));  \
@@ -125,6 +125,6 @@ std::unique_ptr<Protocol> ParseProtocol(const char* arg, Workload& workload, Sta
 #undef EVMTYPE
 #undef FILLIN_ARGS
 #undef ASSGIN_ARGS
-#undef NUMARGS_HELPER
-#undef NUMARGS
+#undef COUNT_HELPER
+#undef COUNT
 #undef THROW

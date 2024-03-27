@@ -116,6 +116,7 @@ class CalvinDispatch {
 
 };
 
+#undef V
 #undef K
 #undef T
 
