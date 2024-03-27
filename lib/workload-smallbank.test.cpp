@@ -7,7 +7,7 @@
 #include <chrono>
 #include <thread>
 #include <spectrum/statistics.hpp>
-#include "glog-prefix-install.hpp"
+#include "glog-prefix-install.test.hpp"
 
 namespace {
 

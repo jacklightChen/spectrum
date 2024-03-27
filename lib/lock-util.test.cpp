@@ -4,7 +4,7 @@
 #include <spectrum/hex.hpp>
 #include <evmc/evmc.hpp>
 #include <span>
-#include "glog-prefix-install.hpp"
+#include "glog-prefix-install.test.hpp"
 
 namespace {
 

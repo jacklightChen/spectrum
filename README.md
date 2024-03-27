@@ -60,6 +60,10 @@ CXX=clang++-17 CC=clang-17 cmake -S . -B build
 
 We conduct experiments to show that Spectrum protocol is better than Sparkle protocol and Aria protocol in high-contention scenarios, and only have minor performance gap in comparison to Sparkle protocol in low-contention scenarios. 
 
+# Credit
+
++ hananbeer/sqlidity
+
 # Implementation Details
 
 ## Sparkle
