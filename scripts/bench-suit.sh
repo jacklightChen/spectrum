@@ -1,10 +1,10 @@
 EXECUTABLE=$2
 
 varthread() {
-    for b in $2; do
+    for b in $1; do
         echo    "------"
         for i in {1..2}; do
-            p=$1
+            p=$2
             eval    "p=\"${p//_/$i}\""
             echo    "@$p $b"
             $EXECUTABLE  $p $b 100ms
@@ -13,8 +13,8 @@ varthread() {
 }
 
 varskew() {
-    for p in $2; do
-        for b in $1; do
+    for p in $1 do
+        for b in $2; do
             for s in {0..20}; do
                 x=$(jq -n 2*$s/20)
                 x=${b//_/$x}
