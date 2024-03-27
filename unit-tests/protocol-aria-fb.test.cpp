@@ -1,7 +1,7 @@
 #include <spectrum/protocol-aria-fb.hpp>
 #include <spectrum/workload-smallbank.hpp>
 #include <gtest/gtest.h>
-#include "glog-prefix-install.test.hpp"
+#include "glog-prefix-install.hpp"
 
 namespace
 {

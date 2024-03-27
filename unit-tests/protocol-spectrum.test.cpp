@@ -3,7 +3,7 @@
 #include <spectrum/evm_transaction.hpp>
 #include <spectrum/workload-smallbank.hpp>
 #include <span>
-#include "glog-prefix-install.test.hpp"
+#include "glog-prefix-install.hpp"
 
 namespace {
 

@@ -1,2 +1,0 @@
-#include <SQLiteCpp/SQLiteCpp.h>
-
