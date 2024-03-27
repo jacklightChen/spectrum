@@ -275,6 +275,7 @@ void Sparkle::Start() {
 
 /// @brief stop sparkle protocol
 void Sparkle::Stop() {
+    stop_flag.store(true);
     for (size_t i = 0; i != num_executors; ++i) {
         executors[i].join();
     }
