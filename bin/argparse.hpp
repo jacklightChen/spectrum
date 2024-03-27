@@ -11,7 +11,7 @@
 #include <spectrum/workload/ycsb.hpp>
 #include "macros.hpp"
 
-// counting & expanding
+// expanding macros to assignments and use them later
 #define ASSGIN_ARGS_HELPER(X, ...) __VA_OPT__(auto NAME(__VA_ARGS__) = (X);)
 #define FILLIN_ARGS_HELPER(X, ...) __VA_OPT__(, NAME(__VA_ARGS__))
 #define ASSGIN_ARGS(...)           FOR_EACH(ASSGIN_ARGS_HELPER, __VA_ARGS__, _)
@@ -125,6 +125,4 @@ std::unique_ptr<Protocol> ParseProtocol(const char* arg, Workload& workload, Sta
 #undef EVMTYPE
 #undef FILLIN_ARGS
 #undef ASSGIN_ARGS
-#undef COUNT_HELPER
-#undef COUNT
 #undef THROW
