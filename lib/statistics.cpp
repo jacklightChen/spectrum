@@ -7,7 +7,7 @@
 #include <glog/logging.h>
 #include <cstdlib>
 #include <thread>
-
+#include <ethash/keccak.hpp>
 namespace spectrum {
 
 void Statistics::JournalCommit(size_t latency) {
@@ -25,7 +25,7 @@ void Statistics::JournalCommit(size_t latency) {
         count_latency_100us_above.fetch_add(1, std::memory_order_relaxed);
     }
     DLOG(INFO) << "latency: " << latency << std::endl;
-    auto random = (std::hash<size_t>()(count_commit_ ^ std::hash<std::thread::id>()(std::this_thread::get_id()))) % count_commit_;
+    auto random = ethash::keccak256((uint8_t*)&count_commit_, 4).word64s[count_commit_ % 4] % count_commit_;
     if (count_commit_ < SAMPLE) {
         sample_latency[count_commit_].store(latency);
     }
@@ -67,9 +67,9 @@ std::string Statistics::Print() {
         count_latency_50us.load(),
         count_latency_100us.load(),
         count_latency_100us_above.load(),
-        PERCENTILE(1),
-        PERCENTILE(25),
+        PERCENTILE(50),
         PERCENTILE(75),
+        PERCENTILE(95),
         PERCENTILE(99)
     ));
     #undef PERCENTILE
@@ -107,9 +107,9 @@ std::string Statistics::PrintWithDuration(std::chrono::milliseconds duration) {
         AVG(count_latency_50us),
         AVG(count_latency_100us),
         AVG(count_latency_100us_above),
-        PERCENTILE(1),
-        PERCENTILE(25),
+        PERCENTILE(50),
         PERCENTILE(75),
+        PERCENTILE(95),
         PERCENTILE(99)
     ));
     #undef AVG
