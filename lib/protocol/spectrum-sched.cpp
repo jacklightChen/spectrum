@@ -278,7 +278,6 @@ SpectrumSchedExecutor::SpectrumSchedExecutor(SpectrumSched& spectrum):
 /// @brief generate a transaction and execute it
 std::unique_ptr<T> SpectrumSchedExecutor::Create() {
     auto tx = std::make_unique<T>(workload.Next(), last_execute.fetch_add(1));
-    if (tx == nullptr || tx->berun_flag.load()) return tx;
     tx->start_time = steady_clock::now();
     tx->berun_flag.store(true);
     auto tx_ref = tx.get();
@@ -371,8 +370,6 @@ void SpectrumSchedExecutor::ReExecute(SpectrumSchedTransaction* tx) {
     tx->tuples_get.resize(back_to);
     tx->Execute();
     statistics.JournalExecute();
-    // tx->execution_count += 1;
-    // if(tx->execution_count >= 10) LOG(ERROR) << tx->id << " execution " << tx->execution_count << std::endl;
     // commit all results if possible & necessary
     for (auto entry: tx->tuples_put) {
         if (tx->HasRerunKeys()) { break; }
@@ -384,8 +381,15 @@ void SpectrumSchedExecutor::ReExecute(SpectrumSchedTransaction* tx) {
 
 /// @brief start an executor
 void SpectrumSchedExecutor::Run() {while (!stop_flag.load()) {
-    auto tx = Create();
-    if (tx == nullptr) continue;
+    auto tx = [&]{
+        if (rng() % (queue.size() + 1) == 0) {
+            return Create();
+        }
+        else {
+            auto tx = std::move(queue.front());
+            return queue.pop(), std::move(tx);
+        }
+    }();
     while (!stop_flag.load()) {
         if (tx->HasRerunKeys()) {
             // sweep all operations from previous execution
@@ -404,6 +408,9 @@ void SpectrumSchedExecutor::Run() {while (!stop_flag.load()) {
             auto latency = duration_cast<microseconds>(steady_clock::now() - tx->start_time).count();
             statistics.JournalCommit(latency);
             break;
+        }
+        else {
+            queue.push(std::move(tx));
         }
     }
 }}

@@ -10,6 +10,7 @@
 #include <thread>
 #include <queue>
 #include <optional>
+#include <random>
 
 namespace spectrum {
 
@@ -83,7 +84,7 @@ class SpectrumSched: public Protocol {
     private:
     size_t              num_executors;
     Workload&           workload;
-    SpectrumSchedTable       table;
+    SpectrumSchedTable  table;
     Statistics&         statistics;
     std::atomic<size_t> last_execute{1};
     std::atomic<size_t> last_finalized{0};
@@ -104,11 +105,13 @@ class SpectrumSchedExecutor {
 
     private:
     Workload&               workload;
-    SpectrumSchedTable&          table;
+    SpectrumSchedTable&     table;
     Statistics&             statistics;
+    std::mt19937            rng;
     std::atomic<size_t>&    last_execute;
     std::atomic<size_t>&    last_finalized;
     std::atomic<bool>&      stop_flag;
+    std::queue<std::unique_ptr<T>>  queue;
 
     public:
     SpectrumSchedExecutor(SpectrumSched& spectrum);
