@@ -12,7 +12,7 @@ namespace spectrum {
 class Statistics {
 
     private:
-    static const int SAMPLE = 10000;
+    static const int SAMPLE = 1000;
     std::atomic<size_t> count_commit{0};
     std::atomic<size_t> count_execution{0};
     std::atomic<size_t> count_latency_25us{0};

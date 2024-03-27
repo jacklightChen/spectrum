@@ -25,7 +25,7 @@ void Statistics::JournalCommit(size_t latency) {
         count_latency_100us_above.fetch_add(1, std::memory_order_relaxed);
     }
     DLOG(INFO) << "latency: " << latency << std::endl;
-    auto random = std::hash<size_t>()(count_commit_) % count_commit_;
+    auto random = (std::hash<size_t>()(count_commit_ ^ std::hash<std::thread::id>()(std::this_thread::get_id()))) % count_commit_;
     if (count_commit_ < SAMPLE) {
         sample_latency[count_commit_].store(latency);
     }
