@@ -5,6 +5,7 @@
 #include <spectrum/protocol/serial.hpp>
 #include <spectrum/protocol/calvin.hpp>
 #include <spectrum/protocol/dummy.hpp>
+#include <spectrum/protocol/spectrum-sched.hpp>
 #include <spectrum/workload/abstraction.hpp>
 #include <spectrum/workload/smallbank.hpp>
 #include <spectrum/workload/ycsb.hpp>
