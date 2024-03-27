@@ -125,5 +125,6 @@
     "CC": "clang-17",
     "CXX": "clang++-17"
 },
-"typewriterAutoScroll.enable": false
+"typewriterAutoScroll.enable": false,
+"cmake.automaticReconfigure": false
 }

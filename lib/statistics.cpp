@@ -6,11 +6,12 @@
 #include <iostream>
 #include <glog/logging.h>
 #include <cstdlib>
+#include <thread>
 
 namespace spectrum {
 
 void Statistics::JournalCommit(size_t latency) {
-    auto _count_commit = count_commit.fetch_add(1, std::memory_order_relaxed);
+    auto count_commit_ = count_commit.fetch_add(1, std::memory_order_relaxed);
     if (latency <= 25) {
         count_latency_25us.fetch_add(1, std::memory_order_relaxed);
     }
@@ -24,13 +25,12 @@ void Statistics::JournalCommit(size_t latency) {
         count_latency_100us_above.fetch_add(1, std::memory_order_relaxed);
     }
     DLOG(INFO) << "latency: " << latency << std::endl;
-    // Reservoir Sampling
-    if (_count_commit < sample_size) {
-        latency_array[_count_commit] = latency;
-    } else {
-        // rand() is not thread-safe, and it cost a lot of time
-        auto index = rand() % _count_commit;
-        if (index < sample_size) latency_array[index] = latency;
+    auto random = std::hash<size_t>()(count_commit_) % count_commit_;
+    if (count_commit_ < SAMPLE) {
+        sample_latency[count_commit_].store(latency);
+    }
+    else if (random < SAMPLE) {
+        sample_latency[random].store(latency);
     }
 }
 
@@ -38,24 +38,16 @@ void Statistics::JournalExecute() {
     count_execution.fetch_add(1, std::memory_order_relaxed);
 }
 
-void Statistics::SortLatency() {
-    if (count_commit.load() <= sample_size) {
-        std::sort(latency_array.begin(), latency_array.begin() + count_commit.load());
-    } else {
-        std::sort(latency_array.begin(), latency_array.end());
-    }
-}
-
-size_t Statistics::PercentileLatency(size_t p) {
-    if (count_commit.load() <= sample_size) {
-        return latency_array[p * count_commit.load() / 100];
-    } else {
-        return latency_array[p * sample_size / 100];
-    }
-}
-
 std::string Statistics::Print() {
-    SortLatency();
+    #define PERCENTILE(X) sample_latency_[X * sample_latency_.size() / 100]
+    auto sample_latency_ = std::vector<size_t>();
+    std::transform(
+        sample_latency.begin(), 
+        sample_latency.end(), 
+        std::back_inserter(sample_latency_),
+        [](auto& x) { return x.load(); }
+    );
+    std::sort(sample_latency_.begin(), sample_latency_.end());
     return std::string(fmt::format(
         "@{}\n"
         "commit             {}\n"
@@ -75,17 +67,25 @@ std::string Statistics::Print() {
         count_latency_50us.load(),
         count_latency_100us.load(),
         count_latency_100us_above.load(),
-        PercentileLatency(50), 
-        PercentileLatency(75),
-        PercentileLatency(95),
-        PercentileLatency(99)
+        PERCENTILE(1),
+        PERCENTILE(25),
+        PERCENTILE(75),
+        PERCENTILE(99)
     ));
-    #undef nth
+    #undef PERCENTILE
 }
 
 std::string Statistics::PrintWithDuration(std::chrono::milliseconds duration) {
-    SortLatency();
     #define AVG(X) ((double)(X.load()) / (double)(duration.count()) * (double)(1000))
+    #define PERCENTILE(X) sample_latency_[X * sample_latency_.size() / 100]
+    auto sample_latency_ = std::vector<size_t>();
+    std::transform(
+        sample_latency.begin(), 
+        sample_latency.end(), 
+        std::back_inserter(sample_latency_),
+        [](auto& x) { return x.load(); }
+    );
+    std::sort(sample_latency_.begin(), sample_latency_.end());
     return std::string(fmt::format(
         "@{}\n"
         "duration      {}\n"
@@ -107,13 +107,13 @@ std::string Statistics::PrintWithDuration(std::chrono::milliseconds duration) {
         AVG(count_latency_50us),
         AVG(count_latency_100us),
         AVG(count_latency_100us_above),
-        PercentileLatency(50), 
-        PercentileLatency(75),
-        PercentileLatency(95),
-        PercentileLatency(99)
+        PERCENTILE(1),
+        PERCENTILE(25),
+        PERCENTILE(75),
+        PERCENTILE(99)
     ));
     #undef AVG
-    #undef nth
+    #undef PERCENTILE
 }
 
 } // namespace spectrum

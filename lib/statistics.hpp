@@ -8,25 +8,27 @@
 
 namespace spectrum {
 
+
 class Statistics {
-    public:
+
+    private:
+    static const int SAMPLE = 10000;
     std::atomic<size_t> count_commit{0};
     std::atomic<size_t> count_execution{0};
     std::atomic<size_t> count_latency_25us{0};
     std::atomic<size_t> count_latency_50us{0};
     std::atomic<size_t> count_latency_100us{0};
     std::atomic<size_t> count_latency_100us_above{0};
-    static const int sample_size = 10000;
-    std::array<size_t, sample_size> latency_array;
-    void SortLatency();
-    size_t PercentileLatency(size_t p);
-    SpinLock            percentile_latency_mu;
+    std::array<std::atomic<size_t>, SAMPLE> sample_latency;
+
+    public:
     Statistics() = default;
     Statistics(const Statistics& statistics) = delete;
     void JournalCommit(size_t latency);
     void JournalExecute();
     std::string Print();
     std::string PrintWithDuration(std::chrono::milliseconds duration);
+
 };
 
 } // namespace spectrum
