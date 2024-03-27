@@ -61,45 +61,26 @@ struct SparkleTable: private Table<K, V, KeyHasher> {
 };
 
 using SparkleQueue = LockPriorityQueue<T>;
-class SparkleDispatch;
 class SparkleExecutor;
 
 class Sparkle: public Protocol {
 
     private:
-    size_t              n_executors;
-    size_t              num_dispatchers;
+    size_t              num_executors;
     Workload&           workload;
     SparkleTable        table;
     Statistics&         statistics;
     std::atomic<size_t> last_execute{1};
     std::atomic<size_t> last_finalized{0};
     std::atomic<bool>   stop_flag{false};
-    std::vector<SparkleQueue>   queue_bundle;
     std::vector<std::thread>    executors{};
     std::vector<std::thread>    dispatchers{};
-    friend class SparkleDispatch;
     friend class SparkleExecutor;
 
     public:
-    Sparkle(Workload& workload, Statistics& statistics, size_t n_executors, size_t num_dispatchers, size_t table_partitions);
+    Sparkle(Workload& workload, Statistics& statistics, size_t num_executors, size_t table_partitions);
     void Start() override;
     void Stop() override;
-
-};
-
-/// @brief a dispatcher that sends transactions to executors in a round-robin manner
-class SparkleDispatch {
-
-    private:
-    Workload&                   workload;
-    std::atomic<size_t>&        last_execute;
-    std::vector<SparkleQueue>&  queue_bundle;
-    std::atomic<bool>&          stop_flag;
-
-    public:
-    SparkleDispatch(Sparkle& sparkle);
-    void Run();
 
 };
 
@@ -107,14 +88,15 @@ class SparkleDispatch {
 class SparkleExecutor {
 
     private:
-    SparkleQueue&           queue;
+    Workload&               workload;
     SparkleTable&           table;
     Statistics&             statistics;
+    std::atomic<size_t>&    last_execute;
     std::atomic<size_t>&    last_finalized;
     std::atomic<bool>&      stop_flag;
 
     public:
-    SparkleExecutor(Sparkle& sparkle, SparkleQueue& queue);
+    SparkleExecutor(Sparkle& sparkle);
     std::unique_ptr<T> Create();
     void ReExecute(SparkleTransaction* tx);
     void Run();

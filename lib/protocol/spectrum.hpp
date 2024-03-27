@@ -81,7 +81,7 @@ class SpectrumDispatch;
 class Spectrum: public Protocol {
 
     private:
-    size_t              n_executors;
+    size_t              num_executors;
     size_t              num_dispatchers;
     Workload&           workload;
     SpectrumTable       table;
@@ -96,7 +96,7 @@ class Spectrum: public Protocol {
     friend class SpectrumDispatch;
 
     public:
-    Spectrum(Workload& workload, Statistics& statistics, size_t n_executors, size_t num_dispatchers, size_t table_partitions, EVMType evm_type);
+    Spectrum(Workload& workload, Statistics& statistics, size_t num_executors, size_t num_dispatchers, size_t table_partitions, EVMType evm_type);
     void Start() override;
     void Stop() override;
 

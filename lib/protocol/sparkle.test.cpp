@@ -60,7 +60,7 @@ TEST(Sparkle, JustRunSmallbank) {
     google::InstallPrefixFormatter(PrefixFormatter);
     auto statistics = Statistics();
     auto workload = Smallbank(10000, 0.0);
-    auto protocol = Sparkle(workload, statistics, 6, 32, 2);
+    auto protocol = Sparkle(workload, statistics, 6, 32);
     protocol.Start();
     std::this_thread::sleep_for(1000ms);
     protocol.Stop();

@@ -235,23 +235,23 @@ void SpectrumTable::ClearPut(T* tx, const K& k) {
 /// @brief spectrum initialization parameters
 /// @param workload the transaction generator
 /// @param table_partitions the number of parallel partitions to use in the hash table
-Spectrum::Spectrum(Workload& workload, Statistics& statistics, size_t n_executors, size_t num_dispatchers, size_t table_partitions, EVMType evm_type):
+Spectrum::Spectrum(Workload& workload, Statistics& statistics, size_t num_executors, size_t num_dispatchers, size_t table_partitions, EVMType evm_type):
     workload{workload},
     statistics{statistics},
-    n_executors{n_executors},
+    num_executors{num_executors},
     num_dispatchers{num_dispatchers},
-    queue_bundle(n_executors),
+    queue_bundle(num_executors),
     table{table_partitions}
 {
-    LOG(INFO) << fmt::format("Spectrum(n_executors={}, num_dispatchers={}, table_partitions={}, evm_type={})", n_executors, num_dispatchers, table_partitions, evm_type);
+    LOG(INFO) << fmt::format("Spectrum(num_executors={}, num_dispatchers={}, table_partitions={}, evm_type={})", num_executors, num_dispatchers, table_partitions, evm_type);
     workload.SetEVMType(evm_type);
 }
 
 /// @brief start spectrum protocol
-/// @param n_executors the number of threads to start
+/// @param num_executors the number of threads to start
 void Spectrum::Start() {
     stop_flag.store(false);
-    for (size_t i = 0; i != n_executors; ++i) {
+    for (size_t i = 0; i != num_executors; ++i) {
         auto queue = &queue_bundle[i];
         executors.push_back(std::thread([this, queue]{
             std::make_unique<SpectrumExecutor>(*this, *queue)->Run();
@@ -270,7 +270,6 @@ void Spectrum::Start() {
 void Spectrum::Stop() {
     stop_flag.store(true);
     for (auto& x: executors) 	{ x.join(); }
-    for (auto& x: dispatchers) 	{ x.join(); }
 }
 
 /// @brief initialize a dispatcher

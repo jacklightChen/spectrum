@@ -125,23 +125,23 @@ void CalvinLockTable::Put(T* tx, const K& k) {
     });
 }
 
-Calvin::Calvin(Workload& workload, Statistics& statistics, size_t n_executors, size_t num_dispatchers, size_t table_partitions):
+Calvin::Calvin(Workload& workload, Statistics& statistics, size_t num_executors, size_t num_dispatchers, size_t table_partitions):
     workload{workload},
     statistics{statistics},
-    n_executors{n_executors},
+    num_executors{num_executors},
     num_dispatchers{num_dispatchers},
-    queue_bundle(n_executors),
+    queue_bundle(num_executors),
     table{table_partitions},
     lock_table{table_partitions}
 {
-    LOG(INFO) << fmt::format("Calvin(n_executors={}, num_dispatchers={}, n_table_partitions={})", n_executors, num_dispatchers, table_partitions);
+    LOG(INFO) << fmt::format("Calvin(num_executors={}, num_dispatchers={}, n_table_partitions={})", num_executors, num_dispatchers, table_partitions);
     workload.SetEVMType(EVMType::BASIC);
 }
 
 /// @brief start calvin protocol
 void Calvin::Start() {
     stop_flag.store(false);
-    for (size_t i = 0; i != n_executors; ++i) {
+    for (size_t i = 0; i != num_executors; ++i) {
         DLOG(INFO) << "start executor " << i << std::endl;
         auto queue = &queue_bundle[i];
         executors.push_back(std::thread([this, queue] {

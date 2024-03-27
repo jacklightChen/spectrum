@@ -251,75 +251,49 @@ void SparkleTable::ClearPut(T* tx, const K& k) {
 /// @brief sparkle initialization parameters
 /// @param workload the transaction generator
 /// @param table_partitions the number of parallel partitions to use in the hash table
-Sparkle::Sparkle(Workload& workload, Statistics& statistics, size_t n_executors, size_t num_dispatchers, size_t table_partitions):
+Sparkle::Sparkle(Workload& workload, Statistics& statistics, size_t num_executors, size_t table_partitions):
     workload{workload},
     statistics{statistics},
-    n_executors{n_executors},
-    num_dispatchers{num_dispatchers},
-    queue_bundle(n_executors),
+    num_executors{num_executors},
     table{table_partitions}
 {
-    LOG(INFO) << fmt::format("Sparkle(n_executors={}, num_dispatchers={}, n_table_partitions={})", n_executors, num_dispatchers, table_partitions);
+    LOG(INFO) << fmt::format("Sparkle(num_executors={}, n_table_partitions={})", num_executors, table_partitions);
     workload.SetEVMType(EVMType::BASIC);
 }
 
 /// @brief start sparkle protocol
 void Sparkle::Start() {
     stop_flag.store(false);
-    for (size_t i = 0; i != n_executors; ++i) {
+    for (size_t i = 0; i != num_executors; ++i) {
         DLOG(INFO) << "start executor " << i << std::endl;
-        auto queue = &queue_bundle[i];
-        executors.push_back(std::thread([this, queue] {
-            std::make_unique<SparkleExecutor>(*this, *queue)->Run();
+        executors.push_back(std::thread([this] {
+            std::make_unique<SparkleExecutor>(*this)->Run();
         }));
-        PinRoundRobin(executors[i], i + num_dispatchers);
-    }
-    for (size_t i = 0; i != num_dispatchers; ++i) {
-        DLOG(INFO) << "start dispatcher " << i << std::endl;
-        dispatchers.push_back(std::thread([this] {
-            std::make_unique<SparkleDispatch>(*this)->Run();
-        }));
-        PinRoundRobin(dispatchers[i], i);
+        PinRoundRobin(executors[i], i);
     }
 }
 
 /// @brief stop sparkle protocol
 void Sparkle::Stop() {
-    stop_flag.store(true);
-    for (auto& x: dispatchers)  { x.join(); }
-    for (auto& x: executors)    { x.join(); }
-}
-
-/// @brief initialize a dispatcher
-/// @param sparkle the sparkle protocol configuration
-SparkleDispatch::SparkleDispatch(Sparkle& sparkle):
-    workload{sparkle.workload},
-    last_execute{sparkle.last_execute},
-    queue_bundle{sparkle.queue_bundle},
-    stop_flag{sparkle.stop_flag}
-{}
-
-/// @brief run dispatcher
-void SparkleDispatch::Run() {
-    while(!stop_flag.load()) {
-        auto tx = std::make_unique<T>(workload.Next(), last_execute.fetch_add(1, std::memory_order_seq_cst));
-        queue_bundle[tx->id % queue_bundle.size()].Push(std::move(tx));
+    for (size_t i = 0; i != num_executors; ++i) {
+        executors[i].join();
     }
 }
 
 /// @brief sparkle executor
 /// @param sparkle sparkle initialization paremeters
-SparkleExecutor::SparkleExecutor(Sparkle& sparkle, SparkleQueue& queue):
-    queue{queue},
+SparkleExecutor::SparkleExecutor(Sparkle& sparkle):
     table{sparkle.table},
     last_finalized{sparkle.last_finalized},
     statistics{sparkle.statistics},
-    stop_flag{sparkle.stop_flag}
+    stop_flag{sparkle.stop_flag},
+    workload{sparkle.workload},
+    last_execute{sparkle.last_execute}
 {}
 
 /// @brief generate a transaction and execute it
 std::unique_ptr<T> SparkleExecutor::Create() {
-    auto tx = queue.Pop();
+    auto tx = std::make_unique<T>(workload.Next(), last_execute.fetch_add(1));
     if (tx == nullptr || tx->berun_flag) return tx;
     tx->start_time = steady_clock::now();
     tx->berun_flag = true;
@@ -402,11 +376,8 @@ void SparkleExecutor::ReExecute(SparkleTransaction* tx) {
 void SparkleExecutor::Run() { while (!stop_flag.load()) {
     auto tx = Create();
     if (tx == nullptr) continue;
-    while (true) {
-        if (stop_flag.load()) {
-            queue.Push(std::move(tx));
-            break;
-        } else if (tx->HasRerunFlag()) {
+    while (stop_flag.load()) {
+        if (tx->HasRerunFlag()) {
             // sweep all operations from previous execution
             DLOG(INFO) << "re-execute " << tx->id;
             ReExecute(tx.get());
@@ -422,10 +393,6 @@ void SparkleExecutor::Run() { while (!stop_flag.load()) {
             }
             auto latency = duration_cast<microseconds>(steady_clock::now() - tx->start_time).count();
             statistics.JournalCommit(latency);
-            break;
-        }
-        else {
-            queue.Push(std::move(tx));
             break;
         }
     }
