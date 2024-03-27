@@ -1,0 +1,60 @@
+------
+Smallbank:1000000:0 YCSB:1000000:0
+@Aria:4:1024:50:FALSE  
+[0;30mFATAL   [0;30m | 125769805229760 | bench.cpp:21     | Check failed: argc == 4 Except google logging flags, we expect 3 arguments. But we got 4 .
+    @     0x726310997a6a  google::LogMessage::Fail()
+    @     0x72631099ba63  google::LogMessageFatal::~LogMessageFatal()
+    @     0x562bc4e961ac  main
+    @     0x72630fe29d90  (unknown)
+    @     0x72630fe29e40  __libc_start_main
+    @     0x562bc4e93e45  _start
+scripts/bench-suit.sh: line 7: 325341 Aborted                 (core dumped) $EXECUTABLE $config $b 2s
+@Aria:8:1024:25:FALSE  
+[0;30mFATAL   [0;30m | 135859526323904 | bench.cpp:21     | Check failed: argc == 4 Except google logging flags, we expect 3 arguments. But we got 4 .
+    @     0x7b9042d75a6a  google::LogMessage::Fail()
+    @     0x7b9042d79a63  google::LogMessageFatal::~LogMessageFatal()
+    @     0x5fc0ab7d21ac  main
+    @     0x7b9042229d90  (unknown)
+    @     0x7b9042229e40  __libc_start_main
+    @     0x5fc0ab7cfe45  _start
+scripts/bench-suit.sh: line 7: 325343 Aborted                 (core dumped) $EXECUTABLE $config $b 2s
+------
+Smallbank:1000000:0 YCSB:1000000:0
+@Sparkle:4:1024               
+[0;30mFATAL   [0;30m | 137055655435968 | bench.cpp:21     | Check failed: argc == 4 Except google logging flags, we expect 3 arguments. But we got 4 .
+    @     0x7ca6c1b12a6a  google::LogMessage::Fail()
+    @     0x7ca6c1b16a63  google::LogMessageFatal::~LogMessageFatal()
+    @     0x564230e5d1ac  main
+    @     0x7ca6c1029d90  (unknown)
+    @     0x7ca6c1029e40  __libc_start_main
+    @     0x564230e5ae45  _start
+scripts/bench-suit.sh: line 7: 325345 Aborted                 (core dumped) $EXECUTABLE $config $b 2s
+@Sparkle:8:1024               
+[0;30mFATAL   [0;30m | 129664239226560 | bench.cpp:21     | Check failed: argc == 4 Except google logging flags, we expect 3 arguments. But we got 4 .
+    @     0x75edcf02ca6a  google::LogMessage::Fail()
+    @     0x75edcf030a63  google::LogMessageFatal::~LogMessageFatal()
+    @     0x556f88f611ac  main
+    @     0x75edce429d90  (unknown)
+    @     0x75edce429e40  __libc_start_main
+    @     0x556f88f5ee45  _start
+scripts/bench-suit.sh: line 7: 325347 Aborted                 (core dumped) $EXECUTABLE $config $b 2s
+------
+Smallbank:1000000:0 YCSB:1000000:0
+@Spectrum:4:1024:4:COPYONWRITE
+[0;30mFATAL   [0;30m | 127061795708608 | bench.cpp:21     | Check failed: argc == 4 Except google logging flags, we expect 3 arguments. But we got 4 .
+    @     0x738fe14a1a6a  google::LogMessage::Fail()
+    @     0x738fe14a5a63  google::LogMessageFatal::~LogMessageFatal()
+    @     0x648bc35a61ac  main
+    @     0x738fe0829d90  (unknown)
+    @     0x738fe0829e40  __libc_start_main
+    @     0x648bc35a3e45  _start
+scripts/bench-suit.sh: line 7: 325349 Aborted                 (core dumped) $EXECUTABLE $config $b 2s
+@Spectrum:8:1024:4:COPYONWRITE
+[0;30mFATAL   [0;30m | 128569422876352 | bench.cpp:21     | Check failed: argc == 4 Except google logging flags, we expect 3 arguments. But we got 4 .
+    @     0x74eee6df0a6a  google::LogMessage::Fail()
+    @     0x74eee6df4a63  google::LogMessageFatal::~LogMessageFatal()
+    @     0x62905cc9b1ac  main
+    @     0x74eee6229d90  (unknown)
+    @     0x74eee6229e40  __libc_start_main
+    @     0x62905cc98e45  _start
+scripts/bench-suit.sh: line 7: 325351 Aborted                 (core dumped) $EXECUTABLE $config $b 2s

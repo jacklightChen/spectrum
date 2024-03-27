@@ -34,7 +34,7 @@ def parse_record(record):
     }
 
 def parse_records_from_file(content: str):
-    return pd.DataFrame(list(map(parse_record, content.split("@")[1:])))
+    return pd.DataFrame(list(map(parse_record, content.split("")[1:])))
 
 def parse_meta(meta):
     print(meta)

@@ -49,7 +49,7 @@ std::string Statistics::Print() {
     );
     std::sort(sample_latency_.begin(), sample_latency_.end());
     return std::string(fmt::format(
-        "@{}\n"
+        "{}\n"
         "commit             {}\n"
         "execution          {}\n"
         "25us               {}\n"
@@ -87,7 +87,7 @@ std::string Statistics::PrintWithDuration(std::chrono::milliseconds duration) {
     );
     std::sort(sample_latency_.begin(), sample_latency_.end());
     return std::string(fmt::format(
-        "@{}\n"
+        "{}\n"
         "duration      {}\n"
         "commit        {:.4f} tx/s\n"
         "execution     {:.4f} tx/s\n"
