@@ -9,27 +9,26 @@
 #include <spectrum/workload/abstraction.hpp>
 #include <spectrum/workload/smallbank.hpp>
 #include <spectrum/workload/ycsb.hpp>
+#include "macros.hpp"
 
-// count args and throw error
-#define NUMARGS_HELPER(_1, _2, _3, _4, _5, _6, _7, _8, _9, _10, N, ...)    N
-#define NUMARGS(X...)  NUMARGS_HELPER(X, 10, 9, 8, 7, 6, 5, 4, 3, 2, 1, 0)
-#define THROW(X...)   throw std::runtime_error(std::string{fmt::format(X)})
+// counting & expanding
+#define ASSGIN_ARGS_HELPER(X, ...) __VA_OPT__(auto NAME(__VA_ARGS__) = (X);)
+#define FILLIN_ARGS_HELPER(X, ...) __VA_OPT__(, NAME(__VA_ARGS__))
+#define ASSGIN_ARGS(...)           FOR_EACH(ASSGIN_ARGS_HELPER, __VA_ARGS__, _)
+#define FILLIN_ARGS(X, ...)        NAME(__VA_ARGS__, _) FOR_EACH(FILLIN_ARGS_HELPER, __VA_ARGS__, _)
+
+// throw error
+#define THROW(...)   throw std::runtime_error(std::string{fmt::format(__VA_ARGS__)})
+
 // declare some helper macros for argument parser (by default, we name the token iterator by 'iter')
-#define INT     to<size_t>  (*(reverse() ? --iter:++iter))
-#define DOUBLE  to<double>  (*(reverse() ? --iter:++iter))
-#define BOOL    to<bool>    (*(reverse() ? --iter:++iter))
-#define EVMTYPE ParseEVMType(*(reverse() ? --iter:++iter))
+#define INT     to<size_t>  (*++iter)
+#define DOUBLE  to<double>  (*++iter)
+#define BOOL    to<bool>    (*++iter)
+#define EVMTYPE ParseEVMType(*++iter)
 
 using namespace spectrum;
 using namespace std::chrono_literals;
 using namespace std::chrono;
-
-bool reverse() {
-    auto v = std::vector<int>{0, 1, 2};
-    auto i = v.begin();
-    auto x = std::make_tuple(*++i, *++i);
-    return std::get<0>(x) == 2;
-}
 
 static auto split(std::basic_string_view<char> s) {
     auto iter = s | std::ranges::views::split(':')
@@ -78,13 +77,14 @@ std::unique_ptr<Workload> ParseWorkload(const char* arg) {
     auto args = split(arg);
     auto name = *args.begin();
     auto dist = (size_t) (std::distance(args.begin(), args.end()) - 1);
-    auto iter = reverse() ? args.end(): args.begin();
+    auto iter = args.begin();
     // map each option to an argparser
     #define OPT(X, Y...) if (name == #X) { \
         auto n = (size_t) NUMARGS(Y);      \
+        ASSGIN_ARGS(Y);                    \
         DLOG(INFO) << #Y << std::endl;     \
         if (dist != n) THROW("workload {} has {} args -- ({}), but we found {} args", #X, n, #Y, dist); \
-        return static_cast<std::unique_ptr<Workload>>(std::make_unique<X>(Y)); \
+        return static_cast<std::unique_ptr<Workload>>(std::make_unique<X>(FILLIN_ARGS(Y))); \
     };
     OPT(Smallbank, INT, DOUBLE)
     OPT(YCSB     , INT, DOUBLE)
@@ -97,18 +97,19 @@ std::unique_ptr<Protocol> ParseProtocol(const char* arg, Workload& workload, Sta
     auto args = split(arg);
     auto name = *args.begin();
     auto dist = (size_t) (std::distance(args.begin(), args.end()) - 1);
-    auto iter = reverse() ? args.end(): args.begin();
+    auto iter = args.begin();
     // map each option to an argparser
     #define OPT(X, Y...) if (name == #X) { \
         auto n = (size_t) NUMARGS(Y);      \
+        ASSGIN_ARGS(Y);                    \
         if (dist != n) THROW("protocol {} has {} args -- ({}), but we found {} args", #X, n, #Y, dist); \
-        return static_cast<std::unique_ptr<Protocol>>(std::make_unique<X>(workload, statistics, Y));  \
+        return static_cast<std::unique_ptr<Protocol>>(std::make_unique<X>(workload, statistics, FILLIN_ARGS(Y)));  \
     };
     OPT(Aria,           INT, INT, INT, BOOL)
     OPT(Sparkle,        INT, INT)
     OPT(Spectrum,       INT, INT, EVMTYPE)
     OPT(SpectrumSched,  INT, INT, EVMTYPE)
-    OPT(Serial,         EVMTYPE, INT)
+    OPT(Serial,         EVMTYPE,  INT)
     OPT(Calvin,         INT, INT, INT)
     OPT(Dummy,          INT, INT, EVMTYPE)
     // Calvin num_threads, num_dispatchers(default 1), table_partitions
@@ -122,6 +123,8 @@ std::unique_ptr<Protocol> ParseProtocol(const char* arg, Workload& workload, Sta
 #undef BOOL
 #undef DOUBLE
 #undef EVMTYPE
+#undef FILLIN_ARGS
+#undef ASSGIN_ARGS
 #undef NUMARGS_HELPER
 #undef NUMARGS
 #undef THROW
