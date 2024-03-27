@@ -10,12 +10,12 @@ namespace spectrum {
 
 class Statistics {
     public:
-    std::vector<size_t> count_commit{0};
-    std::vector<size_t> count_execution{0};
-    std::vector<size_t> count_latency_25us{0};
-    std::vector<size_t> count_latency_50us{0};
-    std::vector<size_t> count_latency_100us{0};
-    std::vector<size_t> count_latency_100us_above{0};
+    std::atomic<size_t> count_commit{0};
+    std::atomic<size_t> count_execution{0};
+    std::atomic<size_t> count_latency_25us{0};
+    std::atomic<size_t> count_latency_50us{0};
+    std::atomic<size_t> count_latency_100us{0};
+    std::atomic<size_t> count_latency_100us_above{0};
     static const int sample_size = 10000;
     std::array<size_t, sample_size> latency_array;
     void SortLatency();
