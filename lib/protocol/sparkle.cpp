@@ -376,7 +376,7 @@ void SparkleExecutor::ReExecute(SparkleTransaction* tx) {
 void SparkleExecutor::Run() { while (!stop_flag.load()) {
     auto tx = Create();
     if (tx == nullptr) continue;
-    while (stop_flag.load()) {
+    while (!stop_flag.load()) {
         if (tx->HasRerunFlag()) {
             // sweep all operations from previous execution
             DLOG(INFO) << "re-execute " << tx->id;

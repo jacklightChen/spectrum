@@ -22,7 +22,7 @@ function(GitHub)
         message(STATUS "+ download skipped")
     else()
         execute_process(
-            COMMAND                 git clone --quiet --branch "${GH_BRANCH}" "https://github.com/${GH_USER}/${GH_REPO}" "${CMAKE_BINARY_DIR}/_deps/${GH_USER}/${GH_REPO}"
+            COMMAND                 git clone --quiet --depth 1 --branch "${GH_BRANCH}" "https://github.com/${GH_USER}/${GH_REPO}" "${CMAKE_BINARY_DIR}/_deps/${GH_USER}/${GH_REPO}"
             WORKING_DIRECTORY       ${CMAKE_BINARY_DIR}
             COMMAND_ERROR_IS_FATAL  ANY
             OUTPUT_QUIET ERROR_QUIET
