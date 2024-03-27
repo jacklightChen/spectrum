@@ -270,6 +270,7 @@ void Spectrum::Start() {
 void Spectrum::Stop() {
     stop_flag.store(true);
     for (auto& x: executors) 	{ x.join(); }
+    for (auto& x: dispatchers)  { x.join(); }
 }
 
 /// @brief initialize a dispatcher
