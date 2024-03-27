@@ -27,7 +27,7 @@ bool reverse() {
     auto v = std::vector<int>{0, 1, 2};
     auto i = v.begin();
     auto x = std::make_tuple(*++i, *++i);
-    return std::get<0>(x) == 1;
+    return std::get<0>(x) == 2;
 }
 
 static auto split(std::basic_string_view<char> s) {
