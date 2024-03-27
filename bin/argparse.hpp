@@ -124,5 +124,7 @@ std::unique_ptr<Protocol> ParseProtocol(const char* arg, Workload& workload, Sta
 #undef DOUBLE
 #undef EVMTYPE
 #undef FILLIN_ARGS
+#undef FILLIN_ARGS_HELPER
 #undef ASSGIN_ARGS
+#undef ASSGIN_ARGS_HELPER
 #undef THROW
