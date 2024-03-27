@@ -1,5 +1,5 @@
 #include <iostream>
-#include <spectrum/hex.hpp>
+#include <spectrum/common/hex.hpp>
 #include <ranges>
 #include <string_view>
 #include <fmt/core.h>
@@ -11,7 +11,7 @@
 #include <evmc/evmc.h>
 #include <evmc/evmc.hpp>
 #include "argparse.hpp"
-#include "glog-prefix.hpp"
+#include <spectrum/common/glog-prefix.hpp>
 
 #define K std::tuple<evmc::address, evmc::bytes32>
 

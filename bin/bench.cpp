@@ -9,7 +9,7 @@
 #include <glog/logging.h>
 #include <string.h>
 #include "argparse.hpp"
-#include "glog-prefix.hpp"
+#include <spectrum/common/glog-prefix.hpp>
 
 int main(int argc, char* argv[]) {
     // configure prefix formatting and eat google logging command line arguments

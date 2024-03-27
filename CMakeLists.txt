@@ -12,13 +12,14 @@ option(DEBUG OFF)
 option(EVM_PRINT_INSTRUCTIONS "print each evm instruction on instruction start" 0)
 find_package(Threads REQUIRED)
 
-# -- Manage External Dependencies
+# -- Manage External Dependencies Using Github
+
 function(GitHub)
     cmake_parse_arguments(GH "" "USER;REPO;BRANCH;AS;PACK;FLAGS;DIR" "" "${ARGV}")
-    message(STATUS ${GH_USER}/${GH_REPO}/${GH_BRANCH})
+    message(STATUS "GITHUB " ${GH_USER}/${GH_REPO}/${GH_BRANCH})
     # download package from github
     if (EXISTS "${CMAKE_BINARY_DIR}/_deps/${GH_USER}/${GH_REPO}/.git")
-        message("      + download skipped")
+        message(STATUS "+ download skipped")
     else()
         execute_process(
             COMMAND                 git clone --quiet --branch "${GH_BRANCH}" "https://github.com/${GH_USER}/${GH_REPO}" "${CMAKE_BINARY_DIR}/_deps/${GH_USER}/${GH_REPO}"
@@ -26,7 +27,7 @@ function(GitHub)
             COMMAND_ERROR_IS_FATAL  ANY
             OUTPUT_QUIET ERROR_QUIET
         )
-        message("      + download finish")
+        message(STATUS "+ download finish")
     endif()
     # configure how this package is added to current project
     if(${GH_AS} STREQUAL "CMAKE SUBDIR")
@@ -34,7 +35,7 @@ function(GitHub)
         set(CMAKE_MESSAGE_LOG_LEVEL ERROR)
         add_subdirectory(${CMAKE_BINARY_DIR}/_deps/${GH_USER}/${GH_REPO} EXCLUDE_FROM_ALL)
         set(CMAKE_MESSAGE_LOG_LEVEL ${CMAKE_MESSAGE_LOG_LEVEL__})
-        message("      + configuration finish (add_subdirectory)")
+        message(STATUS "+ configuration finish (add_subdirecotry)")
     elseif(${GH_AS} STREQUAL "CMAKE INSTALL" OR ${GH_AS} STREQUAL "CMAKE SCANLIB")
         execute_process(
             COMMAND                 cmake -S . -B build ${GH_FLAGS} -DCMAKE_INSTALL_PREFIX=${CMAKE_BINARY_DIR}/_deps/${GH_USER}/${GH_REPO}/install
@@ -42,28 +43,28 @@ function(GitHub)
             COMMAND_ERROR_IS_FATAL  ANY
             OUTPUT_QUIET ERROR_QUIET
         )
-        message("      + configuration finish")
+        message(STATUS "+ configuration finish")
         execute_process(
             COMMAND                 cmake --build build -j
             WORKING_DIRECTORY       ${CMAKE_BINARY_DIR}/_deps/${GH_USER}/${GH_REPO}
             COMMAND_ERROR_IS_FATAL  ANY
             OUTPUT_QUIET ERROR_QUIET
         )
-        message("      + build finish")
+        message(STATUS "+ build finish")
         execute_process(
             COMMAND                 cmake --build build --target install
             WORKING_DIRECTORY       ${CMAKE_BINARY_DIR}/_deps/${GH_USER}/${GH_REPO}
             COMMAND_ERROR_IS_FATAL  ANY
             OUTPUT_QUIET ERROR_QUIET
         )
-        message("      + install finish")
+        message(STATUS "+ install finish")
         set(CMAKE_PREFIX_PATH "${CMAKE_BINARY_DIR}/_deps/${GH_USER}/${GH_REPO}/install")
         if("${GH_PACK}" STREQUAL "")
             set(GH_PACK ${GH_REPO})
         endif()
         if(${GH_AS} STREQUAL "CMAKE INSTALL")
             find_package(${GH_PACK} REQUIRED QUIET)
-            message("      + find package finish")
+            message(STATUS "+ find package finish")
         elseif(${GH_AS} STREQUAL "CMAKE SCANLIB")
             include_directories(${CMAKE_BINARY_DIR}/_deps/${GH_USER}/${GH_REPO}/install/include)
             link_directories(${CMAKE_BINARY_DIR}/_deps/${GH_USER}/${GH_REPO}/install/lib)
@@ -124,8 +125,14 @@ GitHub(
     BRANCH  "gperftools-2.15"
     AS      "CMAKE SCANLIB"
 )
+GitHub(
+    USER    "SRombauts"
+    REPO    "SQLiteCpp"
+    BRANCH  "3.3.1"
+    AS      "CMAKE INSTALL"
+)
 
-# -- compile options
+# -- Manage Compile Options w/ DEBUG flag
 
 if(DEBUG)
     add_compile_options(-fsanitize=address)
@@ -145,22 +152,26 @@ else()
     )
 endif()
 
-# -- add the main library
+# -- Process Main Library & Unit Tests
 
-file(GLOB_RECURSE SRC lib/*.cpp)
+file(GLOB_RECURSE SRC lib/*.cpp lib/*.c)
 file(GLOB_RECURSE INC lib/*.hpp lib/*.h)
+file(GLOB_RECURSE SRC_TEST lib/*.test.cpp)
+file(GLOB_RECURSE INC_TEST lib/*.test.hpp lib/*.test.h)
 
-foreach(F ${INC})
+list(REMOVE_ITEM SRC ${SRC_TEST})
+list(REMOVE_ITEM INC ${INC_TEST})
+
+foreach(F ${INC}) # headers
     file(RELATIVE_PATH REL ${CMAKE_CURRENT_SOURCE_DIR}/lib ${F})
     configure_file(lib/${REL} include/spectrum/${REL} COPYONLY)
-    unset(REL)
-endforeach()
+endforeach(F REL)
 
 add_library(spectrum ${SRC})
 
 target_include_directories(
     spectrum
-    PUBLIC ${CMAKE_CURRENT_BINARY_DIR}/include
+    PUBLIC  ${CMAKE_BINARY_DIR}/include
 )
 target_compile_features(
     spectrum
@@ -169,34 +180,40 @@ target_compile_features(
 target_link_libraries(
     spectrum
     PUBLIC evmc intx::intx fmt tcmalloc
-    PRIVATE gflags ethash::keccak glog::glog Threads::Threads
+    PRIVATE gflags ethash::keccak glog::glog Threads::Threads SQLiteCpp
 )
 
-unset(SRC)
-unset(INC)
+set(gtest_force_shared_crt ON CACHE BOOL "" FORCE)
 
-# -- add some unit-tests
-
-file(GLOB_RECURSE SRC unit-tests/*.test.cpp)
-
+message(STATUS "SPECTRUM LIBRARY")
 foreach(F ${SRC})
-    file(RELATIVE_PATH REL ${CMAKE_CURRENT_SOURCE_DIR}/unit-tests ${F})
-    string(REPLACE ".test.cpp" "" REL ${REL})
-    add_executable(unit-test-${REL} ${F})
-    target_link_libraries(
-        unit-test-${REL}
-        PRIVATE gflags gtest_main spectrum glog::glog Threads::Threads
-    )
-endforeach()
+    message(STATUS "+ " ${F})
+endforeach(F REL)
 
+message(STATUS "UNIT TESTS")
+enable_testing()
+include(GoogleTest)
+foreach(F ${SRC_TEST}) # unit tests
+    get_filename_component(REL ${F} NAME)
+    string(REPLACE ".cpp" "" REL ${REL})
+    message(STATUS "+ " ${F})
+    add_executable(${REL} ${F})
+    target_link_libraries(${REL} gtest_main glog::glog spectrum)
+    gtest_discover_tests(${REL})
+endforeach(F REL)
+
+unset(SRC_TEST)
+unset(INC_TEST)
+unset(INC)
 unset(SRC)
 
-# -- add executables
+# -- Process Executables
 
 file(GLOB_RECURSE SRC bin/*.cpp)
 
+message(STATUS "EXECUTABLES")
 foreach(F ${SRC})
-    message(STATUS ${F})
+    message(STATUS "+ " ${F})
     file(RELATIVE_PATH REL ${CMAKE_CURRENT_SOURCE_DIR}/bin ${F})
     string(REPLACE ".cpp" "" REL ${REL})
     add_executable(${REL} ${F})
@@ -208,6 +225,6 @@ foreach(F ${SRC})
         ${REL}
         PRIVATE -Wno-unsequenced
     )
-endforeach()
+endforeach(F REL)
 
 unset(SRC)
