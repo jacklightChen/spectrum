@@ -72,13 +72,13 @@ inline std::string to_string(uint32_t key) {
 
 Transaction Smallbank::Next() {
     DLOG(INFO) << "smallbank next" << std::endl;
-    auto option = rng->Next() % 10;
-    if (option >= 4 && option < 7) {
-        option = 4;
-    }
-    else if (option >= 7) {
-        option = 5;
-    }
+    auto option = rng->Next() % 6;
+    // if (option >= 4 && option < 7) {
+    //     option = 4;
+    // }
+    // else if (option >= 7) {
+    //     option = 5;
+    // }
     #define X to_string(rng->Next())
     auto input = spectrum::from_hex([&](){switch (option) {
         case 0: return std::string{"1e010439"} + X;
