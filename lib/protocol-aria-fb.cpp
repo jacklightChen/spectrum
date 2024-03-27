@@ -212,8 +212,6 @@ void AriaExecutor::Run() {
             this->CleanLockTable(&tx);
         }
         batch.clear();
-        #undef LATENCY
-        #undef BARRIER
     }
 }
 
