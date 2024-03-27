@@ -13,7 +13,7 @@ varthread() {
 }
 
 varskew() {
-    for p in $1 do
+    for p in $1; do
         for b in $2; do
             for s in {0..20}; do
                 x=$(jq -n 2*$s/20)
