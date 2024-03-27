@@ -13,8 +13,8 @@ varthread() {
 }
 
 varskew() {
-    for p in $1; do
-        for b in $2; do
+    for p in $2; do
+        for b in $1; do
             for s in {0..20}; do
                 x=$(jq -n 2*$s/20)
                 x=${b//_/$x}
@@ -31,9 +31,10 @@ case $1 in
         Smallbank:1000000:0
         YCSB:1000000:0
         "
-        varthread 'Aria:$((_*4)):1024:$((50/_)):FALSE  ' "$BENCH"
-        varthread 'Sparkle:$((_*4)):1024               ' "$BENCH"
-        varthread 'Spectrum:$((_*4)):1024:COPYONWRITE' "$BENCH"
+        varthread "$BENCH" 'Aria:$((_*4)):1024:$((50/_)):FALSE'
+        varthread "$BENCH" 'Sparkle:$((_*4)):1024'
+        varthread "$BENCH" 'Spectrum:$((_*4)):1024:COPYONWRITE'
+        varthread "$BENCH" 'SpectrumSched:$((_*4)):1024:COPYONWRITE'
     ;;
     skew-tps)
         BENCH="
