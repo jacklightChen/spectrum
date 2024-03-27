@@ -33,7 +33,7 @@ case $1 in
         "
         varthread 'Aria:$((_*4)):1024:$((50/_)):FALSE  ' "$BENCH"
         varthread 'Sparkle:$((_*4)):1024               ' "$BENCH"
-        varthread 'Spectrum:$((_*4)):1024:1:COPYONWRITE' "$BENCH"
+        varthread 'Spectrum:$((_*4)):1024:COPYONWRITE' "$BENCH"
     ;;
     skew-tps)
         BENCH="
