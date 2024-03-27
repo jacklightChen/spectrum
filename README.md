@@ -4,8 +4,8 @@
 - [x] Aria w/o Reordering
 - [x] Calvin
 - [x] Serial
-- [ ] Pre-scheduling
 - [ ] TPC-C
+- [ ] Pre-scheduling
 
 # Building Instructions
 

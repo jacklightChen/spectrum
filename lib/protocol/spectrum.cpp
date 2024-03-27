@@ -235,15 +235,13 @@ void SpectrumTable::ClearPut(T* tx, const K& k) {
 /// @brief spectrum initialization parameters
 /// @param workload the transaction generator
 /// @param table_partitions the number of parallel partitions to use in the hash table
-Spectrum::Spectrum(Workload& workload, Statistics& statistics, size_t num_executors, size_t num_dispatchers, size_t table_partitions, EVMType evm_type):
+Spectrum::Spectrum(Workload& workload, Statistics& statistics, size_t num_executors, size_t table_partitions, EVMType evm_type):
     workload{workload},
     statistics{statistics},
     num_executors{num_executors},
-    num_dispatchers{num_dispatchers},
-    queue_bundle(num_executors),
     table{table_partitions}
 {
-    LOG(INFO) << fmt::format("Spectrum(num_executors={}, num_dispatchers={}, table_partitions={}, evm_type={})", num_executors, num_dispatchers, table_partitions, evm_type);
+    LOG(INFO) << fmt::format("Spectrum(num_executors={}, table_partitions={}, evm_type={})", num_executors, table_partitions, evm_type);
     workload.SetEVMType(evm_type);
 }
 
@@ -252,17 +250,10 @@ Spectrum::Spectrum(Workload& workload, Statistics& statistics, size_t num_execut
 void Spectrum::Start() {
     stop_flag.store(false);
     for (size_t i = 0; i != num_executors; ++i) {
-        auto queue = &queue_bundle[i];
-        executors.push_back(std::thread([this, queue]{
-            std::make_unique<SpectrumExecutor>(*this, *queue)->Run();
+        executors.push_back(std::thread([this]{
+            std::make_unique<SpectrumExecutor>(*this)->Run();
         }));
-        PinRoundRobin(executors[i], i + num_dispatchers);
-    }
-    for (size_t i = 0; i != num_dispatchers; ++i) {
-        dispatchers.push_back(std::thread([this]{
-            std::make_unique<SpectrumDispatch>(*this)->Run();
-        }));
-        PinRoundRobin(dispatchers[i], i);
+        PinRoundRobin(executors[i], i);
     }
 }
 
@@ -270,39 +261,22 @@ void Spectrum::Start() {
 void Spectrum::Stop() {
     stop_flag.store(true);
     for (auto& x: executors) 	{ x.join(); }
-    for (auto& x: dispatchers)  { x.join(); }
-}
-
-/// @brief initialize a dispatcher
-/// @param spectrum the spectrum protocol configuration
-SpectrumDispatch::SpectrumDispatch(Spectrum& spectrum):
-    workload{spectrum.workload},
-    last_execute{spectrum.last_execute},
-    queue_bundle{spectrum.queue_bundle},
-    stop_flag{spectrum.stop_flag}
-{}
-
-/// @brief run dispatcher
-void SpectrumDispatch::Run() {
-    while(!stop_flag.load()) {
-        auto tx = std::make_unique<T>(workload.Next(), last_execute.fetch_add(1, std::memory_order_seq_cst));
-        queue_bundle[tx->id % queue_bundle.size()].Push(std::move(tx));
-    }
 }
 
 /// @brief spectrum executor
 /// @param spectrum spectrum initialization paremeters
-SpectrumExecutor::SpectrumExecutor(Spectrum& spectrum, SpectrumQueue& queue):
-    queue{queue},
+SpectrumExecutor::SpectrumExecutor(Spectrum& spectrum):
     table{spectrum.table},
     last_finalized{spectrum.last_finalized},
     stop_flag{spectrum.stop_flag},
-    statistics{spectrum.statistics}
+    statistics{spectrum.statistics},
+    workload{spectrum.workload},
+    last_execute{spectrum.last_execute}
 {}
 
 /// @brief generate a transaction and execute it
 std::unique_ptr<T> SpectrumExecutor::Create() {
-    auto tx = queue.Pop();
+    auto tx = std::make_unique<T>(workload.Next(), last_execute.fetch_add(1));
     if (tx == nullptr || tx->berun_flag.load()) return tx;
     tx->start_time = steady_clock::now();
     tx->berun_flag.store(true);
@@ -411,11 +385,8 @@ void SpectrumExecutor::ReExecute(SpectrumTransaction* tx) {
 void SpectrumExecutor::Run() {while (!stop_flag.load()) {
     auto tx = Create();
     if (tx == nullptr) continue;
-    while (true) {
-        if (stop_flag.load()) {
-            queue.Push(std::move(tx));
-            break;
-        } else if (tx->HasRerunKeys()) {
+    while (!stop_flag.load()) {
+        if (tx->HasRerunKeys()) {
             // sweep all operations from previous execution
             DLOG(INFO) << "re-execute " << tx->id;
             ReExecute(tx.get());
@@ -431,10 +402,6 @@ void SpectrumExecutor::Run() {while (!stop_flag.load()) {
             }
             auto latency = duration_cast<microseconds>(steady_clock::now() - tx->start_time).count();
             statistics.JournalCommit(latency);
-            break;
-        }
-        else {
-            queue.Push(std::move(tx));
             break;
         }
     }

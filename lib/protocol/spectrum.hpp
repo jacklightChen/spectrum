@@ -82,21 +82,19 @@ class Spectrum: public Protocol {
 
     private:
     size_t              num_executors;
-    size_t              num_dispatchers;
     Workload&           workload;
     SpectrumTable       table;
     Statistics&         statistics;
     std::atomic<size_t> last_execute{1};
     std::atomic<size_t> last_finalized{0};
     std::atomic<bool>   stop_flag{false};
-    std::vector<SpectrumQueue>  queue_bundle;
     std::vector<std::thread>    executors{};
     std::vector<std::thread>    dispatchers{};
     friend class SpectrumExecutor;
     friend class SpectrumDispatch;
 
     public:
-    Spectrum(Workload& workload, Statistics& statistics, size_t num_executors, size_t num_dispatchers, size_t table_partitions, EVMType evm_type);
+    Spectrum(Workload& workload, Statistics& statistics, size_t num_executors, size_t table_partitions, EVMType evm_type);
     void Start() override;
     void Stop() override;
 
@@ -105,30 +103,17 @@ class Spectrum: public Protocol {
 class SpectrumExecutor {
 
     private:
-    SpectrumQueue&          queue;
+    Workload&               workload;
     SpectrumTable&          table;
     Statistics&             statistics;
+    std::atomic<size_t>&    last_execute;
     std::atomic<size_t>&    last_finalized;
     std::atomic<bool>&      stop_flag;
 
     public:
-    SpectrumExecutor(Spectrum& spectrum, SpectrumQueue& queue);
+    SpectrumExecutor(Spectrum& spectrum);
     std::unique_ptr<T> Create();
     void ReExecute(SpectrumTransaction* tx);
-    void Run();
-
-};
-
-class SpectrumDispatch {
-
-    private:
-    Workload&                   workload;
-    std::atomic<size_t>&        last_execute;
-    std::vector<SpectrumQueue>& queue_bundle;
-    std::atomic<bool>&          stop_flag;
-
-    public:
-    SpectrumDispatch(Spectrum& spectrum);
     void Run();
 
 };
