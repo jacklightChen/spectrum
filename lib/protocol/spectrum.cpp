@@ -395,7 +395,6 @@ void SpectrumExecutor::Finalize(std::unique_ptr<T>& tx) {
 
 /// @brief start an executor
 void SpectrumExecutor::Run() {
-    auto tx = std::unique_ptr<T>(nullptr);
     Generate(tx);
     while (!stop_flag.load()) {
         if (tx->HasRerunKeys()) {

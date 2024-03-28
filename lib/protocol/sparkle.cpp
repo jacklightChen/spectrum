@@ -333,6 +333,12 @@ void SparkleExecutor::Generate(std::unique_ptr<T>& tx) {
         tx_ref->tuples_get.push_back(std::make_tuple(_key, value, version));
         return value;
     });
+    tx->Execute();
+    statistics.JournalExecute();
+    for (auto i = size_t{0}; i < tx->tuples_put.size(); ++i) {
+        auto& entry = tx->tuples_put[i];
+        table.Put(tx.get(), std::get<0>(entry), std::get<1>(entry));
+    }
 }
 
 /// @brief rollback transaction with given rollback signal
@@ -373,7 +379,6 @@ void SparkleExecutor::Finalize(std::unique_ptr<T>& tx) {
 
 /// @brief start an executor
 void SparkleExecutor::Run() {
-    auto tx = std::unique_ptr<T>(nullptr);
     Generate(tx);
     while (!stop_flag.load()) {
         if (tx->HasRerunFlag()) {
