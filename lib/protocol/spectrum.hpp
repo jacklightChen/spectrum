@@ -89,7 +89,6 @@ class Spectrum: public Protocol {
     std::atomic<size_t> last_finalized{0};
     std::atomic<bool>   stop_flag{false};
     std::vector<std::thread>    executors{};
-    std::vector<std::thread>    dispatchers{};
     std::barrier<std::function<void()>>            stop_latch;
     friend class SpectrumExecutor;
 
