@@ -183,7 +183,7 @@ target_compile_features(
 target_link_libraries(
     spectrum
     PUBLIC evmc intx::intx fmt
-    PRIVATE gflags ethash::keccak glog::glog Threads::Threads SQLiteCpp
+    PRIVATE gflags ethash::keccak glog::glog Threads::Threads SQLiteCpp tcmalloc
 )
 
 set(gtest_force_shared_crt ON CACHE BOOL "" FORCE)

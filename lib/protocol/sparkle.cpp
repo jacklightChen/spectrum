@@ -297,7 +297,6 @@ SparkleExecutor::SparkleExecutor(Sparkle& sparkle):
 /// @brief generate a transaction and execute it
 std::unique_ptr<T> SparkleExecutor::Create() {
     auto tx = std::make_unique<T>(workload.Next(), last_execute.fetch_add(1));
-    if (tx == nullptr || tx->berun_flag) return tx;
     tx->start_time = steady_clock::now();
     tx->berun_flag = true;
     auto tx_ref = tx.get();
@@ -373,7 +372,6 @@ void SparkleExecutor::ReExecute(SparkleTransaction* tx) {
 /// @brief start an executor
 void SparkleExecutor::Run() { while (true) {
     auto tx = Create();
-    if (tx == nullptr) continue;
     while (!stop_flag.load()) {
         if (tx->HasRerunFlag()) {
             // sweep all operations from previous execution
