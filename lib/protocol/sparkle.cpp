@@ -296,11 +296,7 @@ SparkleExecutor::SparkleExecutor(Sparkle& sparkle):
 
 /// @brief generate a transaction and execute it
 void SparkleExecutor::Generate() {
-    if (tx == nullptr) {
-        tx = std::make_unique<T>(workload.Next(), last_execute.fetch_add(1));
-    } else {
-        return;
-    }
+    tx = std::make_unique<T>(workload.Next(), last_execute.fetch_add(1));
     auto tx_ref = tx.get();
     tx->start_time = steady_clock::now();
     tx->InstallSetStorageHandler([tx_ref](
@@ -379,7 +375,6 @@ void SparkleExecutor::Finalize() {
     }
     auto latency = duration_cast<microseconds>(steady_clock::now() - tx->start_time).count();
     statistics.JournalCommit(latency);
-    tx = nullptr;
 }
 
 /// @brief start an executor
