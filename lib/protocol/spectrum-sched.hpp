@@ -114,8 +114,8 @@ class SpectrumSchedExecutor {
 
     public:
     SpectrumSchedExecutor(SpectrumSched& spectrum);
-    std::unique_ptr<T> Create();
-    void ReExecute(SpectrumSchedTransaction* tx);
+    std::unique_ptr<T> Generate();
+    void Execute(SpectrumSchedTransaction* tx);
     void Run();
 
 };

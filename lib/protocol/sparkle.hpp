@@ -101,8 +101,9 @@ class SparkleExecutor {
 
     public:
     SparkleExecutor(Sparkle& sparkle);
-    std::unique_ptr<T> Create();
-    void ReExecute(SparkleTransaction* tx);
+    void Generate(std::unique_ptr<T>& tx);
+    void Finalize(std::unique_ptr<T>& tx);
+    void ReExecute(std::unique_ptr<T>& tx);
     void Run();
 
 };

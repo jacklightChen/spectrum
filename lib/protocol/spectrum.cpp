@@ -277,9 +277,8 @@ SpectrumExecutor::SpectrumExecutor(Spectrum& spectrum):
 {}
 
 /// @brief generate a transaction and execute it
-std::unique_ptr<T> SpectrumExecutor::Create() {
-    auto tx = std::make_unique<T>(workload.Next(), last_execute.fetch_add(1));
-    if (tx == nullptr || tx->berun_flag.load()) return tx;
+void SpectrumExecutor::Generate(std::unique_ptr<T>& tx) {
+    tx = std::make_unique<T>(workload.Next(), last_execute.fetch_add(1));
     tx->start_time = steady_clock::now();
     tx->berun_flag.store(true);
     auto tx_ref = tx.get();
@@ -334,12 +333,11 @@ std::unique_ptr<T> SpectrumExecutor::Create() {
         table.Put(tx.get(), entry.key, entry.value);
         entry.is_committed = true;
     }
-    return tx;
 }
 
 /// @brief rollback transaction with given rollback signal
 /// @param tx the transaction to rollback
-void SpectrumExecutor::ReExecute(SpectrumTransaction* tx) {
+void SpectrumExecutor::ReExecute(std::unique_ptr<T>& tx) {
     DLOG(INFO) << "spectrum re-execute " << tx->id;
     // get current rerun keys
     std::vector<K> rerun_keys{};
@@ -362,56 +360,54 @@ void SpectrumExecutor::ReExecute(SpectrumTransaction* tx) {
     tx->ApplyCheckpoint(tup.checkpoint_id);
     for (size_t i = tup.tuples_put_len; i < tx->tuples_put.size(); ++i) {
         if (tx->tuples_put[i].is_committed) {
-            table.RegretPut(tx, tx->tuples_put[i].key);
+            table.RegretPut(tx.get(), tx->tuples_put[i].key);
         }
     }
     for (size_t i = back_to; i < tx->tuples_get.size(); ++i) {
-        table.RegretGet(tx, tx->tuples_get[i].key, tx->tuples_get[i].version);
+        table.RegretGet(tx.get(), tx->tuples_get[i].key, tx->tuples_get[i].version);
     }
     tx->tuples_put.resize(tup.tuples_put_len);
     tx->tuples_get.resize(back_to);
     tx->Execute();
     statistics.JournalExecute();
-    // tx->execution_count += 1;
-    // if(tx->execution_count >= 10) LOG(ERROR) << tx->id << " execution " << tx->execution_count << std::endl;
     // commit all results if possible & necessary
     for (auto entry: tx->tuples_put) {
         if (tx->HasRerunKeys()) { break; }
         if (entry.is_committed) { continue; }
-        table.Put(tx, entry.key, entry.value);
+        table.Put(tx.get(), entry.key, entry.value);
         entry.is_committed = true;
     }
 }
 
+/// @brief finalize a spectrum transaction
+void SpectrumExecutor::Finalize(std::unique_ptr<T>& tx) {
+    DLOG(INFO) << "spectrum finalize " << tx->id;
+    last_finalized.fetch_add(1, std::memory_order_seq_cst);
+    for (auto entry: tx->tuples_get) {
+        table.ClearGet(tx.get(), entry.key, entry.version);
+    }
+    for (auto entry: tx->tuples_put) {
+        table.ClearPut(tx.get(), entry.key);
+    }
+    auto latency = duration_cast<microseconds>(steady_clock::now() - tx->start_time).count();
+    statistics.JournalCommit(latency);
+}
+
 /// @brief start an executor
-void SpectrumExecutor::Run() {while (true) {
-    auto tx = Create();
-    if (tx == nullptr) continue;
+void SpectrumExecutor::Run() {
+    auto tx = std::unique_ptr<T>(nullptr);
+    Generate(tx);
     while (!stop_flag.load()) {
         if (tx->HasRerunKeys()) {
-            // sweep all operations from previous execution
-            DLOG(INFO) << "re-execute " << tx->id;
-            ReExecute(tx.get());
+            ReExecute(tx);
         }
         else if (last_finalized.load() + 1 == tx->id && !tx->HasRerunKeys()) {
-            DLOG(INFO) << "spectrum finalize " << tx->id;
-            last_finalized.fetch_add(1, std::memory_order_seq_cst);
-            for (auto entry: tx->tuples_get) {
-                table.ClearGet(tx.get(), entry.key, entry.version);
-            }
-            for (auto entry: tx->tuples_put) {
-                table.ClearPut(tx.get(), entry.key);
-            }
-            auto latency = duration_cast<microseconds>(steady_clock::now() - tx->start_time).count();
-            statistics.JournalCommit(latency);
-            break;
+            Finalize(tx);
+            Generate(tx);
         }
     }
-    if (stop_flag.load()) {
-        stop_latch.arrive_and_wait();
-        break;
-    }
-}}
+    stop_latch.arrive_and_wait();
+}
 
 #undef T
 #undef V

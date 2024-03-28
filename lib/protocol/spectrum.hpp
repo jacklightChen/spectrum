@@ -113,8 +113,9 @@ class SpectrumExecutor {
 
     public:
     SpectrumExecutor(Spectrum& spectrum);
-    std::unique_ptr<T> Create();
-    void ReExecute(SpectrumTransaction* tx);
+    void Finalize(std::unique_ptr<T>& tx);
+    void Generate(std::unique_ptr<T>& tx);
+    void ReExecute(std::unique_ptr<T>& tx);
     void Run();
 
 };

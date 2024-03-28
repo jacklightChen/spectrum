@@ -278,7 +278,7 @@ SpectrumSchedExecutor::SpectrumSchedExecutor(SpectrumSched& spectrum):
 {}
 
 /// @brief generate a transaction and execute it
-std::unique_ptr<T> SpectrumSchedExecutor::Create() {
+std::unique_ptr<T> SpectrumSchedExecutor::Generate() {
     auto tx = std::make_unique<T>(workload.Next(), last_execute.fetch_add(1));
     tx->start_time = steady_clock::now();
     tx->berun_flag.store(true);
@@ -332,7 +332,7 @@ std::unique_ptr<T> SpectrumSchedExecutor::Create() {
 
 /// @brief rollback transaction with given rollback signal
 /// @param tx the transaction to rollback
-void SpectrumSchedExecutor::ReExecute(SpectrumSchedTransaction* tx) {
+void SpectrumSchedExecutor::Execute(SpectrumSchedTransaction* tx) {
     DLOG(INFO) << "spectrum-sched re-execute " << tx->id;
     // get current rerun keys
     std::vector<K> rerun_keys{};
@@ -367,12 +367,12 @@ void SpectrumSchedExecutor::ReExecute(SpectrumSchedTransaction* tx) {
 
 /// @brief start an executor
 void SpectrumSchedExecutor::Run() { while (true) {
-    auto tx = Create();
+    auto tx = Generate();
     while (!stop_flag.load()) {
         if (tx->HasRerunKeys()) {
             // sweep all operations from previous execution
             DLOG(INFO) << "re-execute " << tx->id;
-            ReExecute(tx.get());
+            Execute(tx.get());
         }
         else if (last_finalized.load() + 1 == tx->id && !tx->HasRerunKeys()) {
             DLOG(INFO) << "spectrum-sched finalize " << tx->id;

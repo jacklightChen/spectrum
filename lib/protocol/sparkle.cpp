@@ -295,11 +295,10 @@ SparkleExecutor::SparkleExecutor(Sparkle& sparkle):
 {}
 
 /// @brief generate a transaction and execute it
-std::unique_ptr<T> SparkleExecutor::Create() {
-    auto tx = std::make_unique<T>(workload.Next(), last_execute.fetch_add(1));
-    tx->start_time = steady_clock::now();
-    tx->berun_flag = true;
+void SparkleExecutor::Generate(std::unique_ptr<T>& tx) {
+    tx = std::make_unique<T>(workload.Next(), last_execute.fetch_add(1));
     auto tx_ref = tx.get();
+    tx->start_time = steady_clock::now();
     tx->InstallSetStorageHandler([tx_ref](
         const evmc::address &addr, 
         const evmc::bytes32 &key, 
@@ -334,69 +333,59 @@ std::unique_ptr<T> SparkleExecutor::Create() {
         tx_ref->tuples_get.push_back(std::make_tuple(_key, value, version));
         return value;
     });
-    DLOG(INFO) << "sparkle execute " << tx->id;
+}
+
+/// @brief rollback transaction with given rollback signal
+/// @param tx the transaction to rollback
+void SparkleExecutor::ReExecute(std::unique_ptr<T>& tx) {
+    DLOG(INFO) << "sparkle re-execute " << tx->id;
+    tx->SetRerunFlag(false);
+    tx->ApplyCheckpoint(0);
+    for (auto entry: tx->tuples_get) {
+        table.RegretGet(tx.get(), std::get<0>(entry), std::get<2>(entry));
+    }
+    for (auto entry: tx->tuples_put) {
+        table.RegretPut(tx.get(), std::get<0>(entry));
+    }
+    tx->tuples_put.resize(0);
+    tx->tuples_get.resize(0);
     tx->Execute();
     statistics.JournalExecute();
     for (auto i = size_t{0}; i < tx->tuples_put.size(); ++i) {
         auto& entry = tx->tuples_put[i];
         table.Put(tx.get(), std::get<0>(entry), std::get<1>(entry));
     }
-    return tx;
 }
 
-/// @brief rollback transaction with given rollback signal
-/// @param tx the transaction to rollback
-void SparkleExecutor::ReExecute(SparkleTransaction* tx) {
-    DLOG(INFO) << "sparkle re-execute " << tx->id;
-    tx->SetRerunFlag(false);
-    tx->ApplyCheckpoint(0);
+/// @brief finalize a spectrum transaction
+void SparkleExecutor::Finalize(std::unique_ptr<T>& tx) {
+    DLOG(INFO) << "spectrum finalize " << tx->id;
+    last_finalized.fetch_add(1, std::memory_order_seq_cst);
     for (auto entry: tx->tuples_get) {
-        table.RegretGet(tx, std::get<0>(entry), std::get<2>(entry));
+        table.ClearGet(tx.get(), std::get<0>(entry), std::get<2>(entry));
     }
     for (auto entry: tx->tuples_put) {
-        table.RegretPut(tx, std::get<0>(entry));
+        table.ClearPut(tx.get(), std::get<0>(entry));
     }
-    tx->tuples_put.resize(0);
-    tx->tuples_get.resize(0);
-    tx->Execute();
-    statistics.JournalExecute();
-    // tx->execution_count += 1;
-    // if(tx->execution_count >= 10) LOG(ERROR) << tx->id << " execution " << tx->execution_count << std::endl;
-    // commit all results if possible & necessary
-    for (auto i = size_t{0}; i < tx->tuples_put.size(); ++i) {
-        auto& entry = tx->tuples_put[i];
-        table.Put(tx, std::get<0>(entry), std::get<1>(entry));
-    }
+    auto latency = duration_cast<microseconds>(steady_clock::now() - tx->start_time).count();
+    statistics.JournalCommit(latency);
 }
 
 /// @brief start an executor
-void SparkleExecutor::Run() { while (true) {
-    auto tx = Create();
+void SparkleExecutor::Run() {
+    auto tx = std::unique_ptr<T>(nullptr);
+    Generate(tx);
     while (!stop_flag.load()) {
         if (tx->HasRerunFlag()) {
-            // sweep all operations from previous execution
-            DLOG(INFO) << "re-execute " << tx->id;
-            ReExecute(tx.get());
+            ReExecute(tx);
         }
         else if (last_finalized.load() + 1 == tx->id && !tx->HasRerunFlag()) {
-            DLOG(INFO) << "sparkle finalize " << tx->id;
-            last_finalized.fetch_add(1, std::memory_order_seq_cst);
-            for (auto entry: tx->tuples_get) {
-                table.ClearGet(tx.get(), std::get<0>(entry), std::get<2>(entry));
-            }
-            for (auto entry: tx->tuples_put) {
-                table.ClearPut(tx.get(), std::get<0>(entry));
-            }
-            auto latency = duration_cast<microseconds>(steady_clock::now() - tx->start_time).count();
-            statistics.JournalCommit(latency);
-            break;
+            Finalize(tx);
+            Generate(tx);
         }
     }
-    if (stop_flag.load()) {
-        stop_latch.arrive_and_wait();
-        break;
-    }
-}}
+    stop_latch.arrive_and_wait();
+}
 
 #undef T
 #undef V
