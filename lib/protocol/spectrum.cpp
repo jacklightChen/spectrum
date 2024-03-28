@@ -311,7 +311,7 @@ void SpectrumExecutor::Generate(std::unique_ptr<T>& tx) {
         for (auto& tup: tx->tuples_get) {
             if (tup.key == _key) { return tup.value; }
         }
-        if (tx->HasRerunKeys()) { tx->Break(); return 0; }
+        if (tx->HasRerunKeys()) { tx->Break(); return evmc::bytes32{0}; }
         table.Get(tx, _key, value, version);
         size_t checkpoint_id = tx->MakeCheckpoint();
         tx->tuples_get.push_back({
