@@ -28,7 +28,7 @@ if __name__ == '__main__':
                 # f"Calvin:{num_threads}:{num_dispatchers}:{table_partitions}",
                 # f"Aria:{num_threads}:{table_partitions}:{batch_size // num_threads}:FALSE", 
                 # f"Aria:{num_threads}:{table_partitions}:{batch_size // num_threads}:TRUE",
-                # f"Sparkle:{num_threads}:{table_partitions}", 
+                f"Sparkle:{num_threads}:{table_partitions}", 
                 f"Spectrum:{num_threads}:{table_partitions}:COPYONWRITE",
                 # f"Serial:BASIC:{1}",
             ]

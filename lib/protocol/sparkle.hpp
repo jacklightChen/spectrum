@@ -96,13 +96,14 @@ class SparkleExecutor {
     std::atomic<size_t>&    last_execute;
     std::atomic<size_t>&    last_finalized;
     std::atomic<bool>&      stop_flag;
-    std::barrier<std::function<void()>>&  stop_latch;
+    std::unique_ptr<T>      tx{nullptr};
+    std::barrier<std::function<void()>>&           stop_latch;
 
     public:
     SparkleExecutor(Sparkle& sparkle);
-    void Generate(std::unique_ptr<T>& tx);
-    void Finalize(std::unique_ptr<T>& tx);
-    void ReExecute(std::unique_ptr<T>& tx);
+    void Generate();
+    void Finalize();
+    void ReExecute();
     void Run();
 
 };

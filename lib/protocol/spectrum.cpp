@@ -277,18 +277,16 @@ SpectrumExecutor::SpectrumExecutor(Spectrum& spectrum):
 {}
 
 /// @brief generate a transaction and execute it
-void SpectrumExecutor::Generate(std::unique_ptr<T>& tx) {
+void SpectrumExecutor::Generate() {
     tx = std::make_unique<T>(workload.Next(), last_execute.fetch_add(1));
     tx->start_time = steady_clock::now();
     tx->berun_flag.store(true);
-    auto tx_ref = tx.get();
-    tx->InstallSetStorageHandler([tx_ref](
+    tx->InstallSetStorageHandler([this](
         const evmc::address &addr, 
         const evmc::bytes32 &key, 
         const evmc::bytes32 &value
     ) {
-        auto tx = tx_ref;
-        auto _key   = std::make_tuple(addr, key);
+        auto _key = std::make_tuple(addr, key);
         tx->tuples_put.push_back({
             .key = _key, 
             .value = value, 
@@ -297,22 +295,21 @@ void SpectrumExecutor::Generate(std::unique_ptr<T>& tx) {
         if (tx->HasRerunKeys()) { tx->Break(); }
         return evmc_storage_status::EVMC_STORAGE_MODIFIED;
     });
-    tx->InstallGetStorageHandler([tx_ref, this](
+    tx->InstallGetStorageHandler([this](
         const evmc::address &addr, 
         const evmc::bytes32 &key
     ) {
-        auto tx = tx_ref;
-        auto _key   = std::make_tuple(addr, key);
-        auto value  = evmc::bytes32{0};
+        auto _key  = std::make_tuple(addr, key);
+        auto value = evmc::bytes32{0};
         auto version = size_t{0};
-        for (auto& tup: tx_ref->tuples_put | std::views::reverse) {
+        for (auto& tup: tx->tuples_put | std::views::reverse) {
             if (tup.key == _key) { return tup.value; }
         }
         for (auto& tup: tx->tuples_get) {
             if (tup.key == _key) { return tup.value; }
         }
-        if (tx->HasRerunKeys()) { tx->Break(); }
-        table.Get(tx, _key, value, version);
+        if (tx->HasRerunKeys()) { tx->Break(); return evmc::bytes32{0}; }
+        table.Get(tx.get(), _key, value, version);
         size_t checkpoint_id = tx->MakeCheckpoint();
         tx->tuples_get.push_back({
             .key            = _key, 
@@ -337,7 +334,7 @@ void SpectrumExecutor::Generate(std::unique_ptr<T>& tx) {
 
 /// @brief rollback transaction with given rollback signal
 /// @param tx the transaction to rollback
-void SpectrumExecutor::ReExecute(std::unique_ptr<T>& tx) {
+void SpectrumExecutor::ReExecute() {
     DLOG(INFO) << "spectrum re-execute " << tx->id;
     // get current rerun keys
     std::vector<K> rerun_keys{};
@@ -380,7 +377,7 @@ void SpectrumExecutor::ReExecute(std::unique_ptr<T>& tx) {
 }
 
 /// @brief finalize a spectrum transaction
-void SpectrumExecutor::Finalize(std::unique_ptr<T>& tx) {
+void SpectrumExecutor::Finalize() {
     DLOG(INFO) << "spectrum finalize " << tx->id;
     last_finalized.fetch_add(1, std::memory_order_seq_cst);
     for (auto entry: tx->tuples_get) {
@@ -395,15 +392,18 @@ void SpectrumExecutor::Finalize(std::unique_ptr<T>& tx) {
 
 /// @brief start an executor
 void SpectrumExecutor::Run() {
-    auto tx = std::unique_ptr<T>(nullptr);
-    Generate(tx);
+    // first generate a transaction
+    Generate();
     while (!stop_flag.load()) {
         if (tx->HasRerunKeys()) {
-            ReExecute(tx);
+            // if there are some re-run keys, re-execute to obtain the correct result
+            ReExecute();
         }
         else if (last_finalized.load() + 1 == tx->id && !tx->HasRerunKeys()) {
-            Finalize(tx);
-            Generate(tx);
+            // if last transaction has finalized, and currently i don't have to re-execute, 
+            // then i can final commit and do another transaction. 
+            Finalize();
+            Generate();
         }
     }
     stop_latch.arrive_and_wait();

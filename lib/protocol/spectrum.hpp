@@ -108,13 +108,14 @@ class SpectrumExecutor {
     std::atomic<size_t>&    last_execute;
     std::atomic<size_t>&    last_finalized;
     std::atomic<bool>&      stop_flag;
+    std::unique_ptr<T>      tx{nullptr};
     std::barrier<std::function<void()>>&           stop_latch;
 
     public:
     SpectrumExecutor(Spectrum& spectrum);
-    void Finalize(std::unique_ptr<T>& tx);
-    void Generate(std::unique_ptr<T>& tx);
-    void ReExecute(std::unique_ptr<T>& tx);
+    void Finalize();
+    void Generate();
+    void ReExecute();
     void Run();
 
 };

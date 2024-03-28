@@ -295,7 +295,7 @@ SparkleExecutor::SparkleExecutor(Sparkle& sparkle):
 {}
 
 /// @brief generate a transaction and execute it
-void SparkleExecutor::Generate(std::unique_ptr<T>& tx) {
+void SparkleExecutor::Generate() {
     tx = std::make_unique<T>(workload.Next(), last_execute.fetch_add(1));
     auto tx_ref = tx.get();
     tx->start_time = steady_clock::now();
@@ -333,11 +333,17 @@ void SparkleExecutor::Generate(std::unique_ptr<T>& tx) {
         tx_ref->tuples_get.push_back(std::make_tuple(_key, value, version));
         return value;
     });
+    tx->Execute();
+    statistics.JournalExecute();
+    for (auto i = size_t{0}; i < tx->tuples_put.size(); ++i) {
+        auto& entry = tx->tuples_put[i];
+        table.Put(tx.get(), std::get<0>(entry), std::get<1>(entry));
+    }
 }
 
 /// @brief rollback transaction with given rollback signal
 /// @param tx the transaction to rollback
-void SparkleExecutor::ReExecute(std::unique_ptr<T>& tx) {
+void SparkleExecutor::ReExecute() {
     DLOG(INFO) << "sparkle re-execute " << tx->id;
     tx->SetRerunFlag(false);
     tx->ApplyCheckpoint(0);
@@ -358,7 +364,7 @@ void SparkleExecutor::ReExecute(std::unique_ptr<T>& tx) {
 }
 
 /// @brief finalize a spectrum transaction
-void SparkleExecutor::Finalize(std::unique_ptr<T>& tx) {
+void SparkleExecutor::Finalize() {
     DLOG(INFO) << "spectrum finalize " << tx->id;
     last_finalized.fetch_add(1, std::memory_order_seq_cst);
     for (auto entry: tx->tuples_get) {
@@ -373,15 +379,14 @@ void SparkleExecutor::Finalize(std::unique_ptr<T>& tx) {
 
 /// @brief start an executor
 void SparkleExecutor::Run() {
-    auto tx = std::unique_ptr<T>(nullptr);
-    Generate(tx);
+    Generate();
     while (!stop_flag.load()) {
         if (tx->HasRerunFlag()) {
-            ReExecute(tx);
+            ReExecute();
         }
         else if (last_finalized.load() + 1 == tx->id && !tx->HasRerunFlag()) {
-            Finalize(tx);
-            Generate(tx);
+            Finalize();
+            Generate();
         }
     }
     stop_latch.arrive_and_wait();
