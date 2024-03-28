@@ -115,7 +115,7 @@ class SpectrumExecutor {
     std::barrier<std::function<void()>>&           stop_latch;
 
     public:
-    SpectrumExecutor(Spectrum& spectrum);
+    SpectrumExecutor(Spectrum& spectrum, size_t executor_id);
     void Finalize();
     void Generate();
     void ReExecute();
