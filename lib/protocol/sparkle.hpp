@@ -75,7 +75,7 @@ class Sparkle: public Protocol {
     std::atomic<size_t> last_finalized{0};
     std::atomic<bool>   stop_flag{false};
     std::vector<std::thread>    executors{};
-    std::barrier<std::function<void()>>            stop_latch;
+    std::barrier<std::function<void()>>  stop_latch;
 
     friend class SparkleExecutor;
 
@@ -96,7 +96,7 @@ class SparkleExecutor {
     std::atomic<size_t>&    last_execute;
     std::atomic<size_t>&    last_finalized;
     std::atomic<bool>&      stop_flag;
-    std::barrier<std::function<void()>>&           stop_latch;
+    std::barrier<std::function<void()>>&  stop_latch;
 
     public:
     SparkleExecutor(Sparkle& sparkle);
