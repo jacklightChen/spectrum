@@ -9,6 +9,7 @@
 #include <unordered_set>
 #include <chrono>
 #include <thread>
+#include <barrier>
 
 namespace spectrum {
 
@@ -75,6 +76,8 @@ class Sparkle: public Protocol {
     std::atomic<bool>   stop_flag{false};
     std::vector<std::thread>    executors{};
     std::vector<std::thread>    dispatchers{};
+    std::barrier<std::function<void()>>            stop_latch;
+
     friend class SparkleExecutor;
 
     public:
@@ -94,6 +97,7 @@ class SparkleExecutor {
     std::atomic<size_t>&    last_execute;
     std::atomic<size_t>&    last_finalized;
     std::atomic<bool>&      stop_flag;
+    std::barrier<std::function<void()>>&           stop_latch;
 
     public:
     SparkleExecutor(Sparkle& sparkle);

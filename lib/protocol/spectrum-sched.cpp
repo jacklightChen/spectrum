@@ -240,7 +240,8 @@ SpectrumSched::SpectrumSched(Workload& workload, Statistics& statistics, size_t 
     workload{workload},
     statistics{statistics},
     num_executors{num_executors},
-    table{table_partitions}
+    table{table_partitions},
+    stop_latch{static_cast<ptrdiff_t>(num_executors), []{}}
 {
     LOG(INFO) << fmt::format("SpectrumSched(num_executors={}, table_partitions={}, evm_type={})", num_executors, table_partitions, evm_type);
     workload.SetEVMType(evm_type);
@@ -272,7 +273,8 @@ SpectrumSchedExecutor::SpectrumSchedExecutor(SpectrumSched& spectrum):
     stop_flag{spectrum.stop_flag},
     statistics{spectrum.statistics},
     workload{spectrum.workload},
-    last_execute{spectrum.last_execute}
+    last_execute{spectrum.last_execute},
+    stop_latch{spectrum.stop_latch}
 {}
 
 /// @brief generate a transaction and execute it
@@ -281,7 +283,7 @@ std::unique_ptr<T> SpectrumSchedExecutor::Create() {
     tx->start_time = steady_clock::now();
     tx->berun_flag.store(true);
     auto tx_ref = tx.get();
-    tx->InstallSetStorageHandler([tx_ref](
+    tx->InstallSetStorageHandler([tx_ref, this](
         const evmc::address &addr, 
         const evmc::bytes32 &key, 
         const evmc::bytes32 &value
@@ -291,8 +293,8 @@ std::unique_ptr<T> SpectrumSchedExecutor::Create() {
         tx->tuples_put.push_back({
             .key = _key, 
             .value = value, 
-            .is_committed=false
         });
+        table.Put(tx, _key, value);
         if (tx->HasRerunKeys()) { tx->Break(); }
         return evmc_storage_status::EVMC_STORAGE_MODIFIED;
     });
@@ -310,7 +312,7 @@ std::unique_ptr<T> SpectrumSchedExecutor::Create() {
         for (auto& tup: tx->tuples_get) {
             if (tup.key == _key) { return tup.value; }
         }
-        if (tx->HasRerunKeys()) { tx->Break(); return evmc::bytes32{0}; }
+        if (tx->HasRerunKeys()) { tx->Break(); }
         table.Get(tx, _key, value, version);
         size_t checkpoint_id = tx->MakeCheckpoint();
         tx->tuples_get.push_back({
@@ -325,13 +327,6 @@ std::unique_ptr<T> SpectrumSchedExecutor::Create() {
     DLOG(INFO) << "spectrum-sched execute " << tx->id;
     tx->Execute();
     statistics.JournalExecute();
-    // commit all results if possible & necessary
-    for (auto entry: tx->tuples_put) {
-        if (tx->HasRerunKeys()) { break; }
-        if (entry.is_committed) { continue; }
-        table.Put(tx.get(), entry.key, entry.value);
-        entry.is_committed = true;
-    }
     return tx;
 }
 
@@ -359,9 +354,7 @@ void SpectrumSchedExecutor::ReExecute(SpectrumSchedTransaction* tx) {
     auto& tup = tx->tuples_get[back_to];
     tx->ApplyCheckpoint(tup.checkpoint_id);
     for (size_t i = tup.tuples_put_len; i < tx->tuples_put.size(); ++i) {
-        if (tx->tuples_put[i].is_committed) {
-            table.RegretPut(tx, tx->tuples_put[i].key);
-        }
+        table.RegretPut(tx, tx->tuples_put[i].key);
     }
     for (size_t i = back_to; i < tx->tuples_get.size(); ++i) {
         table.RegretGet(tx, tx->tuples_get[i].key, tx->tuples_get[i].version);
@@ -370,26 +363,11 @@ void SpectrumSchedExecutor::ReExecute(SpectrumSchedTransaction* tx) {
     tx->tuples_get.resize(back_to);
     tx->Execute();
     statistics.JournalExecute();
-    // commit all results if possible & necessary
-    for (auto entry: tx->tuples_put) {
-        if (tx->HasRerunKeys()) { break; }
-        if (entry.is_committed) { continue; }
-        table.Put(tx, entry.key, entry.value);
-        entry.is_committed = true;
-    }
 }
 
 /// @brief start an executor
-void SpectrumSchedExecutor::Run() {while (!stop_flag.load()) {
-    auto tx = [&]{
-        if (rng() % (queue.size() + 1) == 0) {
-            return Create();
-        }
-        else {
-            auto tx = std::move(queue.front());
-            return queue.pop(), std::move(tx);
-        }
-    }();
+void SpectrumSchedExecutor::Run() { while (true) {
+    auto tx = Create();
     while (!stop_flag.load()) {
         if (tx->HasRerunKeys()) {
             // sweep all operations from previous execution
@@ -409,9 +387,10 @@ void SpectrumSchedExecutor::Run() {while (!stop_flag.load()) {
             statistics.JournalCommit(latency);
             break;
         }
-        else {
-            queue.push(std::move(tx));
-        }
+    }
+    if (stop_flag.load()) {
+        stop_latch.arrive_and_wait();
+        break;
     }
 }}
 

@@ -239,7 +239,8 @@ Spectrum::Spectrum(Workload& workload, Statistics& statistics, size_t num_execut
     workload{workload},
     statistics{statistics},
     num_executors{num_executors},
-    table{table_partitions}
+    table{table_partitions},
+    stop_latch{static_cast<ptrdiff_t>(num_executors), []{}}
 {
     LOG(INFO) << fmt::format("Spectrum(num_executors={}, table_partitions={}, evm_type={})", num_executors, table_partitions, evm_type);
     workload.SetEVMType(evm_type);
@@ -271,7 +272,8 @@ SpectrumExecutor::SpectrumExecutor(Spectrum& spectrum):
     stop_flag{spectrum.stop_flag},
     statistics{spectrum.statistics},
     workload{spectrum.workload},
-    last_execute{spectrum.last_execute}
+    last_execute{spectrum.last_execute},
+    stop_latch{spectrum.stop_latch}
 {}
 
 /// @brief generate a transaction and execute it
@@ -310,7 +312,7 @@ std::unique_ptr<T> SpectrumExecutor::Create() {
         for (auto& tup: tx->tuples_get) {
             if (tup.key == _key) { return tup.value; }
         }
-        if (tx->HasRerunKeys()) { tx->Break(); return evmc::bytes32{0}; }
+        if (tx->HasRerunKeys()) { tx->Break(); }
         table.Get(tx, _key, value, version);
         size_t checkpoint_id = tx->MakeCheckpoint();
         tx->tuples_get.push_back({
@@ -382,7 +384,7 @@ void SpectrumExecutor::ReExecute(SpectrumTransaction* tx) {
 }
 
 /// @brief start an executor
-void SpectrumExecutor::Run() {while (!stop_flag.load()) {
+void SpectrumExecutor::Run() {while (true) {
     auto tx = Create();
     if (tx == nullptr) continue;
     while (!stop_flag.load()) {
@@ -404,6 +406,10 @@ void SpectrumExecutor::Run() {while (!stop_flag.load()) {
             statistics.JournalCommit(latency);
             break;
         }
+    }
+    if (stop_flag.load()) {
+        stop_latch.arrive_and_wait();
+        break;
     }
 }}
 

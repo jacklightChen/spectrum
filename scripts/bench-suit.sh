@@ -1,13 +1,14 @@
 EXECUTABLE=$2
+T=2s
 
 varthread() {
     for b in $1; do
         echo    "------"
-        for i in {1..2}; do
+        for i in {1..9}; do
             p=$2
             eval    "p=\"${p//_/$i}\""
             echo    "@$p $b"
-            $EXECUTABLE  $p $b 100ms
+            $EXECUTABLE  $p $b $T || (echo "crash"; exit)
         done
     done
 }
@@ -19,7 +20,7 @@ varskew() {
                 x=$(jq -n 2*$s/20)
                 x=${b//_/$x}
                 echo    @$p $x
-                $EXECUTABLE  $p $x 100ms
+                $EXECUTABLE  $p $x $T || (echo "crash"; exit)
             done
         done
     done
@@ -30,8 +31,12 @@ case $1 in
         BENCH="
         Smallbank:1000000:0
         YCSB:1000000:0
+        Smallbank:1000000:1
+        YCSB:1000000:1
+        Smallbank:1000000:2
+        YCSB:1000000:2
         "
-        varthread "$BENCH" 'Aria:$((_*4)):1024:$((50/_)):FALSE'
+        varthread "$BENCH" 'Aria:$((_*4)):1024:4:FALSE'
         varthread "$BENCH" 'Sparkle:$((_*4)):1024'
         varthread "$BENCH" 'Spectrum:$((_*4)):1024:COPYONWRITE'
         varthread "$BENCH" 'SpectrumSched:$((_*4)):1024:COPYONWRITE'

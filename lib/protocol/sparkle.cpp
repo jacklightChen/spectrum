@@ -255,7 +255,8 @@ Sparkle::Sparkle(Workload& workload, Statistics& statistics, size_t num_executor
     workload{workload},
     statistics{statistics},
     num_executors{num_executors},
-    table{table_partitions}
+    table{table_partitions},
+    stop_latch{static_cast<ptrdiff_t>(num_executors), []{}}
 {
     LOG(INFO) << fmt::format("Sparkle(num_executors={}, n_table_partitions={})", num_executors, table_partitions);
     workload.SetEVMType(EVMType::BASIC);
@@ -289,7 +290,8 @@ SparkleExecutor::SparkleExecutor(Sparkle& sparkle):
     statistics{sparkle.statistics},
     stop_flag{sparkle.stop_flag},
     workload{sparkle.workload},
-    last_execute{sparkle.last_execute}
+    last_execute{sparkle.last_execute},
+    stop_latch{sparkle.stop_latch}
 {}
 
 /// @brief generate a transaction and execute it
@@ -374,7 +376,7 @@ void SparkleExecutor::ReExecute(SparkleTransaction* tx) {
 }
 
 /// @brief start an executor
-void SparkleExecutor::Run() { while (!stop_flag.load()) {
+void SparkleExecutor::Run() { while (true) {
     auto tx = Create();
     if (tx == nullptr) continue;
     while (!stop_flag.load()) {
@@ -396,6 +398,10 @@ void SparkleExecutor::Run() { while (!stop_flag.load()) {
             statistics.JournalCommit(latency);
             break;
         }
+    }
+    if (stop_flag.load()) {
+        stop_latch.arrive_and_wait();
+        break;
     }
 }}
 

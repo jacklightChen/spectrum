@@ -11,6 +11,7 @@
 #include <queue>
 #include <optional>
 #include <random>
+#include <barrier>
 
 namespace spectrum {
 
@@ -24,7 +25,6 @@ using namespace std::chrono;
 struct SpectrumSchedPutTuple {
     K               key;
     evmc::bytes32   value;
-    bool            is_committed;
 };
 
 struct SpectrumSchedGetTuple {
@@ -77,7 +77,6 @@ struct SpectrumSchedTable: private Table<K, V, KeyHasher> {
 
 using SpectrumSchedQueue = LockPriorityQueue<T>;
 class SpectrumSchedExecutor;
-class SpectrumSchedDispatch;
 
 class SpectrumSched: public Protocol {
 
@@ -91,8 +90,8 @@ class SpectrumSched: public Protocol {
     std::atomic<bool>   stop_flag{false};
     std::vector<std::thread>    executors{};
     std::vector<std::thread>    dispatchers{};
+    std::barrier<std::function<void()>>                stop_latch;
     friend class SpectrumSchedExecutor;
-    friend class SpectrumSchedDispatch;
 
     public:
     SpectrumSched(Workload& workload, Statistics& statistics, size_t num_executors, size_t table_partitions, EVMType evm_type);
@@ -111,7 +110,7 @@ class SpectrumSchedExecutor {
     std::atomic<size_t>&    last_execute;
     std::atomic<size_t>&    last_finalized;
     std::atomic<bool>&      stop_flag;
-    std::queue<std::unique_ptr<T>>  queue;
+    std::barrier<std::function<void()>>&           stop_latch;
 
     public:
     SpectrumSchedExecutor(SpectrumSched& spectrum);
