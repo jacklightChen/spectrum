@@ -251,8 +251,8 @@ Spectrum::Spectrum(Workload& workload, Statistics& statistics, size_t num_execut
 void Spectrum::Start() {
     stop_flag.store(false);
     for (size_t i = 0; i != num_executors; ++i) {
-        executors.push_back(std::thread([this, i]{
-            std::make_unique<SpectrumExecutor>(*this, i)->Run();
+        executors.push_back(std::thread([this]{
+            std::make_unique<SpectrumExecutor>(*this)->Run();
         }));
         PinRoundRobin(executors[i], i);
     }
@@ -266,16 +266,14 @@ void Spectrum::Stop() {
 
 /// @brief spectrum executor
 /// @param spectrum spectrum initialization paremeters
-SpectrumExecutor::SpectrumExecutor(Spectrum& spectrum, size_t executor_id):
+SpectrumExecutor::SpectrumExecutor(Spectrum& spectrum):
     table{spectrum.table},
     last_finalized{spectrum.last_finalized},
     stop_flag{spectrum.stop_flag},
     statistics{spectrum.statistics},
     workload{spectrum.workload},
     last_execute{spectrum.last_execute},
-    stop_latch{spectrum.stop_latch},
-    num_executors{spectrum.num_executors},
-    executor_id{executor_id}
+    stop_latch{spectrum.stop_latch}
 {}
 
 /// @brief generate a transaction and execute it
