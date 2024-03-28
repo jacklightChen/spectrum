@@ -251,8 +251,8 @@ Spectrum::Spectrum(Workload& workload, Statistics& statistics, size_t num_execut
 void Spectrum::Start() {
     stop_flag.store(false);
     for (size_t i = 0; i != num_executors; ++i) {
-        executors.push_back(std::thread([this]{
-            std::make_unique<SpectrumExecutor>(*this)->Run();
+        executors.push_back(std::thread([this, i]{
+            std::make_unique<SpectrumExecutor>(*this, i)->Run();
         }));
         PinRoundRobin(executors[i], i);
     }
@@ -266,19 +266,21 @@ void Spectrum::Stop() {
 
 /// @brief spectrum executor
 /// @param spectrum spectrum initialization paremeters
-SpectrumExecutor::SpectrumExecutor(Spectrum& spectrum):
+SpectrumExecutor::SpectrumExecutor(Spectrum& spectrum, size_t executor_id):
     table{spectrum.table},
     last_finalized{spectrum.last_finalized},
     stop_flag{spectrum.stop_flag},
     statistics{spectrum.statistics},
     workload{spectrum.workload},
     last_execute{spectrum.last_execute},
-    stop_latch{spectrum.stop_latch}
+    stop_latch{spectrum.stop_latch},
+    num_executors{spectrum.num_executors},
+    executor_id{executor_id}
 {}
 
 /// @brief generate a transaction and execute it
-void SpectrumExecutor::Generate(std::unique_ptr<T>& tx) {
-    tx = std::make_unique<T>(workload.Next(), last_execute.fetch_add(1));
+void SpectrumExecutor::Generate() {
+    tx = std::make_unique<T>(workload.Next(), last_execute.fetch_add(1) / num_executors * num_executors + executor_id);
     tx->start_time = steady_clock::now();
     tx->berun_flag.store(true);
     auto tx_ref = tx.get();
@@ -337,7 +339,7 @@ void SpectrumExecutor::Generate(std::unique_ptr<T>& tx) {
 
 /// @brief rollback transaction with given rollback signal
 /// @param tx the transaction to rollback
-void SpectrumExecutor::ReExecute(std::unique_ptr<T>& tx) {
+void SpectrumExecutor::ReExecute() {
     DLOG(INFO) << "spectrum re-execute " << tx->id;
     // get current rerun keys
     std::vector<K> rerun_keys{};
@@ -380,7 +382,7 @@ void SpectrumExecutor::ReExecute(std::unique_ptr<T>& tx) {
 }
 
 /// @brief finalize a spectrum transaction
-void SpectrumExecutor::Finalize(std::unique_ptr<T>& tx) {
+void SpectrumExecutor::Finalize() {
     DLOG(INFO) << "spectrum finalize " << tx->id;
     last_finalized.fetch_add(1, std::memory_order_seq_cst);
     for (auto entry: tx->tuples_get) {
@@ -395,14 +397,18 @@ void SpectrumExecutor::Finalize(std::unique_ptr<T>& tx) {
 
 /// @brief start an executor
 void SpectrumExecutor::Run() {
-    Generate(tx);
+    // first generate a transaction
+    Generate();
     while (!stop_flag.load()) {
         if (tx->HasRerunKeys()) {
-            ReExecute(tx);
+            // if there are some re-run keys, re-execute to obtain the correct result
+            ReExecute();
         }
         else if (last_finalized.load() + 1 == tx->id && !tx->HasRerunKeys()) {
-            Finalize(tx);
-            Generate(tx);
+            // if last transaction has finalized, and currently i don't have to re-execute, 
+            // then i can final commit and do another transaction. 
+            Finalize();
+            Generate();
         }
     }
     stop_latch.arrive_and_wait();

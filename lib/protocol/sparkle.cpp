@@ -295,8 +295,12 @@ SparkleExecutor::SparkleExecutor(Sparkle& sparkle):
 {}
 
 /// @brief generate a transaction and execute it
-void SparkleExecutor::Generate(std::unique_ptr<T>& tx) {
-    tx = std::make_unique<T>(workload.Next(), last_execute.fetch_add(1));
+void SparkleExecutor::Generate() {
+    if (tx == nullptr) {
+        tx = std::make_unique<T>(workload.Next(), last_execute.fetch_add(1));
+    } else {
+        return;
+    }
     auto tx_ref = tx.get();
     tx->start_time = steady_clock::now();
     tx->InstallSetStorageHandler([tx_ref](
@@ -343,7 +347,7 @@ void SparkleExecutor::Generate(std::unique_ptr<T>& tx) {
 
 /// @brief rollback transaction with given rollback signal
 /// @param tx the transaction to rollback
-void SparkleExecutor::ReExecute(std::unique_ptr<T>& tx) {
+void SparkleExecutor::ReExecute() {
     DLOG(INFO) << "sparkle re-execute " << tx->id;
     tx->SetRerunFlag(false);
     tx->ApplyCheckpoint(0);
@@ -364,7 +368,7 @@ void SparkleExecutor::ReExecute(std::unique_ptr<T>& tx) {
 }
 
 /// @brief finalize a spectrum transaction
-void SparkleExecutor::Finalize(std::unique_ptr<T>& tx) {
+void SparkleExecutor::Finalize() {
     DLOG(INFO) << "spectrum finalize " << tx->id;
     last_finalized.fetch_add(1, std::memory_order_seq_cst);
     for (auto entry: tx->tuples_get) {
@@ -375,18 +379,19 @@ void SparkleExecutor::Finalize(std::unique_ptr<T>& tx) {
     }
     auto latency = duration_cast<microseconds>(steady_clock::now() - tx->start_time).count();
     statistics.JournalCommit(latency);
+    tx = nullptr;
 }
 
 /// @brief start an executor
 void SparkleExecutor::Run() {
-    Generate(tx);
+    Generate();
     while (!stop_flag.load()) {
         if (tx->HasRerunFlag()) {
-            ReExecute(tx);
+            ReExecute();
         }
         else if (last_finalized.load() + 1 == tx->id && !tx->HasRerunFlag()) {
-            Finalize(tx);
-            Generate(tx);
+            Finalize();
+            Generate();
         }
     }
     stop_latch.arrive_and_wait();
