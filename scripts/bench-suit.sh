@@ -36,10 +36,10 @@ case $1 in
         Smallbank:1000000:2
         YCSB:1000000:2
         "
-        varthread "$BENCH" 'Aria:$((_*4)):1024:4:FALSE'
+        # varthread "$BENCH" 'Aria:$((_*4)):1024:4:FALSE'
         varthread "$BENCH" 'Sparkle:$((_*4)):1024'
         varthread "$BENCH" 'Spectrum:$((_*4)):1024:COPYONWRITE'
-        varthread "$BENCH" 'SpectrumSched:$((_*4)):1024:COPYONWRITE'
+        # varthread "$BENCH" 'SpectrumSched:$((_*4)):1024:COPYONWRITE'
     ;;
     skew-tps)
         BENCH="

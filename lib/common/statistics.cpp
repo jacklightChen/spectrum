@@ -25,11 +25,13 @@ void Statistics::JournalCommit(size_t latency) {
         count_latency_100us_above.fetch_add(1, std::memory_order_relaxed);
     }
     DLOG(INFO) << "latency: " << latency << std::endl;
-    auto random = ethash::keccak256((uint8_t*)&count_commit_, 4).word64s[count_commit_ % 4] % count_commit_;
+    
     if (count_commit_ < SAMPLE) {
         sample_latency[count_commit_].store(latency);
+        return;
     }
-    else if (random < SAMPLE) {
+    auto random = ethash::keccak256((uint8_t*)&count_commit_, 4).word64s[count_commit_ % 4] % count_commit_;
+    if (random < SAMPLE) {
         sample_latency[random].store(latency);
     }
 }

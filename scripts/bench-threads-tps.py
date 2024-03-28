@@ -10,7 +10,7 @@ from plot.plot import MyPlot
 
 keys = 1000000
 workload = 'Smallbank'
-zipf = 0
+zipf = 1.1
 times_to_tun = 2
 timestamp = int(time.time())
 
@@ -26,10 +26,10 @@ if __name__ == '__main__':
             # spectrum_dispatcher = num_threads // 6
             protocols       = [
                 # f"Calvin:{num_threads}:{num_dispatchers}:{table_partitions}",
-                f"Aria:{num_threads}:{table_partitions}:{batch_size // num_threads}:FALSE", 
-                f"Aria:{num_threads}:{table_partitions}:{batch_size // num_threads}:TRUE",
-                f"Sparkle:{num_threads}:{num_dispatchers}:{table_partitions}", 
-                f"Spectrum:{num_threads}:{num_dispatchers}:{table_partitions}:COPYONWRITE",
+                # f"Aria:{num_threads}:{table_partitions}:{batch_size // num_threads}:FALSE", 
+                # f"Aria:{num_threads}:{table_partitions}:{batch_size // num_threads}:TRUE",
+                f"Sparkle:{num_threads}:{table_partitions}", 
+                # f"Spectrum:{num_threads}:{table_partitions}:COPYONWRITE",
                 # f"Serial:BASIC:{1}",
             ]
             for cc in protocols:
@@ -37,7 +37,7 @@ if __name__ == '__main__':
                 f.write(f"#COMMIT-{hash} CONFIG-{cc}")
                 print(f'../bench {cc} {workload}:{keys}:{zipf} {times_to_tun}s')
                 f.write(f'../bench {cc} {workload}:{keys}:{zipf} {times_to_tun}s')
-                result = subprocess.run(["../build/bench", cc, f"{workload}:{keys}:{zipf}", f"{times_to_tun}s"], **conf)
+                result = subprocess.run(["../build/bin/bench", cc, f"{workload}:{keys}:{zipf}", f"{times_to_tun}s"], **conf)
                 result_str = result.stderr.decode('utf-8').strip()
                 print(result_str)
                 f.write(result_str)
