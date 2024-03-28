@@ -10,8 +10,7 @@
 #include <fmt/core.h>
 
 /*
-    This is a implementation of "Spectrum: Speculative Deterministic Concurrency Control for Partially Replicated Transactional Data Stores" (Zhongmiao Li, Peter Van Roy and Paolo Romano). 
-    (The "smart" pre-scheduling & re-scheduling variant)
+    This is a implementation of "SpectrumSched: Speculative Deterministic Concurrency Control for Partially Replicated Transactional Data Stores" (Zhongmiao Li, Peter Van Roy and Paolo Romano). 
  */
 
 namespace spectrum {
@@ -22,7 +21,7 @@ using namespace std::chrono;
 #define V SpectrumSchedVersionList
 #define T SpectrumSchedTransaction
 
-/// @brief wrap a base transaction into a spectrum-sched transaction
+/// @brief wrap a base transaction into a spectrum transaction
 /// @param inner the base transaction
 /// @param id transaction id
 SpectrumSchedTransaction::SpectrumSchedTransaction(Transaction&& inner, size_t id):
@@ -233,7 +232,7 @@ void SpectrumSchedTable::ClearPut(T* tx, const K& k) {
     });
 }
 
-/// @brief spectrum-sched initialization parameters
+/// @brief spectrum initialization parameters
 /// @param workload the transaction generator
 /// @param table_partitions the number of parallel partitions to use in the hash table
 SpectrumSched::SpectrumSched(Workload& workload, Statistics& statistics, size_t num_executors, size_t table_partitions, EVMType evm_type):
@@ -247,7 +246,7 @@ SpectrumSched::SpectrumSched(Workload& workload, Statistics& statistics, size_t 
     workload.SetEVMType(evm_type);
 }
 
-/// @brief start spectrum-sched protocol
+/// @brief start spectrum protocol
 /// @param num_executors the number of threads to start
 void SpectrumSched::Start() {
     stop_flag.store(false);
@@ -259,14 +258,14 @@ void SpectrumSched::Start() {
     }
 }
 
-/// @brief stop spectrum-sched protocol
+/// @brief stop spectrum protocol
 void SpectrumSched::Stop() {
     stop_flag.store(true);
     for (auto& x: executors) 	{ x.join(); }
 }
 
-/// @brief spectrum-sched executor
-/// @param spectrum spectrum-sched initialization paremeters
+/// @brief spectrum executor
+/// @param spectrum spectrum initialization paremeters
 SpectrumSchedExecutor::SpectrumSchedExecutor(SpectrumSched& spectrum):
     table{spectrum.table},
     last_finalized{spectrum.last_finalized},
@@ -278,12 +277,12 @@ SpectrumSchedExecutor::SpectrumSchedExecutor(SpectrumSched& spectrum):
 {}
 
 /// @brief generate a transaction and execute it
-std::unique_ptr<T> SpectrumSchedExecutor::Generate() {
-    auto tx = std::make_unique<T>(workload.Next(), last_execute.fetch_add(1));
+void SpectrumSchedExecutor::Extract(std::unique_ptr<T>& tx) {
+    tx = std::make_unique<T>(workload.Next(), last_execute.fetch_add(1));
     tx->start_time = steady_clock::now();
     tx->berun_flag.store(true);
     auto tx_ref = tx.get();
-    tx->InstallSetStorageHandler([tx_ref, this](
+    tx->InstallSetStorageHandler([tx_ref](
         const evmc::address &addr, 
         const evmc::bytes32 &key, 
         const evmc::bytes32 &value
@@ -293,8 +292,8 @@ std::unique_ptr<T> SpectrumSchedExecutor::Generate() {
         tx->tuples_put.push_back({
             .key = _key, 
             .value = value, 
+            .is_committed=false
         });
-        table.Put(tx, _key, value);
         if (tx->HasRerunKeys()) { tx->Break(); }
         return evmc_storage_status::EVMC_STORAGE_MODIFIED;
     });
@@ -324,16 +323,22 @@ std::unique_ptr<T> SpectrumSchedExecutor::Generate() {
         });
         return value;
     });
-    DLOG(INFO) << "spectrum-sched execute " << tx->id;
+    DLOG(INFO) << "spectrum execute " << tx->id;
     tx->Execute();
     statistics.JournalExecute();
-    return tx;
+    // commit all results if possible & necessary
+    for (auto entry: tx->tuples_put) {
+        if (tx->HasRerunKeys()) { break; }
+        if (entry.is_committed) { continue; }
+        table.Put(tx.get(), entry.key, entry.value);
+        entry.is_committed = true;
+    }
 }
 
 /// @brief rollback transaction with given rollback signal
 /// @param tx the transaction to rollback
-void SpectrumSchedExecutor::Execute(SpectrumSchedTransaction* tx) {
-    DLOG(INFO) << "spectrum-sched re-execute " << tx->id;
+void SpectrumSchedExecutor::ReExecute(std::unique_ptr<T>& tx) {
+    DLOG(INFO) << "spectrum re-execute " << tx->id;
     // get current rerun keys
     std::vector<K> rerun_keys{};
     {
@@ -354,45 +359,66 @@ void SpectrumSchedExecutor::Execute(SpectrumSchedTransaction* tx) {
     auto& tup = tx->tuples_get[back_to];
     tx->ApplyCheckpoint(tup.checkpoint_id);
     for (size_t i = tup.tuples_put_len; i < tx->tuples_put.size(); ++i) {
-        table.RegretPut(tx, tx->tuples_put[i].key);
+        if (tx->tuples_put[i].is_committed) {
+            table.RegretPut(tx.get(), tx->tuples_put[i].key);
+        }
     }
     for (size_t i = back_to; i < tx->tuples_get.size(); ++i) {
-        table.RegretGet(tx, tx->tuples_get[i].key, tx->tuples_get[i].version);
+        table.RegretGet(tx.get(), tx->tuples_get[i].key, tx->tuples_get[i].version);
     }
     tx->tuples_put.resize(tup.tuples_put_len);
     tx->tuples_get.resize(back_to);
     tx->Execute();
     statistics.JournalExecute();
+    // commit all results if possible & necessary
+    for (auto entry: tx->tuples_put) {
+        if (tx->HasRerunKeys()) { break; }
+        if (entry.is_committed) { continue; }
+        table.Put(tx.get(), entry.key, entry.value);
+        entry.is_committed = true;
+    }
+}
+
+/// @brief finalize a spectrum transaction
+void SpectrumSchedExecutor::Finalize(std::unique_ptr<T>& tx) {
+    DLOG(INFO) << "spectrum finalize " << tx->id;
+    last_finalized.fetch_add(1, std::memory_order_seq_cst);
+    for (auto entry: tx->tuples_get) {
+        table.ClearGet(tx.get(), entry.key, entry.version);
+    }
+    for (auto entry: tx->tuples_put) {
+        table.ClearPut(tx.get(), entry.key);
+    }
+    auto latency = duration_cast<microseconds>(steady_clock::now() - tx->start_time).count();
+    statistics.JournalCommit(latency);
+}
+
+/// @brief schedule a transaction (put back to queue, swap a nullptr into it)
+void SpectrumSchedExecutor::Schedule(std::unique_ptr<T>& tx) {
+    // find the earliest transaction 
+    auto mark = last_finalized.load();
+    // 
 }
 
 /// @brief start an executor
-void SpectrumSchedExecutor::Run() { while (true) {
-    auto tx = Generate();
+void SpectrumSchedExecutor::Run() {
+    // find smallest workable transaction
+    auto tx = std::unique_ptr<T>(nullptr);
+    Extract(tx);
     while (!stop_flag.load()) {
         if (tx->HasRerunKeys()) {
-            // sweep all operations from previous execution
-            DLOG(INFO) << "re-execute " << tx->id;
-            Execute(tx.get());
+            ReExecute(tx);
         }
         else if (last_finalized.load() + 1 == tx->id && !tx->HasRerunKeys()) {
-            DLOG(INFO) << "spectrum-sched finalize " << tx->id;
-            last_finalized.fetch_add(1, std::memory_order_seq_cst);
-            for (auto entry: tx->tuples_get) {
-                table.ClearGet(tx.get(), entry.key, entry.version);
-            }
-            for (auto entry: tx->tuples_put) {
-                table.ClearPut(tx.get(), entry.key);
-            }
-            auto latency = duration_cast<microseconds>(steady_clock::now() - tx->start_time).count();
-            statistics.JournalCommit(latency);
-            break;
+            Finalize(tx);
+            Extract(tx);
+        }
+        else {
+            Schedule(tx);
         }
     }
-    if (stop_flag.load()) {
-        stop_latch.arrive_and_wait();
-        break;
-    }
-}}
+    stop_latch.arrive_and_wait();
+}
 
 #undef T
 #undef V

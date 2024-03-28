@@ -10,7 +10,6 @@
 #include <thread>
 #include <queue>
 #include <optional>
-#include <random>
 #include <barrier>
 
 namespace spectrum {
@@ -25,6 +24,7 @@ using namespace std::chrono;
 struct SpectrumSchedPutTuple {
     K               key;
     evmc::bytes32   value;
+    bool            is_committed;
 };
 
 struct SpectrumSchedGetTuple {
@@ -89,8 +89,7 @@ class SpectrumSched: public Protocol {
     std::atomic<size_t> last_finalized{0};
     std::atomic<bool>   stop_flag{false};
     std::vector<std::thread>    executors{};
-    std::vector<std::thread>    dispatchers{};
-    std::barrier<std::function<void()>>                stop_latch;
+    std::barrier<std::function<void()>>  stop_latch;
     friend class SpectrumSchedExecutor;
 
     public:
@@ -106,16 +105,18 @@ class SpectrumSchedExecutor {
     Workload&               workload;
     SpectrumSchedTable&     table;
     Statistics&             statistics;
-    std::mt19937            rng;
     std::atomic<size_t>&    last_execute;
     std::atomic<size_t>&    last_finalized;
     std::atomic<bool>&      stop_flag;
-    std::barrier<std::function<void()>>&           stop_latch;
+    std::barrier<std::function<void()>>& stop_latch;
+    std::deque<std::unique_ptr<T>>       idle_queue;
 
     public:
     SpectrumSchedExecutor(SpectrumSched& spectrum);
-    std::unique_ptr<T> Generate();
-    void Execute(SpectrumSchedTransaction* tx);
+    void Finalize(std::unique_ptr<T>& tx);
+    void Extract(std::unique_ptr<T>& tx);
+    void Schedule(std::unique_ptr<T>& tx);
+    void ReExecute(std::unique_ptr<T>& tx);
     void Run();
 
 };
