@@ -280,17 +280,15 @@ SpectrumExecutor::SpectrumExecutor(Spectrum& spectrum, size_t executor_id):
 
 /// @brief generate a transaction and execute it
 void SpectrumExecutor::Generate() {
-    tx = std::make_unique<T>(workload.Next(), last_execute.fetch_add(1) / num_executors * num_executors + executor_id);
+    tx = std::make_unique<T>(workload.Next(), last_execute.fetch_add(1));
     tx->start_time = steady_clock::now();
     tx->berun_flag.store(true);
-    auto tx_ref = tx.get();
-    tx->InstallSetStorageHandler([tx_ref](
+    tx->InstallSetStorageHandler([this](
         const evmc::address &addr, 
         const evmc::bytes32 &key, 
         const evmc::bytes32 &value
     ) {
-        auto tx = tx_ref;
-        auto _key   = std::make_tuple(addr, key);
+        auto _key = std::make_tuple(addr, key);
         tx->tuples_put.push_back({
             .key = _key, 
             .value = value, 
@@ -299,22 +297,21 @@ void SpectrumExecutor::Generate() {
         if (tx->HasRerunKeys()) { tx->Break(); }
         return evmc_storage_status::EVMC_STORAGE_MODIFIED;
     });
-    tx->InstallGetStorageHandler([tx_ref, this](
+    tx->InstallGetStorageHandler([this](
         const evmc::address &addr, 
         const evmc::bytes32 &key
     ) {
-        auto tx = tx_ref;
-        auto _key   = std::make_tuple(addr, key);
-        auto value  = evmc::bytes32{0};
+        auto _key  = std::make_tuple(addr, key);
+        auto value = evmc::bytes32{0};
         auto version = size_t{0};
-        for (auto& tup: tx_ref->tuples_put | std::views::reverse) {
+        for (auto& tup: tx->tuples_put | std::views::reverse) {
             if (tup.key == _key) { return tup.value; }
         }
         for (auto& tup: tx->tuples_get) {
             if (tup.key == _key) { return tup.value; }
         }
         if (tx->HasRerunKeys()) { tx->Break(); return evmc::bytes32{0}; }
-        table.Get(tx, _key, value, version);
+        table.Get(tx.get(), _key, value, version);
         size_t checkpoint_id = tx->MakeCheckpoint();
         tx->tuples_get.push_back({
             .key            = _key, 

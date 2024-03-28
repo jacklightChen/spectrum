@@ -224,10 +224,6 @@ foreach(F ${SRC})
         ${REL}
         PRIVATE gflags spectrum glog::glog fmt Threads::Threads
     )
-    target_compile_options(
-        ${REL}
-        PRIVATE -Wno-unsequenced
-    )
 endforeach(F REL)
 
 unset(SRC)
