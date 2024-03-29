@@ -101,6 +101,11 @@ class SpectrumSched: public Protocol {
 
 class SpectrumSchedExecutor {
 
+    using TP = std::unique_ptr<T>;
+    struct CMP {
+        bool operator()(const TP& a, const TP& b) const { return a->id < b->id; }
+    };
+
     private:
     Workload&               workload;
     SpectrumSchedTable&     table;
@@ -108,13 +113,13 @@ class SpectrumSchedExecutor {
     std::atomic<size_t>&    last_execute;
     std::atomic<size_t>&    last_finalized;
     std::atomic<bool>&      stop_flag;
+    std::set<TP, CMP>       idle_queue;
     std::barrier<std::function<void()>>& stop_latch;
-    std::deque<std::unique_ptr<T>>       idle_queue;
 
     public:
     SpectrumSchedExecutor(SpectrumSched& spectrum);
     void Finalize(std::unique_ptr<T>& tx);
-    void Extract(std::unique_ptr<T>& tx);
+    void Generate(std::unique_ptr<T>& tx);
     void Schedule(std::unique_ptr<T>& tx);
     void ReExecute(std::unique_ptr<T>& tx);
     void Run();
