@@ -305,7 +305,7 @@ void SpectrumSchedExecutor::Extract(std::unique_ptr<T>& tx) {
         auto _key   = std::make_tuple(addr, key);
         auto value  = evmc::bytes32{0};
         auto version = size_t{0};
-        for (auto& tup: tx_ref->tuples_put | std::views::reverse) {
+        for (auto& tup: tx->tuples_put | std::views::reverse) {
             if (tup.key == _key) { return tup.value; }
         }
         for (auto& tup: tx->tuples_get) {
