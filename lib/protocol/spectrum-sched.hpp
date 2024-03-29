@@ -114,14 +114,15 @@ class SpectrumSchedExecutor {
     std::atomic<size_t>&    last_finalized;
     std::atomic<bool>&      stop_flag;
     std::set<TP, CMP>       idle_queue;
+    std::unique_ptr<T>      tx;
     std::barrier<std::function<void()>>& stop_latch;
 
     public:
     SpectrumSchedExecutor(SpectrumSched& spectrum);
-    void Finalize(std::unique_ptr<T>& tx);
-    void Generate(std::unique_ptr<T>& tx);
-    void Schedule(std::unique_ptr<T>& tx);
-    void ReExecute(std::unique_ptr<T>& tx);
+    void Finalize();
+    void Generate();
+    void Schedule();
+    void ReExecute();
     void Run();
 
 };

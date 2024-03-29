@@ -277,7 +277,7 @@ SpectrumSchedExecutor::SpectrumSchedExecutor(SpectrumSched& spectrum):
 {}
 
 /// @brief generate a transaction and execute it
-void SpectrumSchedExecutor::Generate(std::unique_ptr<T>& tx) {
+void SpectrumSchedExecutor::Generate() {
     tx = std::make_unique<T>(workload.Next(), last_execute.fetch_add(1));
     tx->start_time = steady_clock::now();
     tx->berun_flag.store(true);
@@ -337,7 +337,7 @@ void SpectrumSchedExecutor::Generate(std::unique_ptr<T>& tx) {
 
 /// @brief rollback transaction with given rollback signal
 /// @param tx the transaction to rollback
-void SpectrumSchedExecutor::ReExecute(std::unique_ptr<T>& tx) {
+void SpectrumSchedExecutor::ReExecute() {
     DLOG(INFO) << "spectrum re-execute " << tx->id;
     // get current rerun keys
     std::vector<K> rerun_keys{};
@@ -380,7 +380,7 @@ void SpectrumSchedExecutor::ReExecute(std::unique_ptr<T>& tx) {
 }
 
 /// @brief finalize a spectrum transaction
-void SpectrumSchedExecutor::Finalize(std::unique_ptr<T>& tx) {
+void SpectrumSchedExecutor::Finalize() {
     DLOG(INFO) << "spectrum finalize " << tx->id;
     last_finalized.fetch_add(1, std::memory_order_seq_cst);
     for (auto entry: tx->tuples_get) {
@@ -395,7 +395,7 @@ void SpectrumSchedExecutor::Finalize(std::unique_ptr<T>& tx) {
 }
 
 /// @brief schedule a transaction (put back to queue, swap a nullptr into it)
-void SpectrumSchedExecutor::Schedule(std::unique_ptr<T>& tx) {
+void SpectrumSchedExecutor::Schedule() {
     // find the earliest transaction that is waited
     if (tx != nullptr) {
         idle_queue.insert(std::move(tx));
@@ -408,21 +408,20 @@ void SpectrumSchedExecutor::Schedule(std::unique_ptr<T>& tx) {
         idle_queue.erase(it); return;
     }
     // if we cannot find one, we just keep the incoming one in idle_queue and generate another. 
-    Generate(tx);
+    Generate();
 }
 
 /// @brief start an executor
 void SpectrumSchedExecutor::Run() {
     // find smallest workable transaction
-    auto tx = std::unique_ptr<T>(nullptr);
-    Generate(tx);
+    Generate();
     while (!stop_flag.load()) {
-        Schedule(tx);
+        Schedule();
         if (tx->HasRerunKeys()) {
-            ReExecute(tx);
+            ReExecute();
         }
         else if (last_finalized.load() + 1 == tx->id && !tx->HasRerunKeys()) {
-            Finalize(tx);
+            Finalize();
         }
     }
     stop_latch.arrive_and_wait();
