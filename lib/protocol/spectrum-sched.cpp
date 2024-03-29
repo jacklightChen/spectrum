@@ -399,10 +399,12 @@ void SpectrumSchedExecutor::Schedule(std::unique_ptr<T>& tx) {
     idle_queue.insert(std::move(tx));
     auto mark = last_finalized.load();
     for (auto it = idle_queue.begin(); it != idle_queue.end(); ++it) {
-        if ((*it)->should_wait >= mark) { continue; }
+        if ((*it)->should_wait > mark) { continue; }
         tx = std::move(const_cast<TP&>(*it));
+        DLOG(INFO) << "spectrum schedule " << tx->id << std::endl;
         idle_queue.erase(it); return;
     }
+    // if we cannot find one, we just keep the incoming one in idle_queue and generate another. 
     Generate(tx);
 }
 
