@@ -391,12 +391,15 @@ void SpectrumSchedExecutor::Finalize(std::unique_ptr<T>& tx) {
     }
     auto latency = duration_cast<microseconds>(steady_clock::now() - tx->start_time).count();
     statistics.JournalCommit(latency);
+    tx = nullptr;
 }
 
 /// @brief schedule a transaction (put back to queue, swap a nullptr into it)
 void SpectrumSchedExecutor::Schedule(std::unique_ptr<T>& tx) {
     // find the earliest transaction that is waited
-    idle_queue.insert(std::move(tx));
+    if (tx != nullptr) {
+        idle_queue.insert(std::move(tx));
+    }
     auto mark = last_finalized.load();
     for (auto it = idle_queue.begin(); it != idle_queue.end(); ++it) {
         if ((*it)->should_wait > mark) { continue; }
@@ -420,7 +423,6 @@ void SpectrumSchedExecutor::Run() {
         }
         else if (last_finalized.load() + 1 == tx->id && !tx->HasRerunKeys()) {
             Finalize(tx);
-            Generate(tx);
         }
     }
     stop_latch.arrive_and_wait();
