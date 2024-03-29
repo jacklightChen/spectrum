@@ -297,40 +297,39 @@ SparkleExecutor::SparkleExecutor(Sparkle& sparkle):
 /// @brief generate a transaction and execute it
 void SparkleExecutor::Generate() {
     tx = std::make_unique<T>(workload.Next(), last_execute.fetch_add(1));
-    auto tx_ref = tx.get();
     tx->start_time = steady_clock::now();
-    tx->InstallSetStorageHandler([tx_ref](
+    tx->InstallSetStorageHandler([this](
         const evmc::address &addr, 
         const evmc::bytes32 &key, 
         const evmc::bytes32 &value
     ) {
-        DLOG(INFO) << tx_ref->id << " set";
+        DLOG(INFO) << tx->id << " set";
         auto _key   = std::make_tuple(addr, key);
         // just push back
-        tx_ref->tuples_put.push_back(std::make_tuple(_key, value));
+        tx->tuples_put.push_back(std::make_tuple(_key, value));
         return evmc_storage_status::EVMC_STORAGE_MODIFIED;
     });
-    tx->InstallGetStorageHandler([tx_ref, this](
+    tx->InstallGetStorageHandler([this](
         const evmc::address &addr, 
         const evmc::bytes32 &key
     ) {
-        DLOG(INFO) << tx_ref->id << " get";
+        DLOG(INFO) << tx->id << " get";
         auto _key   = std::make_tuple(addr, key);
         auto value  = evmc::bytes32{0};
         auto version = size_t{0};
         // one key from one transaction will be commited once
-        for (auto& tup: tx_ref->tuples_put | std::views::reverse) {
+        for (auto& tup: tx->tuples_put | std::views::reverse) {
             if (std::get<0>(tup) == _key) {
                 return std::get<1>(tup);
             }
         }
-        for (auto& tup: tx_ref->tuples_get) {
+        for (auto& tup: tx->tuples_get) {
             if (std::get<0>(tup) == _key) {
                 return std::get<1>(tup);
             }
         }
-        table.Get(tx_ref, _key, value, version);
-        tx_ref->tuples_get.push_back(std::make_tuple(_key, value, version));
+        table.Get(tx.get(), _key, value, version);
+        tx->tuples_get.push_back(std::make_tuple(_key, value, version));
         return value;
     });
     tx->Execute();
