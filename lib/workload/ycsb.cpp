@@ -31,11 +31,12 @@ inline std::string to_string(uint32_t key) {
 
 Transaction YCSB::Next() {
     DLOG(INFO) << "ycsb next" << std::endl;
-    #define X to_string(rng->Next())
     auto input = spectrum::from_hex([&]() {
         //  10 key 5 read 5 write(may be blind)
         auto s = std::string{"f3d7af72"};
-        for (int i = 0; i <= 10; i++) { s += X; }
+        auto v = std::vector<size_t>(11, 0);
+        SampleUniqueN(*rng, v);
+        for (int i = 0; i <= 10; i++) { s += to_string(v[i]); }
         return s;
     }()).value();
     #undef X
