@@ -193,10 +193,12 @@ void SpectrumCacheTable::RegretPut(T* tx, const K& k) {
     Table::Put(k, [&](V& _v) {
         auto vit = _v.entries.begin();
         auto end = _v.entries.end();
+        auto last_value = evmc::bytes32{0};
         auto readers_ = &_v.readers_default;
         while (vit != end) {
             if (vit->version != tx->id) {
                 readers_ = &vit->readers;
+                last_value = vit->value;
                 ++vit; continue;
             }
             // abort transactions that read from current transaction
@@ -207,6 +209,7 @@ void SpectrumCacheTable::RegretPut(T* tx, const K& k) {
                 DLOG(INFO) << tx->id << " abort " << _tx->id << std::endl;
                 _tx->AddRerunKeys(k, nullptr, tx->id);
                 readers_->insert(_tx);
+                _tx->AddRerunKeys(k, &last_value, tx->id);
                 tit = vit->readers.erase(tit);
             }
             break;
@@ -345,9 +348,6 @@ void SpectrumCacheExecutor::Generate() {
             if (tx->local_cache[_key].size()) {
                 return tx->local_cache[_key].back().value;
             }
-        }
-        for (auto& tup: tx->tuples_get) {
-            if (tup.key == _key) { return tup.value; }
         }
         table.Get(tx.get(), _key, value, version);
         size_t checkpoint_id = tx->MakeCheckpoint();

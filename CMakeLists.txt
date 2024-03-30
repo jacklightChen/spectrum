@@ -71,6 +71,21 @@ function(GitHub)
             include_directories(${CMAKE_BINARY_DIR}/_deps/${GH_USER}/${GH_REPO}/install/include)
             link_directories(${CMAKE_BINARY_DIR}/_deps/${GH_USER}/${GH_REPO}/install/lib)
         endif()
+    elseif(${GH_AS} STREQUAL "AUTOMAKE INSTALL")
+        Execute(
+            COMMAND                 ./autogen.sh --prefix ${CMAKE_BINARY_DIR}/_deps/${GH_USER}/${GH_REPO}/install
+            WORKING_DIRECTORY       ${CMAKE_BINARY_DIR}/_deps/${GH_USER}/${GH_REPO}
+            COMMAND_ERROR_IS_FATAL  ANY
+            OUTPUT_QUIET ERROR_QUIET
+        )
+        Execute(
+            COMMAND                 make install -j
+            WORKING_DIRECTORY       ${CMAKE_BINARY_DIR}/_deps/${GH_USER}/${GH_REPO}
+            COMMAND_ERROR_IS_FATAL  ANY
+            OUTPUT_QUIET ERROR_QUIET
+        )
+        include_directories(${CMAKE_BINARY_DIR}/_deps/${GH_USER}/${GH_REPO}/install/include)
+        link_directories(${CMAKE_BINARY_DIR}/_deps/${GH_USER}/${GH_REPO}/install/lib)
     else()
         message(FATAL_ERROR "UNKNOWN \"AUTOFIND OPTION\"")
     endif()
@@ -133,6 +148,12 @@ GitHub(
     BRANCH  "3.3.1"
     AS      "CMAKE INSTALL"
 )
+GitHub(
+    USER    "jemalloc"
+    REPO    "jemalloc"
+    BRANCH  "5.3.0"
+    AS      "AUTOMAKE INSTALL"
+)
 
 # -- Manage Compile Options w/ DEBUG flag
 
@@ -182,7 +203,7 @@ target_compile_features(
 target_link_libraries(
     spectrum
     PUBLIC evmc intx::intx fmt
-    PRIVATE gflags ethash::keccak glog::glog Threads::Threads SQLiteCpp tcmalloc
+    PRIVATE gflags ethash::keccak glog::glog Threads::Threads SQLiteCpp jemalloc
 )
 
 set(gtest_force_shared_crt ON CACHE BOOL "" FORCE)
