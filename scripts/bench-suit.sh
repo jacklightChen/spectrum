@@ -4,7 +4,7 @@ T=2s
 varthread() {
     for b in $1; do
         echo    "------"
-        for i in {1..9}; do
+        for i in {1..2}; do
             p=$2
             eval    "p=\"${p//_/$i}\""
             echo    "@$p $b"

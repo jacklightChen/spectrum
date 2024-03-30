@@ -43,7 +43,6 @@ void SpectrumCacheTransaction::AddRerunKeys(const K& key, const evmc::bytes32* v
     auto guard = Guard{rerun_keys_mu};
     rerun_keys.push_back(key);
     should_wait = std::max(should_wait, cause_id);
-    local_cache[key] = std::list<CacheTuple>();
     if (v == nullptr) {
         for (auto it = local_cache[key].begin(); it != local_cache[key].end();) {
             if (it->version == cause_id) { local_cache[key].erase(it); }
@@ -55,7 +54,7 @@ void SpectrumCacheTransaction::AddRerunKeys(const K& key, const evmc::bytes32* v
             if (it->version < cause_id) { ++it; continue; }
             local_cache[key].insert(it, CacheTuple{.value=*v, .version=cause_id}); return;
         }
-        local_cache[key].push_back(CacheTuple{.value=*v, .version=cause_id});
+        local_cache[key].emplace_back(*v, cause_id);
     }
 }
 
@@ -107,23 +106,25 @@ void SpectrumCacheTable::Put(T* tx, const K& k, const evmc::bytes32& v) {
                 ++rit; continue;
             }
             // abort transactions that read outdated keys
-            for (auto _tx: rit->readers) {
+            for (auto tit = rit->readers.begin(); tit != rit->readers.end();) {
+                auto _tx = *tit;
                 DLOG(INFO) << KeyHasher()(k) << " has read dependency " << "(" << _tx << ")" << std::endl;
-                if (_tx->id > tx->id) {
-                    DLOG(INFO) << tx->id << " abort " << _tx->id << std::endl;
-                    _tx->AddRerunKeys(k, &v, tx->id);
-                    readers_.insert(_tx);
-                }
-            }
-            break;
-        }
-        for (auto _tx: _v.readers_default) {
-            DLOG(INFO) << KeyHasher()(k) << " has read dependency " << "(" << _tx << ")" << std::endl;
-            if (_tx->id > tx->id) {
+                if (_tx->id < tx->id) { ++tit; continue; }
                 DLOG(INFO) << tx->id << " abort " << _tx->id << std::endl;
                 _tx->AddRerunKeys(k, &v, tx->id);
                 readers_.insert(_tx);
+                tit = rit->readers.erase(tit);
             }
+            break;
+        }
+        for (auto tit = _v.readers_default.begin(); tit != _v.readers_default.end();) {
+            auto _tx = *tit;
+            DLOG(INFO) << KeyHasher()(k) << " has read dependency " << "(" << _tx << ")" << std::endl;
+            if (_tx->id < tx->id) { ++tit; continue; }
+            DLOG(INFO) << tx->id << " abort " << _tx->id << std::endl;
+            _tx->AddRerunKeys(k, &v, tx->id);
+            readers_.insert(_tx);
+            tit = _v.readers_default.erase(tit);
         }
         // handle duplicated write on the same key
         if (rit != end && rit->version == tx->id) {
