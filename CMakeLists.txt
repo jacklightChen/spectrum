@@ -203,6 +203,7 @@ target_compile_features(
 target_link_libraries(
     spectrum
     PUBLIC evmc intx::intx fmt
+    # you can replace jemalloc with tcmalloc here
     PRIVATE gflags ethash::keccak glog::glog Threads::Threads SQLiteCpp jemalloc
 )
 
