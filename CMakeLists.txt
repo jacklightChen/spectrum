@@ -182,13 +182,13 @@ file(GLOB_RECURSE INC lib/*.hpp lib/*.h)
 file(GLOB_RECURSE SRC_TEST lib/*.test.cpp)
 file(GLOB_RECURSE INC_TEST lib/*.test.hpp lib/*.test.h)
 
-list(REMOVE_ITEM SRC ${SRC_TEST})
+list(REMOVE_ITEM SRC ${SRC_TEST}) # remove *.test.cpp and *.test.hpp from target
 list(REMOVE_ITEM INC ${INC_TEST})
 
 foreach(F ${INC}) # headers
-    file(RELATIVE_PATH REL ${CMAKE_CURRENT_SOURCE_DIR}/lib ${F})
-    configure_file(lib/${REL} include/spectrum/${REL} COPYONLY)
-endforeach(F REL)
+    file(RELATIVE_PATH R ${CMAKE_CURRENT_SOURCE_DIR}/lib ${F})
+    configure_file(lib/${R} include/spectrum/${R} COPYONLY)
+endforeach(F R)
 
 add_library(spectrum ${SRC})
 
@@ -202,9 +202,9 @@ target_compile_features(
 )
 target_link_libraries(
     spectrum
-    PUBLIC evmc intx::intx fmt
+    PUBLIC evmc intx::intx fmt glog::glog gflags
     # you can replace jemalloc with tcmalloc here
-    PRIVATE gflags ethash::keccak glog::glog Threads::Threads SQLiteCpp jemalloc
+    PRIVATE ethash::keccak Threads::Threads SQLiteCpp jemalloc
 )
 
 set(gtest_force_shared_crt ON CACHE BOOL "" FORCE)
@@ -212,19 +212,19 @@ set(gtest_force_shared_crt ON CACHE BOOL "" FORCE)
 message(STATUS "SPECTRUM LIBRARY")
 foreach(F ${SRC})
     message(STATUS "+ " ${F})
-endforeach(F REL)
+endforeach(F R)
 
 message(STATUS "UNIT TESTS")
 enable_testing()
 include(GoogleTest)
 foreach(F ${SRC_TEST}) # unit tests
-    get_filename_component(REL ${F} NAME)
-    string(REPLACE ".cpp" "" REL ${REL})
+    get_filename_component(R ${F} NAME)
+    string(REPLACE ".cpp" "" R ${R})
     message(STATUS "+ " ${F})
-    add_executable(${REL} ${F})
-    target_link_libraries(${REL} gtest_main glog::glog spectrum)
-    gtest_discover_tests(${REL})
-endforeach(F REL)
+    add_executable(${R} ${F})
+    target_link_libraries(${R} GTest::gtest_main spectrum)
+    gtest_discover_tests(${R})
+endforeach(F R)
 
 unset(SRC_TEST)
 unset(INC_TEST)
@@ -238,13 +238,13 @@ file(GLOB_RECURSE SRC bin/*.cpp)
 message(STATUS "EXECUTABLES")
 foreach(F ${SRC})
     message(STATUS "+ " ${F})
-    file(RELATIVE_PATH REL ${CMAKE_CURRENT_SOURCE_DIR}/bin ${F})
-    string(REPLACE ".cpp" "" REL ${REL})
-    add_executable(${REL} ${F})
+    file(RELATIVE_PATH R ${CMAKE_CURRENT_SOURCE_DIR}/bin ${F})
+    string(REPLACE ".cpp" "" R ${R})
+    add_executable(${R} ${F})
     target_link_libraries(
-        ${REL}
+        ${R}
         PRIVATE gflags spectrum glog::glog fmt Threads::Threads
     )
-endforeach(F REL)
+endforeach(F R)
 
 unset(SRC)
