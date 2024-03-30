@@ -278,57 +278,61 @@ SpectrumExecutor::SpectrumExecutor(Spectrum& spectrum):
 
 /// @brief generate a transaction and execute it
 void SpectrumExecutor::Generate() {
-    tx = std::make_unique<T>(workload.Next(), last_execute.fetch_add(1));
-    tx->start_time = steady_clock::now();
-    tx->berun_flag.store(true);
-    tx->InstallSetStorageHandler([this](
-        const evmc::address &addr, 
-        const evmc::bytes32 &key, 
-        const evmc::bytes32 &value
-    ) {
-        auto _key = std::make_tuple(addr, key);
-        tx->tuples_put.push_back({
-            .key = _key, 
-            .value = value, 
-            .is_committed=false
+    if (queue.Size() == 0) {
+        tx = std::make_unique<T>(workload.Next(), last_execute.fetch_add(1));
+        tx->start_time = steady_clock::now();
+        tx->berun_flag.store(true);
+        tx->InstallSetStorageHandler([this](
+            const evmc::address &addr, 
+            const evmc::bytes32 &key, 
+            const evmc::bytes32 &value
+        ) {
+            auto _key = std::make_tuple(addr, key);
+            tx->tuples_put.push_back({
+                .key = _key, 
+                .value = value, 
+                .is_committed=false
+            });
+            if (tx->HasRerunKeys()) { tx->Break(); }
+            return evmc_storage_status::EVMC_STORAGE_MODIFIED;
         });
-        if (tx->HasRerunKeys()) { tx->Break(); }
-        return evmc_storage_status::EVMC_STORAGE_MODIFIED;
-    });
-    tx->InstallGetStorageHandler([this](
-        const evmc::address &addr, 
-        const evmc::bytes32 &key
-    ) {
-        auto _key  = std::make_tuple(addr, key);
-        auto value = evmc::bytes32{0};
-        auto version = size_t{0};
-        for (auto& tup: tx->tuples_put | std::views::reverse) {
-            if (tup.key == _key) { return tup.value; }
-        }
-        for (auto& tup: tx->tuples_get) {
-            if (tup.key == _key) { return tup.value; }
-        }
-        if (tx->HasRerunKeys()) { tx->Break(); return evmc::bytes32{0}; }
-        table.Get(tx.get(), _key, value, version);
-        size_t checkpoint_id = tx->MakeCheckpoint();
-        tx->tuples_get.push_back({
-            .key            = _key, 
-            .value          = value, 
-            .version        = version,
-            .tuples_put_len = tx->tuples_put.size(),
-            .checkpoint_id  = checkpoint_id
+        tx->InstallGetStorageHandler([this](
+            const evmc::address &addr, 
+            const evmc::bytes32 &key
+        ) {
+            auto _key  = std::make_tuple(addr, key);
+            auto value = evmc::bytes32{0};
+            auto version = size_t{0};
+            for (auto& tup: tx->tuples_put | std::views::reverse) {
+                if (tup.key == _key) { return tup.value; }
+            }
+            for (auto& tup: tx->tuples_get) {
+                if (tup.key == _key) { return tup.value; }
+            }
+            if (tx->HasRerunKeys()) { tx->Break(); return evmc::bytes32{0}; }
+            table.Get(tx.get(), _key, value, version);
+            size_t checkpoint_id = tx->MakeCheckpoint();
+            tx->tuples_get.push_back({
+                .key            = _key, 
+                .value          = value, 
+                .version        = version,
+                .tuples_put_len = tx->tuples_put.size(),
+                .checkpoint_id  = checkpoint_id
+            });
+            return value;
         });
-        return value;
-    });
-    DLOG(INFO) << "spectrum execute " << tx->id;
-    tx->Execute();
-    statistics.JournalExecute();
-    // commit all results if possible & necessary
-    for (auto entry: tx->tuples_put) {
-        if (tx->HasRerunKeys()) { break; }
-        if (entry.is_committed) { continue; }
-        table.Put(tx.get(), entry.key, entry.value);
-        entry.is_committed = true;
+        DLOG(INFO) << "spectrum execute " << tx->id;
+        tx->Execute();
+        statistics.JournalExecute();
+        // commit all results if possible & necessary
+        for (auto entry: tx->tuples_put) {
+            if (tx->HasRerunKeys()) { break; }
+            if (entry.is_committed) { continue; }
+            table.Put(tx.get(), entry.key, entry.value);
+            entry.is_committed = true;
+        }
+    } else {
+        tx = queue.Pop();
     }
 }
 
@@ -392,18 +396,20 @@ void SpectrumExecutor::Finalize() {
 
 /// @brief start an executor
 void SpectrumExecutor::Run() {
-    // first generate a transaction
-    Generate();
     while (!stop_flag.load()) {
+        // first generate a transaction
+        Generate();
         if (tx->HasRerunKeys()) {
             // if there are some re-run keys, re-execute to obtain the correct result
             ReExecute();
+            queue.Push(std::move(tx));
         }
         else if (last_finalized.load() + 1 == tx->id && !tx->HasRerunKeys()) {
             // if last transaction has finalized, and currently i don't have to re-execute, 
             // then i can final commit and do another transaction. 
             Finalize();
-            Generate();
+        } else {
+            queue.Push(std::move(tx));
         }
     }
     stop_latch.arrive_and_wait();

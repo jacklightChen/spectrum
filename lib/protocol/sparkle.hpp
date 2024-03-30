@@ -96,6 +96,7 @@ class SparkleExecutor {
     std::atomic<size_t>&    last_execute;
     std::atomic<size_t>&    last_finalized;
     std::atomic<bool>&      stop_flag;
+    SparkleQueue            queue;
     std::unique_ptr<T>      tx{nullptr};
     std::barrier<std::function<void()>>&           stop_latch;
 
