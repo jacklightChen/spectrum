@@ -10,6 +10,7 @@ YLABEL = "Troughput(Txn/s)"
 import pandas as pd
 import argparse
 import sys
+import re
 
 sys.path.extend(['.', '..', '../..'])
 from plot.parse import parse_records_from_file
@@ -32,7 +33,32 @@ file: str = args.file
 savepath = 'test.pdf'
 
 #################### 数据准备 ####################
-recs = pd.read_csv(file)
+if (file.endswith('csv')):
+    recs = pd.read_csv(file)
+else:
+    df = pd.DataFrame(columns=['protocol', 'threads', 'zipf', 'table_partition', 'commit', 'abort'])
+    with open(file, 'r') as f:
+        content = f.read()
+        c_list = content.split('#COMMIT-')
+        for c in c_list[1:]:
+            c = c.split('CONFIG-')
+            hash = c[0]
+            c = c[1].split('\n')
+            cc = c[0]
+            result_str = c[1]
+            num_threads = int(cc.split(':')[1])
+            table_partitions = int(cc.split(':')[2])
+            commit = float(re.search(r'commit\s+([\d.]+)', result_str).group(1))
+            execution = float(re.search(r'execution\s+([\d.]+)', result_str).group(1))
+            df.loc[len(df)] = {
+                'protocol': cc.split(':')[0] if cc.split(':')[-1] != 'TRUE' else 'AriaRe', 
+                'threads': num_threads, 
+                'zipf': 0, 
+                'table_partition': table_partitions, 
+                'commit': commit,
+                'abort': execution - commit
+            }
+    recs = df
 schemas = recs['protocol'].unique()
 print(schemas)
 

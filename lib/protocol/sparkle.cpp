@@ -296,47 +296,51 @@ SparkleExecutor::SparkleExecutor(Sparkle& sparkle):
 
 /// @brief generate a transaction and execute it
 void SparkleExecutor::Generate() {
-    tx = std::make_unique<T>(workload.Next(), last_execute.fetch_add(1));
-    tx->start_time = steady_clock::now();
-    tx->InstallSetStorageHandler([this](
-        const evmc::address &addr, 
-        const evmc::bytes32 &key, 
-        const evmc::bytes32 &value
-    ) {
-        DLOG(INFO) << tx->id << " set";
-        auto _key   = std::make_tuple(addr, key);
-        // just push back
-        tx->tuples_put.push_back(std::make_tuple(_key, value));
-        return evmc_storage_status::EVMC_STORAGE_MODIFIED;
-    });
-    tx->InstallGetStorageHandler([this](
-        const evmc::address &addr, 
-        const evmc::bytes32 &key
-    ) {
-        DLOG(INFO) << tx->id << " get";
-        auto _key   = std::make_tuple(addr, key);
-        auto value  = evmc::bytes32{0};
-        auto version = size_t{0};
-        // one key from one transaction will be committed once
-        for (auto& tup: tx->tuples_put | std::views::reverse) {
-            if (std::get<0>(tup) == _key) {
-                return std::get<1>(tup);
+    if (queue.Size() == 0) {
+        tx = std::make_unique<T>(workload.Next(), last_execute.fetch_add(1));
+        tx->start_time = steady_clock::now();
+        tx->InstallSetStorageHandler([this](
+            const evmc::address &addr, 
+            const evmc::bytes32 &key, 
+            const evmc::bytes32 &value
+        ) {
+            DLOG(INFO) << tx->id << " set";
+            auto _key   = std::make_tuple(addr, key);
+            // just push back
+            tx->tuples_put.push_back(std::make_tuple(_key, value));
+            return evmc_storage_status::EVMC_STORAGE_MODIFIED;
+        });
+        tx->InstallGetStorageHandler([this](
+            const evmc::address &addr, 
+            const evmc::bytes32 &key
+        ) {
+            DLOG(INFO) << tx->id << " get";
+            auto _key   = std::make_tuple(addr, key);
+            auto value  = evmc::bytes32{0};
+            auto version = size_t{0};
+            // one key from one transaction will be commited once
+            for (auto& tup: tx->tuples_put | std::views::reverse) {
+                if (std::get<0>(tup) == _key) {
+                    return std::get<1>(tup);
+                }
             }
-        }
-        for (auto& tup: tx->tuples_get) {
-            if (std::get<0>(tup) == _key) {
-                return std::get<1>(tup);
+            for (auto& tup: tx->tuples_get) {
+                if (std::get<0>(tup) == _key) {
+                    return std::get<1>(tup);
+                }
             }
+            table.Get(tx.get(), _key, value, version);
+            tx->tuples_get.push_back(std::make_tuple(_key, value, version));
+            return value;
+        });
+        tx->Execute();
+        statistics.JournalExecute();
+        for (auto i = size_t{0}; i < tx->tuples_put.size(); ++i) {
+            auto& entry = tx->tuples_put[i];
+            table.Put(tx.get(), std::get<0>(entry), std::get<1>(entry));
         }
-        table.Get(tx.get(), _key, value, version);
-        tx->tuples_get.push_back(std::make_tuple(_key, value, version));
-        return value;
-    });
-    tx->Execute();
-    statistics.JournalExecute();
-    for (auto i = size_t{0}; i < tx->tuples_put.size(); ++i) {
-        auto& entry = tx->tuples_put[i];
-        table.Put(tx.get(), std::get<0>(entry), std::get<1>(entry));
+    } else {
+        this->tx = queue.Pop();
     }
 }
 
@@ -378,14 +382,16 @@ void SparkleExecutor::Finalize() {
 
 /// @brief start an executor
 void SparkleExecutor::Run() {
-    Generate();
     while (!stop_flag.load()) {
+        Generate();
         if (tx->HasRerunFlag()) {
             ReExecute();
+            queue.Push(std::move(this->tx));
         }
         else if (last_finalized.load() + 1 == tx->id && !tx->HasRerunFlag()) {
             Finalize();
-            Generate();
+        } else {
+            queue.Push(std::move(this->tx));
         }
     }
     stop_latch.arrive_and_wait();

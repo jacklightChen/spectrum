@@ -20,17 +20,17 @@ if __name__ == '__main__':
     hash = subprocess.run(["git", "rev-parse", "HEAD"], **conf).stdout.decode('utf-8').strip()
     batch_size = 200
     with open(f'./exp_results/bench_results_{timestamp}', 'w') as f:
-        for num_threads in list(range(6, 42, 6)):
+        for num_threads in list(range(6, 56, 3)):
             table_partitions    = 9973
-            num_dispatchers       = 6
-            # spectrum_dispatcher = num_threads // 6
             protocols       = [
-                # f"Calvin:{num_threads}:{num_dispatchers}:{table_partitions}",
-                # f"Aria:{num_threads}:{table_partitions}:{batch_size // num_threads}:FALSE", 
-                # f"Aria:{num_threads}:{table_partitions}:{batch_size // num_threads}:TRUE",
+                f"Calvin:{num_threads}:{table_partitions}:{batch_size // num_threads}",
+                f"Aria:{num_threads}:{table_partitions}:{batch_size // num_threads}:FALSE", 
+                f"Aria:{num_threads}:{table_partitions}:{batch_size // num_threads}:TRUE",
                 f"Sparkle:{num_threads}:{table_partitions}", 
                 f"Spectrum:{num_threads}:{table_partitions}:COPYONWRITE",
-                # f"Serial:BASIC:{1}",
+                f"SpectrumSched:{num_threads}:{table_partitions}:COPYONWRITE",
+                # f"Dummy:{num_threads}:{table_partitions}:COPYONWRITE",
+                f"Serial:BASIC:{1}",
             ]
             for cc in protocols:
                 print(f"#COMMIT-{hash}",  f"CONFIG-{cc}")
