@@ -1,247 +1,211 @@
 #include <spectrum/protocol/calvin.hpp>
-#include <spectrum/common/hex.hpp>
 #include <spectrum/common/thread-util.hpp>
-#include <algorithm>
-#include <string>
-#include <vector>
+#include <fmt/core.h>
 
-namespace spectrum {
+/*
+    This is a implementation of "Calvin: A Fast and Practical Deterministic OLTP Database" (Yi Lu, Xiangyao Yu, Lei Cao, Samuel Madden). 
+    In this implementation we adopt the fallback strategy and reordering strategy discussed in this paper. 
+ */
+
+namespace spectrum 
+{
+
 #define K std::tuple<evmc::address, evmc::bytes32>
-#define V evmc::bytes32
 #define T CalvinTransaction
 
 using namespace std::chrono;
 
-/// @brief wrap a transaction into calvin transaction
-/// @param inner inner transaction
-/// @param id the schedule id of this transaction
-CalvinTransaction::CalvinTransaction(Transaction&& inner, size_t id):
-    Transaction{std::move(inner)},
-    id{id},
-    start_time{std::chrono::steady_clock::now()}
-{
-    this->Analyze(this->prediction);
-}
-
-void CalvinTransaction::UpdateWait(size_t _id) {
-    auto guard = Guard{mu};
-    if (_id < id) { 
-        should_wait = std::max(_id, should_wait);
-    }
-}
-
-/// @brief the multi-version lock table for calvin
-/// @param partitions the number of partitions
-CalvinLockTable::CalvinLockTable(size_t partitions):
-    Table<K, CalvinLockQueue, KeyHasher>{partitions}
-{}
-
-/// @brief remove versions preceeding current transaction
-/// @param tx the transaction the previously wrote this entry
-/// @param k the key of written entry
-void CalvinLockTable::Release(T* tx, const K& k) {
-    DLOG(INFO) << "clear put " << tx->id << std::endl;
-    Table::Put(k, [&](auto& _v) {
-        for (auto& entry: _v.entries) {
-            entry.readers.erase(tx);
-        }
-        _v.readers_default.erase(tx);
-        while (_v.entries.size() && _v.entries.front().version <= tx->id) {
-            _v.entries.pop_front();
-        }
-    });
-}
-
-/// @brief append a read request to lock table
-/// @param tx the transaction that reads the value
-/// @param k the key of the read entry
-void CalvinLockTable::Get(T* tx, const K& k) {
-    DLOG(INFO) << tx->id << " get";
-    Table::Put(k, [&](auto& _v) {
-        auto rit = _v.entries.rbegin();
-        auto end = _v.entries.rend();
-        while (rit != end) {
-            if (rit->version > tx->id) {
-                ++rit; continue;
-            }
-            rit->readers.insert(tx);
-            rit->tx->UpdateWait(tx->id);
-            if (rit != _v.entries.rbegin()) {
-                (--rit)->tx->UpdateWait(tx->id);
-            }
-            return;
-        }
-        DLOG(INFO) << "default";
-        _v.readers_default.insert(tx);
-    });
-}
-
-/// @brief append a write request to lock table
-/// @param tx the transaction the writes the value
-/// @param k the key of write entry
-void CalvinLockTable::Put(T* tx, const K& k) {
-    DLOG(INFO) << tx->id << " put";
-        Table::Put(k, [&](auto& _v) {
-        auto rit = _v.entries.rbegin();
-        auto end = _v.entries.rend();
-        auto readers_ = std::unordered_set<T*>();
-        // search from insertion position
-        while (rit != end) {
-            if (rit->version > tx->id) {
-                ++rit; continue;
-            }
-            // reset transactions' should_wait that read outdated keys
-            for (auto it = rit->readers.begin(); it != rit->readers.end();) {
-                if ((*it)->id >= tx->id) {
-                    readers_.insert(*it);
-                    (*it)->UpdateWait(tx->id);
-                    // this one is very tricky. we **must** use `it++` here.  
-                    rit->readers.erase(it++);
-                }
-                else {
-                    tx->UpdateWait((*it)->id);
-                    ++it;
-                }
-            }
-            break;
-        }
-        for (auto it = _v.readers_default.begin(); it != _v.readers_default.end();) {
-            if ((*it)->id >= tx->id) {
-                readers_.insert(*it);
-                (*it)->UpdateWait(tx->id);
-                _v.readers_default.erase(it++);
-            }
-            else {
-                tx->UpdateWait((*it)->id);
-                ++it;
-            }
-        }
-        // insert an entry, with readers exempted from previous version
-        _v.entries.insert(rit.base(), {
-            .tx      = tx,
-            .version = tx->id,
-            .readers = readers_
-        });
-    });
-}
-
-Calvin::Calvin(Workload& workload, Statistics& statistics, size_t num_executors, size_t num_dispatchers, size_t table_partitions):
+/// @brief initialize calvin protocol
+/// @param workload an evm transaction workload
+/// @param batch_size batch size
+/// @param num_threads the number of threads in thread pool
+/// @param table_partitions the number of partitions in table
+Calvin::Calvin(
+    Workload& workload, Statistics& statistics,
+    size_t num_threads, size_t table_partitions, size_t repeat
+):
     workload{workload},
     statistics{statistics},
-    num_executors{num_executors},
-    num_dispatchers{num_dispatchers},
-    queue_bundle(num_executors),
+    barrier(num_threads, []{ DLOG(INFO) << "batch complete" << std::endl; }),
     table{table_partitions},
-    lock_table{table_partitions}
+    lock_table{table_partitions},
+    num_threads{num_threads},
+    repeat{repeat}
 {
-    LOG(INFO) << fmt::format("Calvin(num_executors={}, num_dispatchers={}, n_table_partitions={})", num_executors, num_dispatchers, table_partitions);
-    workload.SetEVMType(EVMType::BASIC);
+    LOG(INFO) << fmt::format("Calvin(num_threads={}, table_partitions={}, repeat={})", num_threads, table_partitions, repeat) << std::endl;
 }
 
 /// @brief start calvin protocol
 void Calvin::Start() {
-    stop_flag.store(false);
-    for (size_t i = 0; i != num_executors; ++i) {
-        DLOG(INFO) << "start executor " << i << std::endl;
-        auto queue = &queue_bundle[i];
-        executors.push_back(std::thread([this, queue] {
-            CalvinExecutor(*this, *queue).Run();
+    DLOG(INFO) << "calvin start";
+    for (size_t i = 0; i < num_threads; ++i) {
+        workers.push_back(std::thread([this, i]() {
+            CalvinExecutor(*this, i).Run();
         }));
-        PinRoundRobin(executors[i], i + num_dispatchers);
-    }
-    for (size_t i = 0; i != num_dispatchers; ++i) {
-        DLOG(INFO) << "start dispatcher " << i << std::endl;
-        dispatchers.push_back(std::thread([this] {
-            CalvinDispatch(*this).Run();
-        }));
-        PinRoundRobin(dispatchers[i], i);
+        PinRoundRobin(workers[i], i);
     }
 }
 
-/// @brief stop calvin protocol
+/// @brief stop calvin protocol and return statistics
+/// @return statistics of current execution
 void Calvin::Stop() {
     stop_flag.store(true);
-    for (auto& x: dispatchers)  { x.join(); }
-    for (auto& x: executors)    { x.join(); }
+    for (size_t i = 0; i < num_threads; ++i) {
+        workers[i].join();
+    }
+    DLOG(INFO) << "calvin stop";
 }
 
-/// @brief initialize a calvin executor
-/// @param calvin the calvin instance with configuration
-/// @param queue the queue of transactions
-CalvinExecutor::CalvinExecutor(Calvin& calvin, CalvinQueue& queue):
-    queue{queue},
-    stop_flag{calvin.stop_flag},
-    last_committed{calvin.last_committed},
-    table{calvin.table},
-    statistics{calvin.statistics}
+/// @brief construct an empty calvin transaction
+CalvinTransaction::CalvinTransaction(
+    Transaction&& inner, size_t id
+):
+    Transaction{std::move(inner)},
+    id{id},
+    start_time{std::chrono::steady_clock::now()}
 {}
 
-/// @brief run calvin executor until stop_flag modified to true
-void CalvinExecutor::Run() {while(!stop_flag.load()) {
-    auto tx = queue.Pop();
-    if (tx == nullptr) { continue; }
-    DLOG(INFO) << "execute " << tx->id << std::endl;
-    tx->InstallGetStorageHandler([&](auto& address, auto& key) {
-        V v; table.Get({address, key}, [&](auto& _v) { v = _v; });
-        return v;
+CalvinTransaction::CalvinTransaction(CalvinTransaction&& tx):
+    Transaction{std::move(tx)},
+    id{tx.id},
+    start_time{tx.start_time}
+{}
+
+/// @brief initialize an calvin lock table
+/// @param partitions the number of partitions used in parallel hash table
+CalvinLockTable::CalvinLockTable(size_t partitions): 
+    Table::Table(partitions)
+{}
+
+/// @brief initialize an calvin executor
+/// @param calvin the calvin configuration object
+CalvinExecutor::CalvinExecutor(Calvin& calvin, size_t worker_id):
+    statistics{calvin.statistics},
+    workload{calvin.workload},
+    table{calvin.table},
+    lock_table{calvin.lock_table},
+    stop_flag{calvin.stop_flag},
+    barrier{calvin.barrier},
+    counter{calvin.counter},
+    has_conflict{calvin.has_conflict},
+    num_threads{calvin.num_threads},
+    repeat{calvin.repeat},
+    confirm_exit{calvin.confirm_exit},
+    worker_id{worker_id}
+{}
+
+/// @brief run transactions
+void CalvinExecutor::Run() {
+    auto batch = std::vector<T>();
+    batch.reserve(repeat);
+    while(true) {
+        #define LATENCY duration_cast<microseconds>(steady_clock::now() - tx.start_time).count()
+        // -- stage 1: generate and predict
+        auto _stop = confirm_exit.load() == num_threads;
+        barrier.arrive_and_wait();
+        if (_stop) { return; }
+        if (stop_flag.load()) {
+            confirm_exit.compare_exchange_weak(worker_id, worker_id + 1);
+        }
+        has_conflict.store(false);
+        for (size_t i = 0; i < repeat; ++i) {
+            batch.emplace_back(workload.Next(), counter.fetch_add(1));
+            batch[i].Analyze(batch[i].prediction);
+        }
+        // -- stage 2: wait & execute each transaction
+        barrier.arrive_and_wait();
+        for (auto& tx: batch) {
+            this->Execute(&tx);
+            statistics.JournalExecute();
+            statistics.JournalCommit(LATENCY);
+        }
+        // -- stage 3: release lock
+        barrier.arrive_and_wait();
+        for (auto& tx: batch) {
+            this->CleanLockTable(&tx);
+        }
+        batch.clear();
+    }
+}
+
+/// @brief put transaction id (local id) into table
+/// @param tx the transaction
+void CalvinExecutor::PrepareLockTable(T* tx) {
+    for (auto& key: tx->prediction.get) {
+        lock_table.Put(key, [&](auto& entry) {
+            entry.deps_get.push_back(tx);
+        });
+    }
+    for (auto& key: tx->prediction.put) {
+        lock_table.Put(key, [&](auto& entry) {
+            entry.deps_put.push_back(tx);
+        });
+    }
+}
+
+/// @brief fallback execution without constant
+/// @param tx the transaction
+void CalvinExecutor::Execute(T* tx) {
+    // read from the public table
+    tx->InstallGetStorageHandler([&](
+        const evmc::address &addr,
+        const evmc::bytes32 &key
+    ) {
+        auto tup = std::make_tuple(addr, key);
+        auto value = evmc::bytes32{0};
+        table.Get(tup, [&](auto& entry){
+            value = entry.value;
+        });
+        return value;
     });
-    tx->InstallSetStorageHandler([&](auto& address, auto& key, auto& v) {
-        table.Put({address, key}, [&](auto& _v) { _v = v; });
+    // write directly into the public table
+    tx->InstallSetStorageHandler([&](
+        const evmc::address &addr, 
+        const evmc::bytes32 &key,
+        const evmc::bytes32 &value
+    ) {
+        auto tup = std::make_tuple(addr, key);
+        table.Put(tup, [&](auto& entry){
+            entry.value = value;
+        });
         return evmc_storage_status::EVMC_STORAGE_MODIFIED;
     });
+    // get the latest dependency and wait on it
+    T* should_wait = nullptr;
+    #define COND (_tx->id < tx->id && (should_wait == nullptr || _tx->id > should_wait->id))
+    for (auto& key: tx->prediction.put) {
+        lock_table.Get(key, [&](auto& entry) {
+            for (auto _tx: entry.deps_get) { if (COND) { should_wait = _tx; } }
+            for (auto _tx: entry.deps_put) { if (COND) { should_wait = _tx; } }
+        });
+    }
+    for (auto& key: tx->prediction.get) {
+        lock_table.Get(key, [&](auto& entry) {
+            for (auto _tx: entry.deps_put) { if (COND) { should_wait = _tx; } }
+        });
+    }
+    #undef COND
+    while(should_wait && !should_wait->commited.load()) {}
     tx->Execute();
-    statistics.JournalExecute();
-    statistics.JournalCommit(duration_cast<microseconds>(steady_clock::now() - tx->start_time).count());
-    last_committed.fetch_add(1, std::memory_order_seq_cst);
-}}
+    tx->commited.store(true);
+}
 
-/// @brief dispatch a transaction
-/// @param calvin the calvin instance with configuration
-CalvinDispatch::CalvinDispatch(Calvin& calvin):
-    workload{calvin.workload},
-    stop_flag{calvin.stop_flag},
-    queue_bundle{calvin.queue_bundle},
-    lock_table{calvin.lock_table},
-    last_scheduled{calvin.last_scheduled},
-    last_assigned{calvin.last_assigned},
-    last_committed{calvin.last_committed}
-{}
-
-/// @brief run a calvin dispatcher
-void CalvinDispatch::Run() {while(!stop_flag.load()) {
-    // generate and analyze the transaction
-    auto tx = std::make_unique<T>(workload.Next(), last_scheduled.fetch_add(1, std::memory_order_seq_cst));
-    // make get/put requests in lock table
-    DLOG(INFO) << tx->id << " fetch locks" << std::endl;
-    for (auto& k: tx->prediction.get) {
-        lock_table.Get(tx.get(), k);
+/// @brief clean up the lock table
+/// @param tx the transaction to clean up
+void CalvinExecutor::CleanLockTable(T* tx) {
+    for (auto& key: tx->prediction.put) {
+        lock_table.Put(key, [&](auto& entry) {
+            entry.deps_put.clear();
+        });
     }
-    for (auto& k: tx->prediction.put) {
-        lock_table.Put(tx.get(), k);
+    for (auto& key: tx->prediction.get) {
+        lock_table.Put(key, [&](auto& entry) {
+            entry.deps_get.clear();
+        });
     }
-    // wait until the should_wait to finalize
-    while (tx->id != last_assigned.load() + 1) {
-        DLOG(INFO) << tx->id << " wait last assigned" << std::endl;
-    }
-    last_assigned.fetch_add(1, std::memory_order_seq_cst);
-    DLOG(INFO) << tx->id << " release locks" << std::endl;
-    for (auto& k: tx->prediction.get) {
-        lock_table.Release(tx.get(), k);
-    }
-    for (auto& k: tx->prediction.put) {
-        lock_table.Release(tx.get(), k);
-    }
-    // now we have the real should_wait, so we wait until it can be executed
-    while (true) {
-        auto guard = Guard{tx->mu}; 
-        DLOG(INFO) << tx->id << " wait " << tx->should_wait << std::endl;
-        if (tx->should_wait <= last_committed.load()) break;
-    }
-    queue_bundle[tx->id % queue_bundle.size()].Push(std::move(tx));
-}}
+}
 
 #undef K
-#undef V
 #undef T
 
 } // namespace spectrum

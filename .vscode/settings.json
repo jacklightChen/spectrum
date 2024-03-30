@@ -113,7 +113,10 @@
     "charconv": "cpp",
     "*.ipp": "cpp",
     "valarray": "cpp",
-    "barrier": "cpp"
+    "barrier": "cpp",
+    "__bits": "cpp",
+    "__debug": "cpp",
+    "scoped_allocator": "cpp"
 },
   "C_Cpp.clang_format_fallbackStyle": "{ BasedOnStyle: LLVM, IndentWidth: 4 }",
   "C_Cpp.clang_format_style": "{ BasedOnStyle: LLVM, IndentWidth: 4 }",

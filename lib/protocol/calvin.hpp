@@ -1,122 +1,107 @@
+#include <functional>
+#include <spectrum/common/lock-util.hpp>
 #include <spectrum/common/evm_hash.hpp>
+#include <spectrum/common/evm_transaction.hpp>
+#include <spectrum/workload/abstraction.hpp>
 #include <spectrum/protocol/abstraction.hpp>
 #include <spectrum/common/statistics.hpp>
-#include <spectrum/common/lock-util.hpp>
-#include <spectrum/workload/abstraction.hpp>
-#include <atomic>
-#include <deque>
-#include <chrono>
-#include <functional>
-#include <queue>
-#include <thread>
-#include <unordered_set>
+#include <tuple>
 #include <list>
+#include <unordered_map>
+#include <optional>
+#include <atomic>
 #include <memory>
+#include <chrono>
+#include <barrier>
 
-namespace spectrum {
+namespace spectrum
+{
+
 #define K std::tuple<evmc::address, evmc::bytes32>
-#define V evmc::bytes32
 #define T CalvinTransaction
 
-struct CalvinTransaction : public Transaction {
-
-    SpinLock            mu;
-    size_t              id;
-    size_t              should_wait{0};
-    Prediction          prediction{};
+/// @brief calvin tranaction with local read and write set. 
+struct CalvinTransaction: public Transaction {
+    size_t      id;
+    bool        flag_conflict{false};
+    std::atomic<bool>   commited{false};
+    Prediction          prediction;
     std::chrono::time_point<std::chrono::steady_clock> start_time;
-    CalvinTransaction(Transaction &&inner, size_t id);
-    void UpdateWait(size_t id);
-
+    CalvinTransaction(Transaction&& inner, size_t id);
+    CalvinTransaction(CalvinTransaction&& tx);
 };
 
+/// @brief calvin table entry for first round execution
+struct CalvinEntry {
+    evmc::bytes32   value   = evmc::bytes32{0};
+};
+
+/// @brief calvin table for first round execution
+struct CalvinTable: public Table<K, CalvinEntry, KeyHasher> {
+};
+
+/// @brief calvin table entry for fallback pessimistic execution
 struct CalvinLockEntry {
-    T*                      tx;
-    size_t                  version;
-    std::unordered_set<T*>  readers;
+    std::vector<T*>     deps_get;
+    std::vector<T*>     deps_put;
 };
 
-struct CalvinLockQueue {
-
-    std::list<CalvinLockEntry>  entries;
-    std::unordered_set<T*>      readers_default;
-
-};
-
-struct CalvinLockTable: private Table<K, CalvinLockQueue, KeyHasher> {
-
+/// @brief calvin table for fallback pessimistic execution
+struct CalvinLockTable: public Table<K, CalvinLockEntry, KeyHasher> {
     CalvinLockTable(size_t partitions);
-    void Get(T* tx, const K& k);
-    void Put(T* tx, const K& k);
-    void Release(T* tx, const K& k);
-
 };
 
-using CalvinTable = Table<K, V, KeyHasher>;
-using CalvinQueue = LockQueue<T>;
-class CalvinExecutor;
-class CalvinDispatch;
-
-class Calvin : public Protocol {
+/// @brief calvin protocol master class
+class Calvin: public Protocol {
 
     private:
-    Workload&                   workload;
-    Statistics&                 statistics;
-    CalvinTable                 table;
-    CalvinLockTable             lock_table;
-    size_t                      num_dispatchers;
-    size_t                      num_executors;
-    std::atomic<bool>           stop_flag{false};
-    std::atomic<size_t>         last_scheduled{1};
-    std::atomic<size_t>         last_committed{0};
-    std::atomic<size_t>         last_assigned{0};
-    std::vector<CalvinQueue>    queue_bundle;
-    std::vector<std::thread>    executors;
-    std::vector<std::thread>    dispatchers;
-
+    Statistics&                         statistics;
+    Workload&                           workload;
+    CalvinTable                         table;
+    CalvinLockTable                     lock_table;
+    size_t                              repeat;
+    size_t                              num_threads;
+    std::atomic<bool>                   stop_flag{false};
+    std::barrier<std::function<void()>> barrier;
+    std::atomic<size_t>                 confirm_exit{0};
+    std::atomic<size_t>                 counter{0};
+    std::atomic<bool>                   has_conflict{false};
+    std::vector<std::thread>            workers;
     friend class CalvinExecutor;
-    friend class CalvinDispatch;
 
     public:
-    Calvin(Workload& workload, Statistics& statistics, size_t num_executors, size_t num_dispatchers, size_t table_partitions);
+    Calvin(Workload& workload, Statistics& statistics, size_t num_threads, size_t table_partitions, size_t repeat);
     void Start() override;
     void Stop() override;
 
 };
 
+/// @brief routines to be executed in various execution stages
 class CalvinExecutor {
 
     private:
-    CalvinTable&                table;
-    CalvinQueue&                queue;
-    Statistics&                 statistics;
-    std::atomic<bool>&          stop_flag;
-    std::atomic<size_t>&        last_committed;
+    Statistics&                             statistics;
+    Workload&                               workload;
+    CalvinTable&                            table;
+    CalvinLockTable&                        lock_table;
+    size_t                                  num_threads;
+    std::atomic<size_t>&                    confirm_exit;
+    std::atomic<bool>&                      stop_flag;
+    std::barrier<std::function<void()>>&    barrier;
+    std::atomic<size_t>&                    counter;
+    std::atomic<bool>&                      has_conflict;
+    size_t                                  repeat;
+    size_t                                  worker_id;
 
     public:
-    CalvinExecutor(Calvin& calvin, CalvinQueue& queue);
+    CalvinExecutor(Calvin& calvin, size_t worker_id);
     void Run();
+    void PrepareLockTable(T* tx);
+    void Execute(T* tx);
+    void CleanLockTable(T* tx);
 
 };
 
-class CalvinDispatch {
-
-    private:
-    Workload&                   workload;
-    std::atomic<bool>&          stop_flag;
-    CalvinLockTable&            lock_table;
-    std::atomic<size_t>&        last_scheduled;
-    std::atomic<size_t>&        last_committed;
-    std::atomic<size_t>&        last_assigned;
-    std::vector<CalvinQueue>&   queue_bundle;
-
-    public:
-    CalvinDispatch(Calvin& calvin);
-    void Run();
-
-};
-
-#undef V
 #undef K
 #undef T
 
