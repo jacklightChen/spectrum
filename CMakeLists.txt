@@ -17,20 +17,24 @@ find_package(Threads REQUIRED)
 
 # -- Manage External Dependencies Using Github
 
+function(Execute)
+    cmake_parse_arguments(EX "OUTPUT_QUIET;ERROR_QUIET" "WORKING_DIRECTORY;COMMAND_ERROR_IS_FATAL" "COMMAND" "${ARGV}")
+    list(JOIN EX_COMMAND " " EX_COMMAND)
+    message(STATUS "+ " ${EX_COMMAND})
+    execute_process(${ARGN})
+endfunction()
+
 function(GitHub)
     cmake_parse_arguments(GH "" "USER;REPO;BRANCH;AS;PACK;FLAGS;DIR" "" "${ARGV}")
     message(STATUS "GITHUB " ${GH_USER}/${GH_REPO}/${GH_BRANCH})
     # download package from github
-    if (EXISTS "${CMAKE_BINARY_DIR}/_deps/${GH_USER}/${GH_REPO}/.git")
-        message(STATUS "+ download skipped")
-    else()
-        execute_process(
+    if (NOT EXISTS "${CMAKE_BINARY_DIR}/_deps/${GH_USER}/${GH_REPO}/.git")
+        Execute(
             COMMAND                 git clone --quiet --depth 1 --branch "${GH_BRANCH}" "https://github.com/${GH_USER}/${GH_REPO}" "${CMAKE_BINARY_DIR}/_deps/${GH_USER}/${GH_REPO}"
             WORKING_DIRECTORY       ${CMAKE_BINARY_DIR}
             COMMAND_ERROR_IS_FATAL  ANY
             OUTPUT_QUIET ERROR_QUIET
         )
-        message(STATUS "+ download finish")
     endif()
     # configure how this package is added to current project
     if(${GH_AS} STREQUAL "CMAKE SUBDIR")
@@ -38,36 +42,31 @@ function(GitHub)
         set(CMAKE_MESSAGE_LOG_LEVEL ERROR)
         add_subdirectory(${CMAKE_BINARY_DIR}/_deps/${GH_USER}/${GH_REPO} EXCLUDE_FROM_ALL)
         set(CMAKE_MESSAGE_LOG_LEVEL ${CMAKE_MESSAGE_LOG_LEVEL__})
-        message(STATUS "+ configuration finish (add_subdirecotry)")
     elseif(${GH_AS} STREQUAL "CMAKE INSTALL" OR ${GH_AS} STREQUAL "CMAKE SCANLIB")
-        execute_process(
+        Execute(
             COMMAND                 cmake -S . -B build ${GH_FLAGS} -DCMAKE_INSTALL_PREFIX=${CMAKE_BINARY_DIR}/_deps/${GH_USER}/${GH_REPO}/install
             WORKING_DIRECTORY       ${CMAKE_BINARY_DIR}/_deps/${GH_USER}/${GH_REPO}
             COMMAND_ERROR_IS_FATAL  ANY
             OUTPUT_QUIET ERROR_QUIET
         )
-        message(STATUS "+ configuration finish")
-        execute_process(
+        Execute(
             COMMAND                 cmake --build build -j
             WORKING_DIRECTORY       ${CMAKE_BINARY_DIR}/_deps/${GH_USER}/${GH_REPO}
             COMMAND_ERROR_IS_FATAL  ANY
             OUTPUT_QUIET ERROR_QUIET
         )
-        message(STATUS "+ build finish")
-        execute_process(
+        Execute(
             COMMAND                 cmake --build build --target install
             WORKING_DIRECTORY       ${CMAKE_BINARY_DIR}/_deps/${GH_USER}/${GH_REPO}
             COMMAND_ERROR_IS_FATAL  ANY
             OUTPUT_QUIET ERROR_QUIET
         )
-        message(STATUS "+ install finish")
         set(CMAKE_PREFIX_PATH "${CMAKE_BINARY_DIR}/_deps/${GH_USER}/${GH_REPO}/install")
         if("${GH_PACK}" STREQUAL "")
             set(GH_PACK ${GH_REPO})
         endif()
         if(${GH_AS} STREQUAL "CMAKE INSTALL")
             find_package(${GH_PACK} REQUIRED QUIET)
-            message(STATUS "+ find package finish")
         elseif(${GH_AS} STREQUAL "CMAKE SCANLIB")
             include_directories(${CMAKE_BINARY_DIR}/_deps/${GH_USER}/${GH_REPO}/install/include)
             link_directories(${CMAKE_BINARY_DIR}/_deps/${GH_USER}/${GH_REPO}/install/lib)
