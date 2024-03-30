@@ -111,14 +111,19 @@ void CalvinExecutor::Run() {
         for (size_t i = 0; i < repeat; ++i) {
             batch.emplace_back(workload.Next(), counter.fetch_add(1));
             batch[i].Analyze(batch[i].prediction);
+            this->Analyze(&batch[i]);
         }
-        // -- stage 2: wait & execute each transaction
+        // -- stage 3: wait & execute each transaction
         barrier.arrive_and_wait();
-        for (auto& tx: batch) {
-            this->Execute(&tx);
+        auto count_committed = 0;
+        while (count_committed != repeat) {for (auto& tx: batch) {
+            if (tx.committed.load()) { continue; }
+            if (tx.should_wait && !tx.should_wait->committed.load()) { continue; }
+            tx.Execute();
             statistics.JournalExecute();
             statistics.JournalCommit(LATENCY);
-        }
+            ++count_committed;
+        }}
         // -- stage 3: release lock
         barrier.arrive_and_wait();
         for (auto& tx: batch) {
@@ -145,7 +150,7 @@ void CalvinExecutor::PrepareLockTable(T* tx) {
 
 /// @brief fallback execution without constant
 /// @param tx the transaction
-void CalvinExecutor::Execute(T* tx) {
+void CalvinExecutor::Analyze(T* tx) {
     // read from the public table
     tx->InstallGetStorageHandler([&](
         const evmc::address &addr,
@@ -171,23 +176,19 @@ void CalvinExecutor::Execute(T* tx) {
         return evmc_storage_status::EVMC_STORAGE_MODIFIED;
     });
     // get the latest dependency and wait on it
-    T* should_wait = nullptr;
-    #define COND (_tx->id < tx->id && (should_wait == nullptr || _tx->id > should_wait->id))
+    #define COND (_tx->id < tx->id && (tx->should_wait == nullptr || _tx->id > tx->should_wait->id))
     for (auto& key: tx->prediction.put) {
         lock_table.Get(key, [&](auto& entry) {
-            for (auto _tx: entry.deps_get) { if (COND) { should_wait = _tx; } }
-            for (auto _tx: entry.deps_put) { if (COND) { should_wait = _tx; } }
+            for (auto _tx: entry.deps_get) { if (COND) { tx->should_wait = _tx; } }
+            for (auto _tx: entry.deps_put) { if (COND) { tx->should_wait = _tx; } }
         });
     }
     for (auto& key: tx->prediction.get) {
         lock_table.Get(key, [&](auto& entry) {
-            for (auto _tx: entry.deps_put) { if (COND) { should_wait = _tx; } }
+            for (auto _tx: entry.deps_put) { if (COND) { tx->should_wait = _tx; } }
         });
     }
     #undef COND
-    while(should_wait && !should_wait->commited.load()) {}
-    tx->Execute();
-    tx->commited.store(true);
 }
 
 /// @brief clean up the lock table

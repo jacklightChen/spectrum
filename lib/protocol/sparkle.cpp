@@ -317,7 +317,7 @@ void SparkleExecutor::Generate() {
         auto _key   = std::make_tuple(addr, key);
         auto value  = evmc::bytes32{0};
         auto version = size_t{0};
-        // one key from one transaction will be commited once
+        // one key from one transaction will be committed once
         for (auto& tup: tx->tuples_put | std::views::reverse) {
             if (std::get<0>(tup) == _key) {
                 return std::get<1>(tup);

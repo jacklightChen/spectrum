@@ -11,7 +11,7 @@ set(CMAKE_ARCHIVE_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/lib)
 set(ENV{CC}     ${CMAKE_C_COMPILER})
 set(ENV{CXX}    ${CMAKE_CXX_COMPILER})
 
-option(DEBUG OFF)
+option(ASAN OFF)
 option(EVM_PRINT_INSTRUCTIONS "print each evm instruction on instruction start" 0)
 find_package(Threads REQUIRED)
 
@@ -155,14 +155,14 @@ GitHub(
     AS      "AUTOMAKE INSTALL"
 )
 
-# -- Manage Compile Options w/ DEBUG flag
+# -- Manage Compile Options w/ ASAN flag
 
-if(DEBUG)
+if(ASAN)
     add_compile_options(-fsanitize=address)
     add_link_options(-fsanitize=address)
     add_compile_options(
         -O0 -ggdb -Wall -Wno-reorder -Wno-attributes
-        -DPROJECT_VERSION="0.12.0-dev"
+        -DPROJECT_VERSION=""
         -DEVMONE_X86_64_ARCH_LEVEL=2
         -DEVM_PRINT_INSTRUCTIONS=${EVM_PRINT_INSTRUCTIONS}
     )
@@ -170,7 +170,7 @@ else()
     add_compile_options(
         -O3 -Wall -Wno-reorder -Wno-attributes
         -DNDEBUG -ggdb
-        -DPROJECT_VERSION="0.12.0-dev"
+        -DPROJECT_VERSION=""
         -DEVMONE_X86_64_ARCH_LEVEL=2
     )
 endif()

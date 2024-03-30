@@ -23,8 +23,9 @@ namespace spectrum
 /// @brief calvin tranaction with local read and write set. 
 struct CalvinTransaction: public Transaction {
     size_t      id;
+    T*          should_wait{nullptr};
     bool        flag_conflict{false};
-    std::atomic<bool>   commited{false};
+    std::atomic<bool>   committed{false};
     Prediction          prediction;
     std::chrono::time_point<std::chrono::steady_clock> start_time;
     CalvinTransaction(Transaction&& inner, size_t id);
@@ -97,7 +98,7 @@ class CalvinExecutor {
     CalvinExecutor(Calvin& calvin, size_t worker_id);
     void Run();
     void PrepareLockTable(T* tx);
-    void Execute(T* tx);
+    void Analyze(T* tx);
     void CleanLockTable(T* tx);
 
 };

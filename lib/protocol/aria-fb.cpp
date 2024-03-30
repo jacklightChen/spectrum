@@ -368,9 +368,9 @@ void AriaExecutor::Fallback(T* tx) {
         });
     }
     #undef COND
-    while(should_wait && !should_wait->commited.load()) {}
+    while(should_wait && !should_wait->committed.load()) {}
     tx->Execute();
-    tx->commited.store(true);
+    tx->committed.store(true);
 }
 
 /// @brief clean up the lock table
