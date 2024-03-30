@@ -39,22 +39,31 @@ bool SpectrumCacheTransaction::HasRerunKeys() {
 
 /// @brief call the transaction to rerun providing the key that caused it
 /// @param key the key that caused rerun
-void SpectrumCacheTransaction::AddRerunKeys(const K& key, const evmc::bytes32* v, size_t cause_id) {
+void SpectrumCacheTransaction::AddRerunKeys(const K& key, const evmc::bytes32* value, size_t version) {
     auto guard = Guard{rerun_keys_mu};
     rerun_keys.push_back(key);
-    should_wait = std::max(should_wait, cause_id);
-    if (v == nullptr) {
+    should_wait = std::max(should_wait, version);
+    if (value == nullptr) {
         for (auto it = local_cache[key].begin(); it != local_cache[key].end();) {
-            if (it->version == cause_id) { local_cache[key].erase(it); }
+            if (it->version == version) { local_cache[key].erase(it); }
             else { ++it; }
         }
     }
     else {
-        for (auto it = local_cache[key].begin(); it != local_cache[key].end();) {
-            if (it->version < cause_id) { ++it; continue; }
-            local_cache[key].insert(it, CacheTuple{.value=*v, .version=cause_id}); return;
+        for (auto it = local_cache[key].begin();;++it) {
+            if (it == local_cache[key].end()) {
+                local_cache[key].push_back({.value=*value, .version=version});
+                break;
+            }
+            else if (it->version == version) {
+                it->value = *value;
+                break;
+            }
+            else if (it->version > version) {
+                local_cache[key].insert(it, {.value=*value, .version=version});
+                break;
+            }
         }
-        local_cache[key].emplace_back(*v, cause_id);
     }
 }
 
@@ -184,15 +193,21 @@ void SpectrumCacheTable::RegretPut(T* tx, const K& k) {
     Table::Put(k, [&](V& _v) {
         auto vit = _v.entries.begin();
         auto end = _v.entries.end();
+        auto readers_ = &_v.readers_default;
         while (vit != end) {
             if (vit->version != tx->id) {
+                readers_ = &vit->readers;
                 ++vit; continue;
             }
             // abort transactions that read from current transaction
-            for (auto _tx: vit->readers) {
+            for (auto tit = vit->readers.begin(); tit != vit->readers.end();) {
+                auto _tx = *tit;
                 DLOG(INFO) << KeyHasher()(k) << " has read dependency " << "(" << _tx << ")" << std::endl;
+                if (_tx->id < tx->id) { ++tit; continue; }
                 DLOG(INFO) << tx->id << " abort " << _tx->id << std::endl;
                 _tx->AddRerunKeys(k, nullptr, tx->id);
+                readers_->insert(_tx);
+                tit = vit->readers.erase(tit);
             }
             break;
         }
@@ -304,19 +319,20 @@ void SpectrumCacheExecutor::Generate() {
         const evmc::bytes32 &key, 
         const evmc::bytes32 &value
     ) {
+        if (tx->HasRerunKeys()) { tx->Break(); }
         auto _key = std::make_tuple(addr, key);
         tx->tuples_put.push_back({
             .key = _key, 
             .value = value, 
             .is_committed=false
         });
-        if (tx->HasRerunKeys()) { tx->Break(); }
         return evmc_storage_status::EVMC_STORAGE_MODIFIED;
     });
     tx->InstallGetStorageHandler([this](
         const evmc::address &addr, 
         const evmc::bytes32 &key
     ) {
+        if (tx->HasRerunKeys()) { tx->Break(); return evmc::bytes32{0}; }
         auto _key  = std::make_tuple(addr, key);
         auto value = evmc::bytes32{0};
         auto version = size_t{0};
@@ -333,7 +349,6 @@ void SpectrumCacheExecutor::Generate() {
         for (auto& tup: tx->tuples_get) {
             if (tup.key == _key) { return tup.value; }
         }
-        if (tx->HasRerunKeys()) { tx->Break(); return evmc::bytes32{0}; }
         table.Get(tx.get(), _key, value, version);
         size_t checkpoint_id = tx->MakeCheckpoint();
         tx->tuples_get.push_back({
@@ -349,6 +364,10 @@ void SpectrumCacheExecutor::Generate() {
             for (auto it = tx->local_cache[_key].begin();;++it) {
                 if (it == tx->local_cache[_key].end()) {
                     tx->local_cache[_key].push_back({.value=value, .version=version});
+                    break;
+                }
+                else if (it->version == version) {
+                    it->value = value;
                     break;
                 }
                 else if (it->version > version) {
