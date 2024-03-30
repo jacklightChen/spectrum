@@ -38,8 +38,7 @@ struct CalvinEntry {
 };
 
 /// @brief calvin table for first round execution
-struct CalvinTable: public Table<K, CalvinEntry, KeyHasher> {
-};
+struct CalvinTable: public Table<K, CalvinEntry, KeyHasher> {};
 
 /// @brief calvin table entry for fallback pessimistic execution
 struct CalvinLockEntry {

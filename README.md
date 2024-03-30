@@ -21,7 +21,7 @@ Optionally, we can use debug option to generate debug logs.
 Note that performance will deteriorate significantly if debug mode is enabled. 
 
 ```sh
-cmake -S . -B build -DDEBUG=1
+cmake -S . -B build -DASAN=1
 ```
 
 To build this project, we use the following command. 

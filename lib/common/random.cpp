@@ -14,6 +14,19 @@
 
 namespace spectrum {
 
+void SampleUniqueN(Random& random, std::vector<size_t>& samples) {
+    for (size_t i = 0; i < samples.size(); ++i) {
+        auto x = random.Next();
+        while (true) {
+            auto eq = false;
+            for (size_t j = 0; j < i; ++j) {
+                eq |= samples[j] == x;
+            }
+            if (!eq) { samples[i] = x; break; }
+        }
+    }
+}
+
 ThreadLocalRandom::ThreadLocalRandom(
     std::function<std::unique_ptr<Random>()> random_fn, 
     size_t duplication

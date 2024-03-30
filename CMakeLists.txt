@@ -241,10 +241,7 @@ foreach(F ${SRC})
     file(RELATIVE_PATH R ${CMAKE_CURRENT_SOURCE_DIR}/bin ${F})
     string(REPLACE ".cpp" "" R ${R})
     add_executable(${R} ${F})
-    target_link_libraries(
-        ${R}
-        PRIVATE gflags spectrum glog::glog fmt Threads::Threads
-    )
+    target_link_libraries(${R} PRIVATE spectrum Threads::Threads)
 endforeach(F R)
 
 unset(SRC)

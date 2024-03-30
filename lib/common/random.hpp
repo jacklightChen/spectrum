@@ -14,6 +14,8 @@ class Random {
 
 };
 
+void SampleUniqueN(Random& random, std::vector<size_t>& samples);
+
 class ThreadLocalRandom: public Random {
 
     private:
