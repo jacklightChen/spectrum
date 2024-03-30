@@ -120,6 +120,7 @@ void CalvinExecutor::Run() {
             if (tx.committed.load()) { continue; }
             if (tx.should_wait && !tx.should_wait->committed.load()) { continue; }
             tx.Execute();
+            tx.committed.store(true);
             statistics.JournalExecute();
             statistics.JournalCommit(LATENCY);
             ++count_committed;
