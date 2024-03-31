@@ -6,4 +6,4 @@
 /Testing
 perf*
 **.swp
-scripts/plot/__pycache__
+**/__pycache__

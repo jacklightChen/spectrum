@@ -20,7 +20,7 @@ if __name__ == '__main__':
     hash = subprocess.run(["git", "rev-parse", "HEAD"], **conf).stdout.decode('utf-8').strip()
     batch_size = 200
     with open(f'./exp_results/bench_results_{timestamp}', 'w') as f:
-        for num_threads in list(range(6, 56, 3)):
+        for num_threads in list(range(6, 42, 6)):
             table_partitions    = 9973
             protocols       = [
                 f"Calvin:{num_threads}:{table_partitions}:{batch_size // num_threads}",
@@ -30,7 +30,7 @@ if __name__ == '__main__':
                 f"Spectrum:{num_threads}:{table_partitions}:COPYONWRITE",
                 f"SpectrumSched:{num_threads}:{table_partitions}:COPYONWRITE",
                 # f"Dummy:{num_threads}:{table_partitions}:COPYONWRITE",
-                f"Serial:BASIC:{1}",
+                # f"Serial:BASIC:{1}",
             ]
             for cc in protocols:
                 print(f"#COMMIT-{hash}",  f"CONFIG-{cc}")

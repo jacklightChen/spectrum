@@ -4,11 +4,12 @@ T=2s
 varthread() {
     for b in $1; do
         echo    "------"
-        for i in {1..2}; do
+        for i in {1..16}; do
             p=$2
             eval    "p=\"${p//_/$i}\""
             echo    "@$p $b"
-            $EXECUTABLE  $p $b $T || (echo "crash"; exit)
+	    sleep 	2
+	    $EXECUTABLE  $p $b $T || (echo "crash"; exit)
         done
     done
 }
@@ -20,6 +21,7 @@ varskew() {
                 x=$(jq -n 2*$s/20)
                 x=${b//_/$x}
                 echo    @$p $x
+		sleep 	2
                 $EXECUTABLE  $p $x $T || (echo "crash"; exit)
             done
         done
