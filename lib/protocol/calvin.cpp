@@ -111,8 +111,11 @@ void CalvinExecutor::Run() {
         for (size_t i = 0; i < repeat; ++i) {
             batch.emplace_back(workload.Next(), counter.fetch_add(1));
             batch[i].Analyze(batch[i].prediction);
-            this->Analyze(&batch[i]);
+            this->PrepareLockTable(&batch[i]);
         }
+        // -- stage 2: analyze transaction using table information
+        barrier.arrive_and_wait()
+        for (auto& tx: batch) { this->Analyze(&tx); }
         // -- stage 3: wait & execute each transaction
         barrier.arrive_and_wait();
         auto count_committed = 0;
@@ -125,7 +128,7 @@ void CalvinExecutor::Run() {
             statistics.JournalCommit(LATENCY);
             ++count_committed;
         }}
-        // -- stage 3: release lock
+        // -- stage 4: release lock
         barrier.arrive_and_wait();
         for (auto& tx: batch) {
             this->CleanLockTable(&tx);
