@@ -17,12 +17,15 @@ namespace spectrum {
 void SampleUniqueN(Random& random, std::vector<size_t>& samples) {
     for (size_t i = 0; i < samples.size(); ++i) {
         while (true) {
-            auto sx = random.Next();
+            // sample a random number
+            auto rn = random.Next();
+            // see if it is distinct from others
             auto eq = false;
             for (size_t j = 0; j < i; ++j) {
-                eq |= samples[j] == sx;
+                eq |= samples[j] == rn;
             }
-            if (!eq) { samples[i] = sx; break; }
+            // if it is distinct, assign and breaks
+            if (!eq) { samples[i] = rn; break; }
         }
     }
 }
