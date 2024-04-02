@@ -1,5 +1,4 @@
 #include "evmc/evmc.h"
-#include "evmc/evmc.hpp"
 #include <spectrum/transaction/evm-transaction.hpp>
 #include <spectrum/transaction/evm-hash.hpp>
 #include <spectrum/workload/ycsb.hpp>
@@ -103,7 +102,7 @@ TEST(YCSB, RollbackReadSame) {
 // see if the transaction continues correctly
 TEST(YCSB, Continue) {
     auto workload = spectrum::YCSB(1000, 1.0);
-    auto testing  = [&]{for (size_t i = 0; i < 100; ++i) {
+    auto testing  = [&]{for (size_t i = 0; i < 10; ++i) {
         auto transaction = workload.Next();
         auto checkpoints = std::vector<std::tuple<size_t, size_t>>();
         // set up get storage handler to track read keys
@@ -131,31 +130,32 @@ TEST(YCSB, Continue) {
         auto second_record = std::vector<std::tuple<size_t, size_t>>();
         transaction.InstallGetStorageHandler(
             [&](auto addr, auto key) {
+                if (second_record.size() == i) {
+                    transaction.Break();
+                }
                 second_record.push_back(std::tuple{
                     transaction.MakeCheckpoint(),
                     spectrum::KeyHasher()(std::tuple{addr, key})
                 });
-                if (second_record.size() == i / 2  && i % 2 == 0) {
-                    transaction.Break();
-                }
                 return key;
             }
         );
         transaction.InstallSetStorageHandler(
             [&](auto addr, auto key, auto value) {
+                if (second_record.size() == i) {
+                    transaction.Break();
+                }
                 second_record.push_back(std::tuple{
                     transaction.MakeCheckpoint(),
                     spectrum::KeyHasher()(std::tuple{addr, key})
                 });
-                if (second_record.size() == i / 2  && i % 2 == 1) {
-                    transaction.Break();
-                }
                 return evmc_storage_status::EVMC_STORAGE_ASSIGNED;
             }
         );
         transaction.Execute();
+        ASSERT_EQ(second_record.size(), i + 1);// it breaks at the right place!
         transaction.Execute();
-        ASSERT_EQ(second_record, checkpoints);
+        ASSERT_EQ(second_record, checkpoints); // the checkpoints match!
     }};
     workload.SetEVMType(spectrum::COPYONWRITE);
     testing();
