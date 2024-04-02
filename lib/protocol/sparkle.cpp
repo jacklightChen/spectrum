@@ -66,11 +66,11 @@ void SparkleTable::Get(T* tx, const K& k, evmc::bytes32& v, size_t& version) {
             v = rit->value;
             version = rit->version;
             rit->readers.insert(tx);
-            DLOG(INFO) << tx->id << "(" << tx << ")" << " read " << KeyHasher()(k) << " version " << rit->version << std::endl;
+            DLOG(INFO) << tx->id << "(" << tx << ")" << " read " << KeyHasher()(k) % 1000 << " version " << rit->version << std::endl;
             return;
         }
         version = 0;
-        DLOG(INFO) << tx->id << "(" << tx << ")" << " read " << KeyHasher()(k) << " version 0" << std::endl;
+        DLOG(INFO) << tx->id << "(" << tx << ")" << " read " << KeyHasher()(k) % 1000 << " version 0" << std::endl;
         _v.readers_default.insert(tx);
     });
 }
@@ -92,7 +92,7 @@ void SparkleTable::Put(T* tx, const K& k, const evmc::bytes32& v) {
             }
             // abort transactions that read outdated keys
             for (auto _tx: rit->readers) {
-                DLOG(INFO) << KeyHasher()(k) << " has read dependency " << "(" << _tx << ")" << std::endl;
+                DLOG(INFO) << KeyHasher()(k) % 1000 << " has read dependency " << "(" << _tx << ")" << std::endl;
                 if (_tx->id > tx->id) {
                     DLOG(INFO) << tx->id << " abort " << _tx->id;
                     _tx->SetRerunFlag(true);
@@ -101,7 +101,7 @@ void SparkleTable::Put(T* tx, const K& k, const evmc::bytes32& v) {
             break;
         }
         for (auto _tx: _v.readers_default) {
-            DLOG(INFO) << KeyHasher()(k) << " has read dependency " << "(" << _tx << ")" << std::endl;
+            DLOG(INFO) << KeyHasher()(k) % 1000 << " has read dependency " << "(" << _tx << ")" << std::endl;
             if (_tx->id > tx->id) {
                 DLOG(INFO) << tx->id << " abort " << _tx->id;
                 _tx->SetRerunFlag(true);
@@ -142,7 +142,7 @@ bool SparkleTable::Lock(T* tx, const K& k) {
 /// @param tx the transaction that previously read this entry
 /// @param k the key of read entry
 void SparkleTable::RegretGet(T* tx, const K& k, size_t version) {
-    DLOG(INFO) << "remove read record " << tx->id << "(" << tx << ")" << " from " << KeyHasher()(k) << std::endl;
+    DLOG(INFO) << "remove read record " << tx->id << "(" << tx << ")" << " from " << KeyHasher()(k) % 1000 << std::endl;
     Table::Put(k, [&](V& _v) {
         auto vit = _v.entries.begin();
         auto end = _v.entries.end();
@@ -188,7 +188,7 @@ void SparkleTable::RegretPut(T* tx, const K& k) {
             }
             // abort transactions that read from current transaction
             for (auto _tx: vit->readers) {
-                DLOG(INFO) << KeyHasher()(k) << " has read dependency " << "(" << _tx << ")" << std::endl;
+                DLOG(INFO) << KeyHasher()(k) % 1000 << " has read dependency " << "(" << _tx << ")" << std::endl;
                 DLOG(INFO) << tx->id << " abort " << _tx->id << std::endl;
                 _tx->SetRerunFlag(true);
             }
@@ -240,7 +240,7 @@ void SparkleTable::ClearGet(T* tx, const K& k, size_t version) {
 /// @param tx the transaction the previously wrote this entry
 /// @param k the key of written entry
 void SparkleTable::ClearPut(T* tx, const K& k) {
-    DLOG(INFO) << "remove write record before " << tx->id << "(" << tx << ")" << " from " << KeyHasher()(k) << std::endl;
+    DLOG(INFO) << "remove write record before " << tx->id << "(" << tx << ")" << " from " << KeyHasher()(k) % 1000 << std::endl;
     Table::Put(k, [&](V& _v) {
         while (_v.entries.size() && _v.entries.front().version < tx->id) {
             _v.entries.pop_front();

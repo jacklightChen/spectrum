@@ -1,7 +1,7 @@
 #include <gtest/gtest.h>
 #include <spectrum/protocol/sparkle.hpp>
 #include <spectrum/transaction/evm-transaction.hpp>
-#include <spectrum/workload/smallbank.hpp>
+#include <spectrum/workload/ycsb.hpp>
 #include <span>
 #include <spectrum/common/glog-prefix.hpp>
 
@@ -56,10 +56,10 @@ TEST(Sparkle, TableWriteAfterWrite) {
     ASSERT_FALSE(t1.HasRerunFlag()) << "t1 rerun_flag";
 }
 
-TEST(Sparkle, JustRunSmallbank) {
+TEST(Sparkle, JustRunYCSB) {
     google::InstallPrefixFormatter(PrefixFormatter);
     auto statistics = Statistics();
-    auto workload = Smallbank(10000, 0.0);
+    auto workload = YCSB(10000, 0.0);
     auto protocol = Sparkle(workload, statistics, 6, 32);
     protocol.Start();
     std::this_thread::sleep_for(100ms);

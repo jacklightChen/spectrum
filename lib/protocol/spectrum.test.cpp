@@ -1,8 +1,7 @@
 #include <gtest/gtest.h>
 #include <spectrum/protocol/spectrum.hpp>
 #include <spectrum/transaction/evm-transaction.hpp>
-#include <spectrum/workload/smallbank.hpp>
-#include <span>
+#include <spectrum/workload/ycsb.hpp>
 #include <spectrum/common/glog-prefix.hpp>
 
 namespace {
@@ -12,13 +11,13 @@ namespace {
 using namespace spectrum;
 using namespace std::chrono_literals;
 
-TEST(Spectrum, JustRunSmallbank) {
+TEST(Spectrum, JustRunYCSB) {
     google::InstallPrefixFormatter(PrefixFormatter);
     auto statistics = Statistics();
-    auto workload = Smallbank(10000, 0.0);
+    auto workload = YCSB(100, 1.0);
     auto protocol = Spectrum(workload, statistics, 8, 32, EVMType::COPYONWRITE);
     protocol.Start();
-    std::this_thread::sleep_for(100ms);
+    std::this_thread::sleep_for(10s);
     protocol.Stop();
     statistics.Print();
 }

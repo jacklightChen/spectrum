@@ -67,11 +67,11 @@ void SpectrumTable::Get(T* tx, const K& k, evmc::bytes32& v, size_t& version) {
             v = rit->value;
             version = rit->version;
             rit->readers.insert(tx);
-            DLOG(INFO) << tx->id << "(" << tx << ")" << " read " << KeyHasher()(k) << " version " << rit->version << std::endl;
+            DLOG(INFO) << tx->id << "(" << tx << ")" << " read " << KeyHasher()(k) % 1000 << " version " << rit->version << std::endl;
             return;
         }
         version = 0;
-        DLOG(INFO) << tx->id << "(" << tx << ")" << " read " << KeyHasher()(k) << " version 0" << std::endl;
+        DLOG(INFO) << tx->id << "(" << tx << ")" << " read " << KeyHasher()(k) % 1000 << " version 0" << std::endl;
         _v.readers_default.insert(tx);
     });
 }
@@ -82,7 +82,7 @@ void SpectrumTable::Get(T* tx, const K& k, evmc::bytes32& v, size_t& version) {
 /// @param v the value to write
 void SpectrumTable::Put(T* tx, const K& k, const evmc::bytes32& v) {
     CHECK(tx->id > 0) << "we reserve version(0) for default value";
-    DLOG(INFO) << tx->id << "(" << tx << ")" << " write " << KeyHasher()(k) << std::endl;
+    DLOG(INFO) << tx->id << "(" << tx << ")" << " write " << KeyHasher()(k) % 1000 << std::endl;
     Table::Put(k, [&](V& _v) {
         auto rit = _v.entries.rbegin();
         auto end = _v.entries.rend();
@@ -93,7 +93,7 @@ void SpectrumTable::Put(T* tx, const K& k, const evmc::bytes32& v) {
             }
             // abort transactions that read outdated keys
             for (auto _tx: rit->readers) {
-                DLOG(INFO) << KeyHasher()(k) << " has read dependency " << "(" << _tx << ")" << std::endl;
+                DLOG(INFO) << KeyHasher()(k) % 1000 << " has read dependency " << "(" << _tx << ")" << std::endl;
                 if (_tx->id > tx->id) {
                     DLOG(INFO) << tx->id << " abort " << _tx->id << std::endl;
                     _tx->AddRerunKeys(k, tx->id);
@@ -102,7 +102,7 @@ void SpectrumTable::Put(T* tx, const K& k, const evmc::bytes32& v) {
             break;
         }
         for (auto _tx: _v.readers_default) {
-            DLOG(INFO) << KeyHasher()(k) << " has read dependency " << "(" << _tx << ")" << std::endl;
+            DLOG(INFO) << KeyHasher()(k) % 1000 << " has read dependency " << "(" << _tx << ")" << std::endl;
             if (_tx->id > tx->id) {
                 DLOG(INFO) << tx->id << " abort " << _tx->id << std::endl;
                 _tx->AddRerunKeys(k, tx->id);
@@ -126,7 +126,7 @@ void SpectrumTable::Put(T* tx, const K& k, const evmc::bytes32& v) {
 /// @param tx the transaction that previously read this entry
 /// @param k the key of read entry
 void SpectrumTable::RegretGet(T* tx, const K& k, size_t version) {
-    DLOG(INFO) << "remove read record " << tx->id << "(" << tx << ")" << " from " << KeyHasher()(k) << std::endl;
+    DLOG(INFO) << "remove read record " << tx->id << "(" << tx << ")" << " from " << KeyHasher()(k) % 1000 << std::endl;
     Table::Put(k, [&](V& _v) {
         auto vit = _v.entries.begin();
         auto end = _v.entries.end();
@@ -162,7 +162,7 @@ void SpectrumTable::RegretGet(T* tx, const K& k, size_t version) {
 /// @param tx the transaction that previously put into this entry
 /// @param k the key of this put entry
 void SpectrumTable::RegretPut(T* tx, const K& k) {
-    DLOG(INFO) << "remove write record " << tx->id << "(" << tx << ")" << " from " << KeyHasher()(k) << std::endl;
+    DLOG(INFO) << "remove write record " << tx->id << "(" << tx << ")" << " from " << KeyHasher()(k) % 1000 << std::endl;
     Table::Put(k, [&](V& _v) {
         auto vit = _v.entries.begin();
         auto end = _v.entries.end();
@@ -172,7 +172,7 @@ void SpectrumTable::RegretPut(T* tx, const K& k) {
             }
             // abort transactions that read from current transaction
             for (auto _tx: vit->readers) {
-                DLOG(INFO) << KeyHasher()(k) << " has read dependency " << "(" << _tx << ")" << std::endl;
+                DLOG(INFO) << KeyHasher()(k) % 1000 << " has read dependency " << "(" << _tx << ")" << std::endl;
                 DLOG(INFO) << tx->id << " abort " << _tx->id << std::endl;
                 _tx->AddRerunKeys(k, tx->id);
             }
@@ -187,7 +187,7 @@ void SpectrumTable::RegretPut(T* tx, const K& k) {
 /// @param k the key of read entry
 /// @param version the version of read entry, which indicates the transaction that writes this value
 void SpectrumTable::ClearGet(T* tx, const K& k, size_t version) {
-    DLOG(INFO) << "remove read record " << tx->id << "(" << tx << ")" << " from " << KeyHasher()(k) << std::endl;
+    DLOG(INFO) << "remove read record " << tx->id << "(" << tx << ")" << " from " << KeyHasher()(k) % 1000 << std::endl;
     Table::Put(k, [&](V& _v) {
         auto vit = _v.entries.begin();
         auto end = _v.entries.end();
@@ -224,7 +224,7 @@ void SpectrumTable::ClearGet(T* tx, const K& k, size_t version) {
 /// @param tx the transaction the previously wrote this entry
 /// @param k the key of written entry
 void SpectrumTable::ClearPut(T* tx, const K& k) {
-    DLOG(INFO) << "remove write record before " << tx->id << "(" << tx << ")" << " from " << KeyHasher()(k) << std::endl;
+    DLOG(INFO) << "remove write record before " << tx->id << "(" << tx << ")" << " from " << KeyHasher()(k) % 1000 << std::endl;
     Table::Put(k, [&](V& _v) {
         while (_v.entries.size() && _v.entries.front().version < tx->id) {
             _v.entries.pop_front();
@@ -293,7 +293,13 @@ void SpectrumExecutor::Generate() {
                 .value = value, 
                 .is_committed=false
             });
-            if (tx->HasRerunKeys()) { tx->Break(); }
+            if (tx->HasRerunKeys()) {
+                DLOG(INFO) << "spectrum tx " << tx->id << " break" << std::endl;
+                tx->Break();
+            }
+            DLOG(INFO) << "tx " << tx->id <<
+                " tuples put: " << tx->tuples_put.size() <<
+                " tuples get: " << tx->tuples_get.size();
             return evmc_storage_status::EVMC_STORAGE_MODIFIED;
         });
         tx->InstallGetStorageHandler([this](
@@ -304,12 +310,19 @@ void SpectrumExecutor::Generate() {
             auto value = evmc::bytes32{0};
             auto version = size_t{0};
             for (auto& tup: tx->tuples_put | std::views::reverse) {
-                if (tup.key == _key) { return tup.value; }
+                if (tup.key != _key) { continue; }
+                DLOG(INFO) << "spectrum tx " << tx->id << " has key " << KeyHasher()(_key) % 1000 << " in tuples_put. ";
+                return tup.value;
             }
             for (auto& tup: tx->tuples_get) {
-                if (tup.key == _key) { return tup.value; }
+                if (tup.key != _key) { continue; }
+                DLOG(INFO) << "spectrum tx " << tx->id << " has key " << KeyHasher()(_key) % 1000 << " in tuples_get. ";
+                return tup.value;
             }
-            if (tx->HasRerunKeys()) { tx->Break(); }
+            if (tx->HasRerunKeys()) {
+                DLOG(INFO) << "spectrum tx " << tx->id << " break" << std::endl;
+                tx->Break();
+            }
             table.Get(tx.get(), _key, value, version);
             size_t checkpoint_id = tx->MakeCheckpoint();
             tx->tuples_get.push_back({
@@ -333,7 +346,7 @@ void SpectrumExecutor::Generate() {
         }
     } else {
         tx = queue.Pop();
-        DLOG(INFO) << "pop tx" << tx->id <<
+        DLOG(INFO) << "tx " << tx->id <<
             " tuples put: " << tx->tuples_put.size() <<
             " tuples get: " << tx->tuples_get.size();
     }
@@ -357,8 +370,11 @@ void SpectrumExecutor::ReExecute() {
             back_to = std::min(i, back_to); break;
         }
     }
-    // good news: we don't have to rollback
-    if (back_to == ~size_t{0}) { return; }
+    // good news: we don't have to rollback, so just resume execution
+    if (back_to == ~size_t{0}) {
+        DLOG(INFO) << "tx " << tx->id << " do not have to rollback" << std::endl;
+        tx->Execute(); return;
+    }
     // bad news: we have to rollback
     auto& tup = tx->tuples_get[back_to];
     tx->ApplyCheckpoint(tup.checkpoint_id);
@@ -372,6 +388,9 @@ void SpectrumExecutor::ReExecute() {
     }
     tx->tuples_put.resize(tup.tuples_put_len);
     tx->tuples_get.resize(back_to);
+    DLOG(INFO) << "tx " << tx->id <<
+        " tuples put: " << tx->tuples_put.size() <<
+        " tuples get: " << tx->tuples_get.size();
     tx->Execute();
     statistics.JournalExecute();
     // commit all results if possible & necessary
@@ -387,8 +406,10 @@ void SpectrumExecutor::ReExecute() {
 void SpectrumExecutor::Finalize() {
     DLOG(INFO) << "spectrum finalize " << tx->id;
     last_finalized.fetch_add(1, std::memory_order_seq_cst);
-    DCHECK(tx->tuples_get.size() == 5);
-    DCHECK(tx->tuples_put.size() == 5);
+    DCHECK(tx->tuples_get.size() == 5 && tx->tuples_put.size() == 5)
+        << " tx " << tx->id
+        << " tuples put: " << tx->tuples_put.size()
+        << " tuples get: " << tx->tuples_get.size();
     for (auto entry: tx->tuples_get) {
         table.ClearGet(tx.get(), entry.key, entry.version);
     }
