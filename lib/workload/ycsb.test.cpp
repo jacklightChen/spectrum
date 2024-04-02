@@ -49,8 +49,4 @@ TEST(YCSB, Rollback5R5W) {
     testing();
 }
 
-TEST(YCSB, Break5R5W) {
-    auto workload = spectrum::YCSB(1000, 1.0);
-}
-
 } // namespace
