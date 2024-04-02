@@ -5,11 +5,9 @@
 
 namespace {
 
-TEST(YCSB, CopyOnWrite5R5W) {
+TEST(YCSB, Rollback5R5W) {
     auto workload = spectrum::YCSB(1000, 1.0);
-    workload.SetEVMType(spectrum::COPYONWRITE);
-    for (size_t i = 0; i < 5; ++i) {
-        for (size_t j = 0; j < 5; ++j) {
+    auto testing = [&]{for (size_t i = 0; i < 5; ++i) {for (size_t j = 0; j < 5; ++j) {
             auto transaction = workload.Next();
             auto checkpoints = std::vector<size_t>();
             auto count_get = 0;
@@ -44,8 +42,11 @@ TEST(YCSB, CopyOnWrite5R5W) {
             transaction.Execute();
             ASSERT_EQ(count_get, 15 - i - j); // when i see you again
             ASSERT_EQ(count_put, 15 - i - j); // when i see you again ~~~
-        }
-    }
+    }}};
+    workload.SetEVMType(spectrum::COPYONWRITE);
+    testing();
+    workload.SetEVMType(spectrum::STRAWMAN);
+    testing();
 }
 
 } // namespace
