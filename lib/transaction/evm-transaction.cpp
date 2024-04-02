@@ -99,14 +99,14 @@ void Transaction::ApplyCheckpoint(size_t checkpoint_id) {
     }
     if (evm_type == EVMType::STRAWMAN) {
         auto& _vm = std::get<evmone::VM>(vm);
-        _vm.checkpoints.resize(checkpoint_id + 1);
-        _vm.state = std::make_unique<evmone::ExecutionState>(*_vm.checkpoints.back());
+        _vm.state = std::make_unique<evmone::ExecutionState>(*_vm.checkpoints[checkpoint_id]);
+        _vm.checkpoints.resize(checkpoint_id);
         return;
     }
     if (evm_type == EVMType::COPYONWRITE) {
         auto& _vm = std::get<evmcow::VM>(vm);
-        _vm.checkpoints.resize(checkpoint_id + 1);
-        _vm.state.value()->load_checkpoint(_vm.checkpoints.back());
+        _vm.state.value()->load_checkpoint(_vm.checkpoints[checkpoint_id]);
+        _vm.checkpoints.resize(checkpoint_id);
         return;
     }
 }
