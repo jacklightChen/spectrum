@@ -1,6 +1,6 @@
 #pragma once
-#include <spectrum/evmtxn/evm_host_impl.hpp>
-#include <spectrum/evmtxn/evm_transaction.hpp>
+#include <spectrum/transaction/evm-host-impl.hpp>
+#include <spectrum/transaction/evm-transaction.hpp>
 #include <spectrum/evmcow/baseline.hpp>
 #include <spectrum/evmcow/vm.hpp>
 #include <spectrum/evmone/baseline.hpp>

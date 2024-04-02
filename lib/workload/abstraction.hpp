@@ -1,7 +1,7 @@
 #pragma once
 #include <variant>
 #include <functional>
-#include <spectrum/evmtxn/evm_transaction.hpp>
+#include <spectrum/transaction/evm-transaction.hpp>
 
 namespace spectrum {
 

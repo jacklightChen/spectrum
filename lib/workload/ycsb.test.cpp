@@ -1,4 +1,4 @@
-#include <spectrum/evmtxn/evm_transaction.hpp>
+#include <spectrum/transaction/evm-transaction.hpp>
 #include <spectrum/workload/ycsb.hpp>
 #include <gtest/gtest.h>
 #include <vector>

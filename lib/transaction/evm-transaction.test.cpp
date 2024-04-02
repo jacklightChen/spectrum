@@ -2,12 +2,12 @@
 #include <unordered_map>
 #include <evmc/evmc.hpp>
 #include <tuple>
-#include <spectrum/evmtxn/evm_transaction.hpp>
+#include <spectrum/transaction/evm-transaction.hpp>
 #include <spectrum/common/hex.hpp>
 #include <iostream>
 #include <sstream>
 #include <span>
-#include <spectrum/evmtxn/evm_hash.hpp>
+#include <spectrum/transaction/evm-hash.hpp>
 
 #define CODE \
     spectrum::from_hex(std::string{\

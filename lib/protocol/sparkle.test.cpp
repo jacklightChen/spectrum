@@ -1,6 +1,6 @@
 #include <gtest/gtest.h>
 #include <spectrum/protocol/sparkle.hpp>
-#include <spectrum/evmtxn/evm_transaction.hpp>
+#include <spectrum/transaction/evm-transaction.hpp>
 #include <spectrum/workload/smallbank.hpp>
 #include <span>
 #include <spectrum/common/glog-prefix.hpp>
