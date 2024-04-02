@@ -1,3 +1,4 @@
+#include "evmc/evmc.hpp"
 #include <spectrum/protocol/spectrum.hpp>
 #include <spectrum/common/lock-util.hpp>
 #include <spectrum/common/hex.hpp>
@@ -73,6 +74,7 @@ void SpectrumTable::Get(T* tx, const K& k, evmc::bytes32& v, size_t& version) {
         version = 0;
         DLOG(INFO) << tx->id << "(" << tx << ")" << " read " << KeyHasher()(k) % 1000 << " version 0" << std::endl;
         _v.readers_default.insert(tx);
+        v = evmc::bytes32{0};
     });
 }
 
@@ -293,10 +295,10 @@ void SpectrumExecutor::Generate() {
                 .value = value, 
                 .is_committed=false
             });
-            if (tx->HasRerunKeys()) {
-                DLOG(INFO) << "spectrum tx " << tx->id << " break" << std::endl;
-                tx->Break();
-            }
+            // if (tx->HasRerunKeys()) {
+            //     DLOG(INFO) << "spectrum tx " << tx->id << " break" << std::endl;
+            //     tx->Break();
+            // }
             DLOG(INFO) << "tx " << tx->id <<
                 " tuples put: " << tx->tuples_put.size() <<
                 " tuples get: " << tx->tuples_get.size();
@@ -319,19 +321,23 @@ void SpectrumExecutor::Generate() {
                 DLOG(INFO) << "spectrum tx " << tx->id << " has key " << KeyHasher()(_key) % 1000 << " in tuples_get. ";
                 return tup.value;
             }
-            if (tx->HasRerunKeys()) {
-                DLOG(INFO) << "spectrum tx " << tx->id << " break" << std::endl;
-                tx->Break();
-            }
+            DLOG(INFO) << "tx " << tx->id << " " << 
+                " read(" << tx->tuples_get.size() << ")" << 
+                " key(" << KeyHasher()(_key) % 1000 << ")" << std::endl;
             table.Get(tx.get(), _key, value, version);
-            size_t checkpoint_id = tx->MakeCheckpoint();
             tx->tuples_get.push_back({
                 .key            = _key, 
                 .value          = value, 
                 .version        = version,
                 .tuples_put_len = tx->tuples_put.size(),
-                .checkpoint_id  = checkpoint_id
+                .checkpoint_id  = tx->MakeCheckpoint()
             });
+            // we have to break after make checkpoint
+            //   , or we will snapshot the break signal into the checkpoint!
+            // if (tx->HasRerunKeys()) {
+            //     DLOG(INFO) << "spectrum tx " << tx->id << " break" << std::endl;
+            //     tx->Break();
+            // }
             return value;
         });
         DLOG(INFO) << "spectrum execute " << tx->id;
@@ -339,7 +345,7 @@ void SpectrumExecutor::Generate() {
         statistics.JournalExecute();
         // commit all results if possible & necessary
         for (auto entry: tx->tuples_put) {
-            if (tx->HasRerunKeys()) { break; }
+            // if (tx->HasRerunKeys()) { break; }
             if (entry.is_committed) { continue; }
             table.Put(tx.get(), entry.key, entry.value);
             entry.is_committed = true;

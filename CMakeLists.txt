@@ -168,15 +168,15 @@ if(ASAN)
     add_compile_options(-fsanitize=address)
     add_link_options(-fsanitize=address)
     add_compile_options(
-        -O0 -ggdb -Wno-attributes -Werror
+        -O0 -g -Werror -Wno-unknown-attributes
         -DPROJECT_VERSION=""
         -DEVMONE_X86_64_ARCH_LEVEL=2
         -DEVM_PRINT_INSTRUCTIONS=${EVM_PRINT_INSTRUCTIONS}
     )
 else()
     add_compile_options(
-        -O3 -Wno-attributes -Werror
-        -DNDEBUG -ggdb
+        -O3 -Werror -Wno-unknown-attributes
+        -DNDEBUG -g
         -DPROJECT_VERSION=""
         -DEVMONE_X86_64_ARCH_LEVEL=2
     )

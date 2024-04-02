@@ -1,3 +1,4 @@
+#include <ostream>
 #include <spectrum/transaction/evm-host-impl.hpp>
 #include <spectrum/transaction/evm-transaction.hpp>
 #include <spectrum/common/hex.hpp>
@@ -73,6 +74,7 @@ void Transaction::InstallGetStorageHandler(spectrum::GetStorage&& handler) {
 /// @brief making checkpoint
 /// @return checkpoint id, see Transaction::ApplyCheckpoint
 size_t Transaction::MakeCheckpoint() {
+    DLOG(INFO) << "transaction make checkpoint " << std::endl;
     // can only be called inside execution
     if (evm_type == EVMType::BASIC) {
         return 0;
@@ -93,6 +95,7 @@ size_t Transaction::MakeCheckpoint() {
 /// @brief making checkpoint
 /// @param checkpoint_id the checkpoint id to go back to
 void Transaction::ApplyCheckpoint(size_t checkpoint_id) {
+    DLOG(INFO) << "transaction apply checkpoint " << checkpoint_id << std::endl;
     if (evm_type == EVMType::BASIC) {
         vm.emplace<evmone::VM>();
         return;
@@ -113,6 +116,7 @@ void Transaction::ApplyCheckpoint(size_t checkpoint_id) {
 
 /// @brief break current execution
 void Transaction::Break() {
+    DLOG(INFO) << "transaction break" << std::endl;
     // can only be called inside execution
     if (evm_type == EVMType::BASIC || evm_type == EVMType::STRAWMAN) {
         auto& _vm = std::get<evmone::VM>(vm);
@@ -126,6 +130,7 @@ void Transaction::Break() {
 
 /// @brief execute a transaction
 void Transaction::Execute() {
+    DLOG(INFO) << "transaction execute" << std::endl;
     if (evm_type == EVMType::BASIC || evm_type == EVMType::STRAWMAN) {
         auto& _vm = std::get<evmone::VM>(vm);
         auto host_interface = &host.get_interface();

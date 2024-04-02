@@ -102,7 +102,7 @@ TEST(YCSB, RollbackReadSame) {
 // see if the transaction continues correctly
 TEST(YCSB, Continue) {
     auto workload = spectrum::YCSB(1000, 1.0);
-    auto testing  = [&]{for (size_t i = 0; i < 10; ++i) {
+    auto testing  = [&]{for (size_t i = 0; i < 10; ++i) {for (size_t j = i; j < 10; ++j) {
         auto transaction = workload.Next();
         auto checkpoints = std::vector<std::tuple<size_t, size_t>>();
         // set up get storage handler to track read keys
@@ -125,12 +125,12 @@ TEST(YCSB, Continue) {
             }
         );
         transaction.Execute();
-        transaction.ApplyCheckpoint(0);
+        transaction.ApplyCheckpoint(i);
         // now let's how break works
         auto second_record = std::vector<std::tuple<size_t, size_t>>();
         transaction.InstallGetStorageHandler(
             [&](auto addr, auto key) {
-                if (second_record.size() == i) {
+                if (second_record.size() == j - i) {
                     transaction.Break();
                 }
                 second_record.push_back(std::tuple{
@@ -142,7 +142,7 @@ TEST(YCSB, Continue) {
         );
         transaction.InstallSetStorageHandler(
             [&](auto addr, auto key, auto value) {
-                if (second_record.size() == i) {
+                if (second_record.size() == j - i) {
                     transaction.Break();
                 }
                 second_record.push_back(std::tuple{
@@ -153,10 +153,12 @@ TEST(YCSB, Continue) {
             }
         );
         transaction.Execute();
-        ASSERT_EQ(second_record.size(), i + 1);// it breaks at the right place!
+        ASSERT_EQ(second_record.size(), j - i + 1);// it breaks at the right place!
         transaction.Execute();
-        ASSERT_EQ(second_record, checkpoints); // the checkpoints match!
-    }};
+        for (auto j = 0; j < second_record.size(); ++j) {
+            ASSERT_EQ(second_record[j], checkpoints[j + i]);
+        }
+    }}};
     workload.SetEVMType(spectrum::COPYONWRITE);
     testing();
     workload.SetEVMType(spectrum::STRAWMAN);

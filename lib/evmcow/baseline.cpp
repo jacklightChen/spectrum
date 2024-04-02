@@ -271,9 +271,10 @@ int64_t dispatch(const CostTable& cost_table, ExecutionState& state, int64_t gas
 
         #if EVM_PRINT_INSTRUCTIONS
         switch (op) {
-            #define ON_OPCODE(OPCODE)                                                                                     \
-            case OPCODE:                                                                                                  \
-                DLOG(INFO) << #OPCODE << "\t\t" << static_cast<uint32_t>(position.code_it - code);                        \
+            #define ON_OPCODE(OPCODE)                                                                                       \
+            case OPCODE:                                                                                                    \
+                DLOG(INFO) << #OPCODE << "\t\t" << static_cast<uint32_t>(position.code_it - code)                           \
+                           << " " << state.stack_top.height;                                                                \
                 break;
             MAP_OPCODES
             #undef ON_OPCODE

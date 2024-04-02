@@ -1,3 +1,4 @@
+#include <gflags/gflags.h>
 #include <gtest/gtest.h>
 #include <spectrum/protocol/spectrum.hpp>
 #include <spectrum/transaction/evm-transaction.hpp>
@@ -11,15 +12,15 @@ namespace {
 using namespace spectrum;
 using namespace std::chrono_literals;
 
-// TEST(Spectrum, JustRunYCSB) {
-//     google::InstallPrefixFormatter(PrefixFormatter);
-//     auto statistics = Statistics();
-//     auto workload = YCSB(100, 1.0);
-//     auto protocol = Spectrum(workload, statistics, 8, 32, EVMType::COPYONWRITE);
-//     protocol.Start();
-//     std::this_thread::sleep_for(10s);
-//     protocol.Stop();
-//     statistics.Print();
-// }
+TEST(Spectrum, JustRunYCSB) {
+    google::InstallPrefixFormatter(PrefixFormatter);
+    auto statistics = Statistics();
+    auto workload = YCSB(11, 0.0);
+    auto protocol = Spectrum(workload, statistics, 8, 32, EVMType::COPYONWRITE);
+    protocol.Start();
+    std::this_thread::sleep_for(10s);
+    protocol.Stop();
+    statistics.Print();
+}
 
 }
