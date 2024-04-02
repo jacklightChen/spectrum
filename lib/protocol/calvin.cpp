@@ -114,7 +114,7 @@ void CalvinExecutor::Run() {
             this->PrepareLockTable(&batch[i]);
         }
         // -- stage 2: analyze transaction using table information
-        barrier.arrive_and_wait()
+        barrier.arrive_and_wait();
         for (auto& tx: batch) { this->Analyze(&tx); }
         // -- stage 3: wait & execute each transaction
         barrier.arrive_and_wait();
