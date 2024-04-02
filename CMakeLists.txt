@@ -43,24 +43,27 @@ function(GitHub)
         add_subdirectory(${CMAKE_BINARY_DIR}/_deps/${GH_USER}/${GH_REPO} EXCLUDE_FROM_ALL)
         set(CMAKE_MESSAGE_LOG_LEVEL ${CMAKE_MESSAGE_LOG_LEVEL__})
     elseif(${GH_AS} STREQUAL "CMAKE INSTALL" OR ${GH_AS} STREQUAL "CMAKE SCANLIB")
-        Execute(
-            COMMAND                 cmake -S . -B build ${GH_FLAGS} -DCMAKE_INSTALL_PREFIX=${CMAKE_BINARY_DIR}/_deps/${GH_USER}/${GH_REPO}/install
-            WORKING_DIRECTORY       ${CMAKE_BINARY_DIR}/_deps/${GH_USER}/${GH_REPO}
-            COMMAND_ERROR_IS_FATAL  ANY
-            OUTPUT_QUIET ERROR_QUIET
-        )
-        Execute(
-            COMMAND                 cmake --build build -j
-            WORKING_DIRECTORY       ${CMAKE_BINARY_DIR}/_deps/${GH_USER}/${GH_REPO}
-            COMMAND_ERROR_IS_FATAL  ANY
-            OUTPUT_QUIET ERROR_QUIET
-        )
-        Execute(
-            COMMAND                 cmake --build build --target install
-            WORKING_DIRECTORY       ${CMAKE_BINARY_DIR}/_deps/${GH_USER}/${GH_REPO}
-            COMMAND_ERROR_IS_FATAL  ANY
-            OUTPUT_QUIET ERROR_QUIET
-        )
+        # run the build command if it targeted directory don't exists
+        if(NOT EXISTS ${CMAKE_BINARY_DIR}/_deps/${GH_USER}/${GH_REPO}/install)
+            Execute(
+                COMMAND                 cmake -S . -B build ${GH_FLAGS} -DCMAKE_INSTALL_PREFIX=${CMAKE_BINARY_DIR}/_deps/${GH_USER}/${GH_REPO}/install
+                WORKING_DIRECTORY       ${CMAKE_BINARY_DIR}/_deps/${GH_USER}/${GH_REPO}
+                COMMAND_ERROR_IS_FATAL  ANY
+                OUTPUT_QUIET ERROR_QUIET
+            )
+            Execute(
+                COMMAND                 cmake --build build -j
+                WORKING_DIRECTORY       ${CMAKE_BINARY_DIR}/_deps/${GH_USER}/${GH_REPO}
+                COMMAND_ERROR_IS_FATAL  ANY
+                OUTPUT_QUIET ERROR_QUIET
+            )
+            Execute(
+                COMMAND                 cmake --build build --target install
+                WORKING_DIRECTORY       ${CMAKE_BINARY_DIR}/_deps/${GH_USER}/${GH_REPO}
+                COMMAND_ERROR_IS_FATAL  ANY
+                OUTPUT_QUIET ERROR_QUIET
+            )
+        endif()
         set(CMAKE_PREFIX_PATH "${CMAKE_BINARY_DIR}/_deps/${GH_USER}/${GH_REPO}/install")
         if("${GH_PACK}" STREQUAL "")
             set(GH_PACK ${GH_REPO})
@@ -72,18 +75,21 @@ function(GitHub)
             link_directories(${CMAKE_BINARY_DIR}/_deps/${GH_USER}/${GH_REPO}/install/lib)
         endif()
     elseif(${GH_AS} STREQUAL "AUTOMAKE INSTALL")
-        Execute(
-            COMMAND                 ./autogen.sh --prefix ${CMAKE_BINARY_DIR}/_deps/${GH_USER}/${GH_REPO}/install
-            WORKING_DIRECTORY       ${CMAKE_BINARY_DIR}/_deps/${GH_USER}/${GH_REPO}
-            COMMAND_ERROR_IS_FATAL  ANY
-            OUTPUT_QUIET ERROR_QUIET
-        )
-        Execute(
-            COMMAND                 make install -j
-            WORKING_DIRECTORY       ${CMAKE_BINARY_DIR}/_deps/${GH_USER}/${GH_REPO}
-            COMMAND_ERROR_IS_FATAL  ANY
-            OUTPUT_QUIET ERROR_QUIET
-        )
+        # run the build command if it targeted directory don't exists
+        if(NOT EXISTS ${CMAKE_BINARY_DIR}/_deps/${GH_USER}/${GH_REPO}/install)
+            Execute(
+                COMMAND                 ./autogen.sh --prefix ${CMAKE_BINARY_DIR}/_deps/${GH_USER}/${GH_REPO}/install
+                WORKING_DIRECTORY       ${CMAKE_BINARY_DIR}/_deps/${GH_USER}/${GH_REPO}
+                COMMAND_ERROR_IS_FATAL  ANY
+                OUTPUT_QUIET ERROR_QUIET
+            )
+            Execute(
+                COMMAND                 make install -j4
+                WORKING_DIRECTORY       ${CMAKE_BINARY_DIR}/_deps/${GH_USER}/${GH_REPO}
+                COMMAND_ERROR_IS_FATAL  ANY
+                OUTPUT_QUIET ERROR_QUIET
+            )
+        endif()
         include_directories(${CMAKE_BINARY_DIR}/_deps/${GH_USER}/${GH_REPO}/install/include)
         link_directories(${CMAKE_BINARY_DIR}/_deps/${GH_USER}/${GH_REPO}/install/lib)
     else()
@@ -223,7 +229,7 @@ foreach(F ${SRC_TEST}) # unit tests
     message(STATUS "+ " ${F})
     add_executable(${R} ${F})
     target_link_libraries(${R} GTest::gtest_main spectrum)
-    gtest_discover_tests(${R})
+    gtest_add_tests(TARGET ${R})
 endforeach(F R)
 
 unset(SRC_TEST)

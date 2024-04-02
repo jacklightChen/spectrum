@@ -15,10 +15,10 @@ TEST(Statistics, BenchJournal) {
         statistics.JournalExecute();
         statistics.JournalCommit(10);
     }});
-    std::this_thread::sleep_for(2000ms);
+    std::this_thread::sleep_for(200ms);
     stop_flag.store(true);
     handle.join();
-    std::cerr << statistics.PrintWithDuration(2000ms) << std::endl;
+    std::cerr << statistics.PrintWithDuration(200ms) << std::endl;
 }
 
 }

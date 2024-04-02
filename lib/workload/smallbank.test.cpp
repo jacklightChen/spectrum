@@ -67,7 +67,7 @@ TEST(Smallbank, JustRunWorkload) {
         statistics.JournalExecute();
         statistics.JournalCommit(duration_cast<milliseconds>(steady_clock::now() - start_time).count());
     }});
-    std::this_thread::sleep_for(1000ms);
+    std::this_thread::sleep_for(100ms);
     stop_flag.store(true);
     handle.join();
     std::cerr << statistics.Print() << std::endl;
@@ -81,10 +81,10 @@ TEST(Smallbank, JustFetchWorkload) {
         auto transaction = workload.Next();
         statistics.JournalExecute();
     }});
-    std::this_thread::sleep_for(2000ms);
+    std::this_thread::sleep_for(200ms);
     stop_flag.store(true);
     handle.join();
-    std::cerr << statistics.PrintWithDuration(2000ms) << std::endl;
+    std::cerr << statistics.PrintWithDuration(200ms) << std::endl;
 }
 
 }
