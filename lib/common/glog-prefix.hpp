@@ -2,7 +2,7 @@
 #include <iomanip>
 
 void PrefixFormatter(std::ostream& s, const google::LogMessage& m, void* data) {
-    auto color = [&m](){
+    auto color = [&m]{
         switch (m.severity()) {
             case 0: return "\e[1;36m";
             case 1: return "\e[1;33m";

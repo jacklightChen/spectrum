@@ -12,7 +12,7 @@ const static char* CODE =
 
 Smallbank::Smallbank(size_t num_elements, double zipf_exponent): 
     evm_type{EVMType::STRAWMAN},
-    rng{std::unique_ptr<Random>(new ThreadLocalRandom([&](){return (zipf_exponent > 0.0 ? 
+    rng{std::unique_ptr<Random>(new ThreadLocalRandom([&]{return (zipf_exponent > 0.0 ? 
         std::unique_ptr<Random>(new Zipf(num_elements, zipf_exponent)) : 
         std::unique_ptr<Random>(new Unif(num_elements))
     );}, std::thread::hardware_concurrency()))}
@@ -41,7 +41,7 @@ Transaction Smallbank::Next() {
         option = 5;
     }
     #define X to_string(rng->Next())
-    auto input = spectrum::from_hex([&](){switch (option) {
+    auto input = spectrum::from_hex([&]{switch (option) {
         case 0: return std::string{"1e010439"} + X;
         case 1: return std::string{"bb27eb2c"} + X + X;
         case 2: return std::string{"ad0f98c0"} + X + X;

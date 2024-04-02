@@ -238,7 +238,7 @@ int64_t dispatch(const CostTable& cost_table, ExecutionState& state, int64_t gas
         DLOG(INFO) << "---";
     #endif
 
-    Position position = ([&](){
+    Position position = [&]{
         if (state.position != std::nullopt) {
             // We jumped out of interpreter loop in previous execution. 
             // Now, we have to come back with the right position. 
@@ -251,7 +251,7 @@ int64_t dispatch(const CostTable& cost_table, ExecutionState& state, int64_t gas
             Position position{code};
             return position;
         }
-    })();
+    }();
 
     while (true)  // Guaranteed to terminate because padded code ends with STOP.
     {
@@ -291,6 +291,7 @@ int64_t dispatch(const CostTable& cost_table, ExecutionState& state, int64_t gas
                 }                                                                                     \
                 else if (state.will_break)                                                            \
                 {                                                                                     \
+                    state.will_break = false;                                                         \
                     state.position = next;                                                            \
                     return gas;                                                                       \
                 }                                                                                     \
@@ -360,7 +361,7 @@ evmc_result execute(VM& vm, const evmc_host_interface* host, evmc_host_context* 
         vm.analysis = std::make_unique<CodeAnalysis>(analyze(rev, container));
     }
     const auto data = vm.analysis->eof_header.get_data(container);
-    ExecutionState& state = *([&](){
+    ExecutionState& state = *([&]{
         if (vm.state == std::nullopt) {
             vm.state.emplace(std::make_unique<ExecutionState>(*msg, rev, *host, ctx, container, data));
         }
