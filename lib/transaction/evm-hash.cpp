@@ -5,7 +5,7 @@
 
 namespace spectrum
 {
-    
+
 #define K std::tuple<evmc::address, evmc::bytes32>
 
 /// @brief the hashing method

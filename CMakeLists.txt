@@ -167,14 +167,14 @@ if(ASAN)
     add_compile_options(-fsanitize=address)
     add_link_options(-fsanitize=address)
     add_compile_options(
-        -O0 -ggdb -Wall -Wno-reorder -Wno-attributes
+        -O0 -ggdb -Wno-attributes -Werror
         -DPROJECT_VERSION=""
         -DEVMONE_X86_64_ARCH_LEVEL=2
         -DEVM_PRINT_INSTRUCTIONS=${EVM_PRINT_INSTRUCTIONS}
     )
 else()
     add_compile_options(
-        -O3 -Wall -Wno-reorder -Wno-attributes
+        -O3 -Wno-attributes -Werror
         -DNDEBUG -ggdb
         -DPROJECT_VERSION=""
         -DEVMONE_X86_64_ARCH_LEVEL=2
