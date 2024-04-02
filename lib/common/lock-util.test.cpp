@@ -1,6 +1,6 @@
 #include <gtest/gtest.h>
 #include <spectrum/common/lock-util.hpp>
-#include <spectrum/common/evm_hash.hpp>
+#include <spectrum/evmtxn/evm_hash.hpp>
 #include <spectrum/common/hex.hpp>
 #include <evmc/evmc.hpp>
 #include <span>

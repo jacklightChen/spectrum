@@ -1,4 +1,4 @@
-#include <spectrum/common/evm_hash.hpp>
+#include <spectrum/evmtxn/evm_hash.hpp>
 #include <cstddef>
 #include <functional>
 #include <tuple>

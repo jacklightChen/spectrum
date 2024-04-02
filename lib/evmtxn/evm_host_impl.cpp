@@ -1,4 +1,4 @@
-#include <spectrum/common/evm_host_impl.hpp>
+#include <spectrum/evmtxn/evm_host_impl.hpp>
 #include <evmc/evmc.hpp>
 #include <iostream>
 #include <glog/logging.h>

@@ -1,5 +1,5 @@
 #include <spectrum/workload/smallbank.hpp>
-#include <spectrum/common/evm_hash.hpp>
+#include <spectrum/evmtxn/evm_hash.hpp>
 #include <spectrum/common/hex.hpp>
 #include <gtest/gtest.h>
 #include <evmc/evmc.hpp>

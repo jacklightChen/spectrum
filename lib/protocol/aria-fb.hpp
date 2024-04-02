@@ -1,7 +1,7 @@
 #include <functional>
 #include <spectrum/common/lock-util.hpp>
-#include <spectrum/common/evm_hash.hpp>
-#include <spectrum/common/evm_transaction.hpp>
+#include <spectrum/evmtxn/evm_hash.hpp>
+#include <spectrum/evmtxn/evm_transaction.hpp>
 #include <spectrum/workload/abstraction.hpp>
 #include <spectrum/protocol/abstraction.hpp>
 #include <spectrum/common/statistics.hpp>

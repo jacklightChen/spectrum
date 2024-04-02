@@ -1,5 +1,5 @@
-#include <spectrum/common/evm_host_impl.hpp>
-#include <spectrum/common/evm_transaction.hpp>
+#include <spectrum/evmtxn/evm_host_impl.hpp>
+#include <spectrum/evmtxn/evm_transaction.hpp>
 #include <spectrum/common/hex.hpp>
 #include <spectrum/evmcow/baseline.hpp>
 #include <spectrum/evmone/baseline.hpp>

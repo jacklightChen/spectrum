@@ -2,7 +2,7 @@
 #include <spectrum/protocol/abstraction.hpp>
 #include <spectrum/workload/abstraction.hpp>
 #include <spectrum/common/statistics.hpp>
-#include <spectrum/common/evm_hash.hpp>
+#include <spectrum/evmtxn/evm_hash.hpp>
 #include <thread>
 #include <vector>
 #include <atomic>
