@@ -3,7 +3,7 @@
 
 namespace spectrum {
 
-class TPCC: public Workload {
+class TPCC {
 
     private:
     std::basic_string<uint8_t>  code;
@@ -18,8 +18,8 @@ class TPCC: public Workload {
 
     public:
     TPCC(size_t scale_factor, size_t num_warehouses);
-    Transaction Next() override;
-    void SetEVMType(EVMType ty) override;
+    Transaction Next(); // override;
+    void SetEVMType(EVMType ty); // override;
 
 };
 

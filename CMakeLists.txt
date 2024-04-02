@@ -107,7 +107,8 @@ GitHub(
     USER    "fmtlib"
     REPO    "fmt"
     BRANCH  "10.2.1"
-    AS      "CMAKE SUBDIR"
+    AS      "CMAKE INSTALL"
+    FLAGS   "-DBUILD_SHARED_LIBS=TRUE"
 )
 GitHub(
     USER    "chfast"
@@ -196,7 +197,7 @@ foreach(F ${INC}) # headers
     configure_file(lib/${R} include/spectrum/${R} COPYONLY)
 endforeach(F R)
 
-add_library(spectrum ${SRC})
+add_library(spectrum SHARED ${SRC})
 
 target_include_directories(
     spectrum
@@ -208,8 +209,7 @@ target_compile_features(
 )
 target_link_libraries(
     spectrum
-    PUBLIC evmc intx::intx fmt glog::glog gflags
-    # you can replace jemalloc with tcmalloc here
+    PUBLIC  fmt::fmt evmc intx::intx glog::glog gflags
     PRIVATE ethash::keccak Threads::Threads SQLiteCpp jemalloc
 )
 

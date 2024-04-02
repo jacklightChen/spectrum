@@ -1,11 +1,11 @@
 #pragma once
+#include <memory>
 #include <queue>
 #include <vector>
 #include <atomic>
 #include <unordered_map>
 #include <evmc/evmc.hpp>
 #include <glog/logging.h>
-#include <tuple>
 #include <vector>
 
 namespace spectrum {
@@ -50,9 +50,9 @@ class LockQueue {
     TP Pop() {
         auto guard = Guard{mu};
         if (!queue.size()) return {nullptr};
-        auto tx = std::move(queue.front());
+        auto tx = const_cast<TP&>(queue.top()).release();
         queue.pop();
-        return tx;
+        return std::unique_ptr<T>(tx);
     }
     void Push(TP&& tx) {
         auto guard = Guard{mu};
@@ -80,9 +80,9 @@ class LockPriorityQueue {
     TP Pop() {
         auto guard = Guard{mu};
         if (!queue.size()) return {nullptr};
-        auto tx = std::move(const_cast<TP&>(queue.top()));
+        auto tx = const_cast<TP&>(queue.top()).release();
         queue.pop();
-        return tx;
+        return std::unique_ptr<T>(tx);
     }
     void Push(TP&& tx) {
         auto guard = Guard{mu};

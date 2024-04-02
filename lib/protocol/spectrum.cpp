@@ -309,7 +309,7 @@ void SpectrumExecutor::Generate() {
             for (auto& tup: tx->tuples_get) {
                 if (tup.key == _key) { return tup.value; }
             }
-            if (tx->HasRerunKeys()) { tx->Break(); return evmc::bytes32{0}; }
+            if (tx->HasRerunKeys()) { tx->Break(); }
             table.Get(tx.get(), _key, value, version);
             size_t checkpoint_id = tx->MakeCheckpoint();
             tx->tuples_get.push_back({
@@ -333,6 +333,9 @@ void SpectrumExecutor::Generate() {
         }
     } else {
         tx = queue.Pop();
+        DLOG(INFO) << "pop tx" << tx->id <<
+            " tuples put: " << tx->tuples_put.size() <<
+            " tuples get: " << tx->tuples_get.size();
     }
 }
 
@@ -384,6 +387,8 @@ void SpectrumExecutor::ReExecute() {
 void SpectrumExecutor::Finalize() {
     DLOG(INFO) << "spectrum finalize " << tx->id;
     last_finalized.fetch_add(1, std::memory_order_seq_cst);
+    DCHECK(tx->tuples_get.size() == 5);
+    DCHECK(tx->tuples_put.size() == 5);
     for (auto entry: tx->tuples_get) {
         table.ClearGet(tx.get(), entry.key, entry.version);
     }

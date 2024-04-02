@@ -11,6 +11,7 @@
 #include <spectrum/workload/smallbank.hpp>
 #include <spectrum/workload/ycsb.hpp>
 #include "macros.hpp"
+#include <ranges>
 
 // expanding macros to assignments and use them later
 #define ASSGIN_ARGS_HELPER(X, ...) __VA_OPT__(auto NAME(__VA_ARGS__) = (X);)
@@ -74,7 +75,7 @@ milliseconds to<milliseconds>(std::basic_string_view<char> s) {
 	return milliseconds{};
 }
 
-std::unique_ptr<Workload> ParseWorkload(const char* arg) {
+inline std::unique_ptr<Workload> ParseWorkload(const char* arg) {
     auto args = split(arg);
     auto name = *args.begin();
     auto dist = (size_t) (std::distance(args.begin(), args.end()) - 1);
@@ -93,7 +94,7 @@ std::unique_ptr<Workload> ParseWorkload(const char* arg) {
     THROW("unknown workload option ({})", std::string{name});
 }
 
-std::unique_ptr<Protocol> ParseProtocol(const char* arg, Workload& workload, Statistics& statistics) {
+inline std::unique_ptr<Protocol> ParseProtocol(const char* arg, Workload& workload, Statistics& statistics) {
     auto args = split(arg);
     auto name = *args.begin();
     auto dist = (size_t) (std::distance(args.begin(), args.end()) - 1);
