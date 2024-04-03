@@ -18,7 +18,7 @@ TEST(Spectrum, JustRunYCSB) {
     auto workload = YCSB(11, 0.0);
     auto protocol = Spectrum(workload, statistics, 8, 32, EVMType::COPYONWRITE);
     protocol.Start();
-    std::this_thread::sleep_for(10s);
+    std::this_thread::sleep_for(100ms);
     protocol.Stop();
     statistics.Print();
 }
