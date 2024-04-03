@@ -295,10 +295,10 @@ void SpectrumExecutor::Generate() {
                 .value = value, 
                 .is_committed=false
             });
-            // if (tx->HasRerunKeys()) {
-            //     DLOG(INFO) << "spectrum tx " << tx->id << " break" << std::endl;
-            //     tx->Break();
-            // }
+            if (tx->HasRerunKeys()) {
+                DLOG(INFO) << "spectrum tx " << tx->id << " break" << std::endl;
+                tx->Break();
+            }
             DLOG(INFO) << "tx " << tx->id <<
                 " tuples put: " << tx->tuples_put.size() <<
                 " tuples get: " << tx->tuples_get.size();
@@ -334,10 +334,10 @@ void SpectrumExecutor::Generate() {
             });
             // we have to break after make checkpoint
             //   , or we will snapshot the break signal into the checkpoint!
-            // if (tx->HasRerunKeys()) {
-            //     DLOG(INFO) << "spectrum tx " << tx->id << " break" << std::endl;
-            //     tx->Break();
-            // }
+            if (tx->HasRerunKeys()) {
+                DLOG(INFO) << "spectrum tx " << tx->id << " break" << std::endl;
+                tx->Break();
+            }
             return value;
         });
         DLOG(INFO) << "spectrum execute " << tx->id;

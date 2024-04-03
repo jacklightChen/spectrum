@@ -108,7 +108,8 @@ Result sload(StackTop& stack, int64_t gas_left, ExecutionState& state) noexcept
             return {EVMC_OUT_OF_GAS, gas_left};
     }
 
-    x = intx::be::load<uint256>(state.host.get_storage(state.msg->recipient, key));
+    const auto val = state.host.get_storage(state.msg->recipient, key);
+    stack.get_mut(0) = intx::be::load<uint256>(val);
 
     return {EVMC_SUCCESS, gas_left};
 }
