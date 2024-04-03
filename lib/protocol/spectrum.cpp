@@ -412,10 +412,6 @@ void SpectrumExecutor::ReExecute() {
 void SpectrumExecutor::Finalize() {
     DLOG(INFO) << "spectrum finalize " << tx->id;
     last_finalized.fetch_add(1, std::memory_order_seq_cst);
-    DCHECK(tx->tuples_get.size() == 5 && tx->tuples_put.size() == 5)
-        << " tx " << tx->id
-        << " tuples put: " << tx->tuples_put.size()
-        << " tuples get: " << tx->tuples_get.size();
     for (auto entry: tx->tuples_get) {
         table.ClearGet(tx.get(), entry.key, entry.version);
     }
