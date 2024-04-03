@@ -20,7 +20,11 @@ function(Execute)
     cmake_parse_arguments(EX "OUTPUT_QUIET;ERROR_QUIET" "WORKING_DIRECTORY;COMMAND_ERROR_IS_FATAL" "COMMAND" "${ARGV}")
     list(JOIN EX_COMMAND " " EX_COMMAND)
     message(STATUS "+ " ${EX_COMMAND})
-    execute_process(${ARGN})
+    execute_process(
+        ${ARGN}
+        COMMAND_ERROR_IS_FATAL  ANY
+        OUTPUT_QUIET ERROR_QUIET
+    )
 endfunction()
 
 function(GitHub)
@@ -47,20 +51,14 @@ function(GitHub)
             Execute(
                 COMMAND                 cmake -S . -B build ${GH_FLAGS} -DCMAKE_INSTALL_PREFIX=${CMAKE_BINARY_DIR}/_deps/${GH_USER}/${GH_REPO}/install
                 WORKING_DIRECTORY       ${CMAKE_BINARY_DIR}/_deps/${GH_USER}/${GH_REPO}
-                COMMAND_ERROR_IS_FATAL  ANY
-                OUTPUT_QUIET ERROR_QUIET
             )
             Execute(
                 COMMAND                 cmake --build build -j
                 WORKING_DIRECTORY       ${CMAKE_BINARY_DIR}/_deps/${GH_USER}/${GH_REPO}
-                COMMAND_ERROR_IS_FATAL  ANY
-                OUTPUT_QUIET ERROR_QUIET
             )
             Execute(
                 COMMAND                 cmake --build build --target install
                 WORKING_DIRECTORY       ${CMAKE_BINARY_DIR}/_deps/${GH_USER}/${GH_REPO}
-                COMMAND_ERROR_IS_FATAL  ANY
-                OUTPUT_QUIET ERROR_QUIET
             )
         endif()
         set(CMAKE_PREFIX_PATH "${CMAKE_BINARY_DIR}/_deps/${GH_USER}/${GH_REPO}/install")
@@ -79,14 +77,10 @@ function(GitHub)
             Execute(
                 COMMAND                 ./autogen.sh --prefix ${CMAKE_BINARY_DIR}/_deps/${GH_USER}/${GH_REPO}/install
                 WORKING_DIRECTORY       ${CMAKE_BINARY_DIR}/_deps/${GH_USER}/${GH_REPO}
-                COMMAND_ERROR_IS_FATAL  ANY
-                OUTPUT_QUIET ERROR_QUIET
             )
             Execute(
                 COMMAND                 make install -j4
                 WORKING_DIRECTORY       ${CMAKE_BINARY_DIR}/_deps/${GH_USER}/${GH_REPO}
-                COMMAND_ERROR_IS_FATAL  ANY
-                OUTPUT_QUIET ERROR_QUIET
             )
         endif()
         include_directories(${CMAKE_BINARY_DIR}/_deps/${GH_USER}/${GH_REPO}/install/include)
@@ -149,12 +143,6 @@ GitHub(
     AS      "CMAKE SCANLIB"
 )
 GitHub(
-    USER    "SRombauts"
-    REPO    "SQLiteCpp"
-    BRANCH  "3.3.1"
-    AS      "CMAKE INSTALL"
-)
-GitHub(
     USER    "jemalloc"
     REPO    "jemalloc"
     BRANCH  "5.3.0"
@@ -208,7 +196,7 @@ target_compile_features(
 target_link_libraries(
     spectrum
     PUBLIC  fmt::fmt evmc intx::intx glog::glog gflags
-    PRIVATE ethash::keccak Threads::Threads SQLiteCpp jemalloc
+    PRIVATE ethash::keccak Threads::Threads jemalloc
 )
 
 set(gtest_force_shared_crt ON CACHE BOOL "" FORCE)

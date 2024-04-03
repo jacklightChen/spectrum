@@ -1,4 +1,3 @@
-#include <SQLiteCpp/SQLiteCpp.h>
 #include <spectrum/workload/tpcc.hpp>
 
 namespace spectrum {

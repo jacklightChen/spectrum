@@ -10,7 +10,6 @@
 #include "./vm.hpp"
 #include <memory>
 #include <optional>
-#include <iostream>
 #include <glog/logging.h>
 
 #ifdef NDEBUG
