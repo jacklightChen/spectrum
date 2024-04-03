@@ -9,7 +9,6 @@
 #include "./instructions_traits.hpp"
 #include "./instructions_xmacro.hpp"
 #include <ethash/keccak.hpp>
-#include <iostream>
 
 namespace evmone
 {
