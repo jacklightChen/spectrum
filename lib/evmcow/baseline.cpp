@@ -234,7 +234,7 @@ int64_t dispatch(const CostTable& cost_table, ExecutionState& state, int64_t gas
 {
     const auto stack_bottom = state.stack_space.bottom();
 
-    #if EVM_PRINT_INSTRUCTIONS
+    #ifndef NDEBUG
         DLOG(INFO) << "---";
     #endif
 
@@ -269,7 +269,7 @@ int64_t dispatch(const CostTable& cost_table, ExecutionState& state, int64_t gas
 
         const auto op = *position.code_it;
 
-        #if EVM_PRINT_INSTRUCTIONS
+        #ifndef NDEBUG
         switch (op) {
             #define ON_OPCODE(OPCODE)                                                                                       \
             case OPCODE:                                                                                                    \

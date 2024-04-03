@@ -260,7 +260,7 @@ int64_t dispatch(const CostTable& cost_table, ExecutionState& state, int64_t gas
 
         const auto op = *position.code_it;
 
-        #if EVM_PRINT_INSTRUCTIONS
+        #ifndef NDEBUG
         switch (op) {
             #define ON_OPCODE(OPCODE)                                                                          \
             case OPCODE:                                                                                       \
