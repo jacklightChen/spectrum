@@ -113,7 +113,7 @@ class SpectrumPreSchedExecutor {
     std::barrier<std::function<void()>>&            stop_latch;
 
     public:
-    SpectrumPreSchedExecutor(SpectrumPreSched& spectrum);
+    SpectrumPreSchedExecutor(SpectrumPreSched& spectrum, SpectrumPreSchedQueue& queue);
     void Finalize();
     void Generate();
     void ReExecute();
