@@ -3,6 +3,9 @@
 #include <fmt/core.h>
 #include <glog/logging.h>
 #include <optional>
+#include <iomanip>
+#include <iostream>
+#include <sstream>
 
 namespace spectrum {
 

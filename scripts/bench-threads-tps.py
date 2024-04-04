@@ -9,8 +9,8 @@ sys.path.extend(['.', '..', '../..'])
 from plot.plot import MyPlot
 
 keys = 1000000
-workload = 'Smallbank'
-zipf = 1.1
+workload = 'YCSB'
+zipf = 0.99
 times_to_tun = 2
 timestamp = int(time.time())
 
@@ -18,7 +18,7 @@ if __name__ == '__main__':
     df = pd.DataFrame(columns=['protocol', 'threads', 'zipf', 'table_partition', 'commit', 'abort'])
     conf = {'stdout': subprocess.PIPE, 'stderr': subprocess.PIPE}
     hash = subprocess.run(["git", "rev-parse", "HEAD"], **conf).stdout.decode('utf-8').strip()
-    batch_size = 200
+    batch_size = 120
     with open(f'./exp_results/bench_results_{timestamp}', 'w') as f:
         for num_threads in list(range(6, 42, 6)):
             table_partitions    = 9973
@@ -28,7 +28,7 @@ if __name__ == '__main__':
                 f"Aria:{num_threads}:{table_partitions}:{batch_size // num_threads}:TRUE",
                 f"Sparkle:{num_threads}:{table_partitions}", 
                 f"Spectrum:{num_threads}:{table_partitions}:COPYONWRITE",
-                f"SpectrumSched:{num_threads}:{table_partitions}:COPYONWRITE",
+                # f"SpectrumSched:{num_threads}:{table_partitions}:COPYONWRITE",
                 # f"Dummy:{num_threads}:{table_partitions}:COPYONWRITE",
                 # f"Serial:BASIC:{1}",
             ]
