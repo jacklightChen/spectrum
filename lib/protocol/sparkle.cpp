@@ -128,12 +128,29 @@ void SparkleTable::Put(T* tx, const K& k, const evmc::bytes32& v) {
 bool SparkleTable::Lock(T* tx, const K& k) {
     bool succeed = false;
     Table::Put(k, [&](V& _v) {
-        succeed = _v.tx == nullptr || _v.tx->id >= tx->id;
-        if (_v.tx && _v.tx->id < tx->id) {
+        DLOG(INFO) << "tx " << tx->id << " lock " << KeyHasher()(k) % 1000 << " see " << (_v.tx ? _v.tx->id : -1) << std::endl;
+        if (_v.tx && _v.tx->id > tx->id) {
             _v.tx->SetRerunFlag(true);
             DLOG(INFO) << tx->id << " abort " << _v.tx->id;
         }
-        if (succeed) { _v.tx = tx; }
+        else if (_v.tx && _v.tx->id < tx->id) {
+            tx->SetRerunFlag(true);
+            DLOG(INFO) << _v.tx->id << " abort " << tx->id;
+        }
+        if ((succeed = _v.tx == nullptr || _v.tx->id >= tx->id)) { _v.tx = tx; }
+    });
+    return succeed;
+}
+
+/// @brief unlock an entry for finished write
+/// @param tx the transaction containing write operation
+/// @param k the key of written entry
+/// @return true if lock succeeds
+bool SparkleTable::Unlock(T* tx, const K& k) {
+    DLOG(INFO) << "tx " << tx->id << " unlock " << KeyHasher()(k) % 1000 << std::endl;
+    bool succeed = false;
+    Table::Put(k, [&](V& _v) {
+        if ((succeed = _v.tx == tx)) _v.tx = nullptr;
     });
     return succeed;
 }
@@ -296,51 +313,52 @@ SparkleExecutor::SparkleExecutor(Sparkle& sparkle):
 
 /// @brief generate a transaction and execute it
 void SparkleExecutor::Generate() {
-    if (queue.Size() == 0) {
-        tx = std::make_unique<T>(workload.Next(), last_execute.fetch_add(1));
-        tx->start_time = steady_clock::now();
-        tx->InstallSetStorageHandler([this](
-            const evmc::address &addr, 
-            const evmc::bytes32 &key, 
-            const evmc::bytes32 &value
-        ) {
-            DLOG(INFO) << tx->id << " set";
-            auto _key   = std::make_tuple(addr, key);
-            // just push back
-            tx->tuples_put.push_back(std::make_tuple(_key, value));
-            return evmc_storage_status::EVMC_STORAGE_MODIFIED;
-        });
-        tx->InstallGetStorageHandler([this](
-            const evmc::address &addr, 
-            const evmc::bytes32 &key
-        ) {
-            DLOG(INFO) << tx->id << " get";
-            auto _key   = std::make_tuple(addr, key);
-            auto value  = evmc::bytes32{0};
-            auto version = size_t{0};
-            // one key from one transaction will be commited once
-            for (auto& tup: tx->tuples_put | std::views::reverse) {
-                if (std::get<0>(tup) == _key) {
-                    return std::get<1>(tup);
-                }
+    if (queue.Size() != 0) { this->tx = queue.Pop(); return; }
+    tx = std::make_unique<T>(workload.Next(), last_execute.fetch_add(1));
+    tx->start_time = steady_clock::now();
+    tx->InstallSetStorageHandler([this](
+        const evmc::address &addr, 
+        const evmc::bytes32 &key, 
+        const evmc::bytes32 &value
+    ) {
+        DLOG(INFO) << tx->id << " set";
+        auto _key = std::make_tuple(addr, key);
+        table.Lock(tx.get(), _key);
+        tx->tuples_put.push_back(std::make_tuple(_key, value));
+        if (tx->HasRerunFlag()) { tx->Break(); }
+        return evmc_storage_status::EVMC_STORAGE_MODIFIED;
+    });
+    tx->InstallGetStorageHandler([this](
+        const evmc::address &addr, 
+        const evmc::bytes32 &key
+    ) {
+        DLOG(INFO) << tx->id << " get";
+        auto _key   = std::make_tuple(addr, key);
+        auto value  = evmc::bytes32{0};
+        auto version = size_t{0};
+        // one key from one transaction will be commited once
+        for (auto& tup: tx->tuples_put | std::views::reverse) {
+            if (std::get<0>(tup) == _key) {
+                return std::get<1>(tup);
             }
-            for (auto& tup: tx->tuples_get) {
-                if (std::get<0>(tup) == _key) {
-                    return std::get<1>(tup);
-                }
-            }
-            table.Get(tx.get(), _key, value, version);
-            tx->tuples_get.push_back(std::make_tuple(_key, value, version));
-            return value;
-        });
-        tx->Execute();
-        statistics.JournalExecute();
-        for (auto i = size_t{0}; i < tx->tuples_put.size(); ++i) {
-            auto& entry = tx->tuples_put[i];
-            table.Put(tx.get(), std::get<0>(entry), std::get<1>(entry));
         }
-    } else {
-        this->tx = queue.Pop();
+        for (auto& tup: tx->tuples_get) {
+            if (std::get<0>(tup) == _key) {
+                return std::get<1>(tup);
+            }
+        }
+        table.Get(tx.get(), _key, value, version);
+        tx->tuples_get.push_back(std::make_tuple(_key, value, version));
+        if (tx->HasRerunFlag()) { tx->Break(); }
+        return value;
+    });
+    tx->Execute();
+    statistics.JournalExecute();
+    for (auto i = size_t{0}; i < tx->tuples_put.size(); ++i) {
+        auto& entry = tx->tuples_put[i];
+        table.Put(tx.get(), std::get<0>(entry), std::get<1>(entry));
+        table.Unlock(tx.get(), std::get<0>(entry));
+        if (tx->HasRerunFlag()) break;
     }
 }
 
@@ -363,6 +381,8 @@ void SparkleExecutor::ReExecute() {
     for (auto i = size_t{0}; i < tx->tuples_put.size(); ++i) {
         auto& entry = tx->tuples_put[i];
         table.Put(tx.get(), std::get<0>(entry), std::get<1>(entry));
+        table.Unlock(tx.get(), std::get<0>(entry));
+        if (tx->HasRerunFlag()) break;
     }
 }
 
@@ -390,7 +410,8 @@ void SparkleExecutor::Run() {
         }
         else if (last_finalized.load() + 1 == tx->id && !tx->HasRerunFlag()) {
             Finalize();
-        } else {
+        }
+        else {
             queue.Push(std::move(this->tx));
         }
     }

@@ -59,12 +59,12 @@ TEST(Sparkle, TableWriteAfterWrite) {
 TEST(Sparkle, JustRunYCSB) {
     google::InstallPrefixFormatter(PrefixFormatter);
     auto statistics = Statistics();
-    auto workload = YCSB(10000, 0.0);
+    auto workload = YCSB(11, 0.0);
     auto protocol = Sparkle(workload, statistics, 6, 32);
     protocol.Start();
     std::this_thread::sleep_for(100ms);
     protocol.Stop();
-    statistics.Print();   
+    statistics.Print();
 }
 
 #undef TX
