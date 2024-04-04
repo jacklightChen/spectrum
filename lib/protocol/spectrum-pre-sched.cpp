@@ -242,7 +242,8 @@ SpectrumPreSched::SpectrumPreSched(Workload& workload, Statistics& statistics, s
     statistics{statistics},
     num_executors{num_executors},
     table{table_partitions},
-    stop_latch{static_cast<ptrdiff_t>(num_executors), []{}}
+    stop_latch{static_cast<ptrdiff_t>(num_executors), []{}},
+    queue_bundle{num_executors}
 {
     LOG(INFO) << fmt::format("SpectrumPreSched(num_executors={}, table_partitions={}, evm_type={})", num_executors, table_partitions, evm_type);
     workload.SetEVMType(evm_type);
@@ -253,8 +254,8 @@ SpectrumPreSched::SpectrumPreSched(Workload& workload, Statistics& statistics, s
 void SpectrumPreSched::Start() {
     stop_flag.store(false);
     for (size_t i = 0; i != num_executors; ++i) {
-        executors.push_back(std::thread([this]{
-            std::make_unique<SpectrumPreSchedExecutor>(*this)->Run();
+        executors.push_back(std::thread([this, i]{
+            std::make_unique<SpectrumPreSchedExecutor>(*this, queue_bundle[i])->Run();
         }));
         PinRoundRobin(executors[i], i);
     }
@@ -268,93 +269,91 @@ void SpectrumPreSched::Stop() {
 
 /// @brief spectrum executor
 /// @param spectrum spectrum initialization paremeters
-SpectrumPreSchedExecutor::SpectrumPreSchedExecutor(SpectrumPreSched& spectrum):
+SpectrumPreSchedExecutor::SpectrumPreSchedExecutor(SpectrumPreSched& spectrum, SpectrumPreSchedQueue& queue):
     table{spectrum.table},
     last_finalized{spectrum.last_finalized},
     stop_flag{spectrum.stop_flag},
     statistics{spectrum.statistics},
     workload{spectrum.workload},
     last_execute{spectrum.last_execute},
-    stop_latch{spectrum.stop_latch}
+    stop_latch{spectrum.stop_latch},
+    queue_bundle{spectrum.queue_bundle},
+    queue{queue}
 {}
 
 /// @brief generate a transaction and execute it
 void SpectrumPreSchedExecutor::Generate() {
-    if (queue.Size() == 0) {
-        tx = std::make_unique<T>(workload.Next(), last_execute.fetch_add(1));
-        tx->start_time = steady_clock::now();
-        tx->berun_flag.store(true);
-        tx->InstallSetStorageHandler([this](
-            const evmc::address &addr, 
-            const evmc::bytes32 &key, 
-            const evmc::bytes32 &value
-        ) {
-            auto _key = std::make_tuple(addr, key);
-            tx->tuples_put.push_back({
-                .key = _key, 
-                .value = value, 
-                .is_committed=false
-            });
-            if (tx->HasRerunKeys()) {
-                DLOG(INFO) << "spectrum tx " << tx->id << " break" << std::endl;
-                tx->Break();
-            }
-            DLOG(INFO) << "tx " << tx->id <<
-                " tuples put: " << tx->tuples_put.size() <<
-                " tuples get: " << tx->tuples_get.size();
-            return evmc_storage_status::EVMC_STORAGE_MODIFIED;
-        });
-        tx->InstallGetStorageHandler([this](
-            const evmc::address &addr, 
-            const evmc::bytes32 &key
-        ) {
-            auto _key  = std::make_tuple(addr, key);
-            auto value = evmc::bytes32{0};
-            auto version = size_t{0};
-            for (auto& tup: tx->tuples_put | std::views::reverse) {
-                if (tup.key != _key) { continue; }
-                DLOG(INFO) << "spectrum tx " << tx->id << " has key " << KeyHasher()(_key) % 1000 << " in tuples_put. ";
-                return tup.value;
-            }
-            for (auto& tup: tx->tuples_get) {
-                if (tup.key != _key) { continue; }
-                DLOG(INFO) << "spectrum tx " << tx->id << " has key " << KeyHasher()(_key) % 1000 << " in tuples_get. ";
-                return tup.value;
-            }
-            DLOG(INFO) << "tx " << tx->id << " " << 
-                " read(" << tx->tuples_get.size() << ")" << 
-                " key(" << KeyHasher()(_key) % 1000 << ")" << std::endl;
-            table.Get(tx.get(), _key, value, version);
-            tx->tuples_get.push_back({
-                .key            = _key, 
-                .value          = value, 
-                .version        = version,
-                .tuples_put_len = tx->tuples_put.size(),
-                .checkpoint_id  = tx->MakeCheckpoint()
-            });
-            // we have to break after make checkpoint
-            //   , or we will snapshot the break signal into the checkpoint!
-            if (tx->HasRerunKeys()) {
-                DLOG(INFO) << "spectrum tx " << tx->id << " break" << std::endl;
-                tx->Break();
-            }
-            return value;
-        });
-        DLOG(INFO) << "spectrum execute " << tx->id;
-        tx->Execute();
-        statistics.JournalExecute();
-        // commit all results if possible & necessary
-        for (auto entry: tx->tuples_put) {
-            // if (tx->HasRerunKeys()) { break; }
-            if (entry.is_committed) { continue; }
-            table.Put(tx.get(), entry.key, entry.value);
-            entry.is_committed = true;
-        }
-    } else {
+    if (queue.Size() != 0) {
         tx = queue.Pop();
+        return;
+    }
+    tx = std::make_unique<T>(workload.Next(), last_execute.fetch_add(1));
+    tx->start_time = steady_clock::now();
+    tx->InstallSetStorageHandler([this](
+        const evmc::address &addr, 
+        const evmc::bytes32 &key, 
+        const evmc::bytes32 &value
+    ) {
+        auto _key = std::make_tuple(addr, key);
+        tx->tuples_put.push_back({
+            .key = _key, 
+            .value = value, 
+            .is_committed=false
+        });
+        if (tx->HasRerunKeys()) {
+            DLOG(INFO) << "spectrum tx " << tx->id << " break" << std::endl;
+            tx->Break();
+        }
         DLOG(INFO) << "tx " << tx->id <<
             " tuples put: " << tx->tuples_put.size() <<
             " tuples get: " << tx->tuples_get.size();
+        return evmc_storage_status::EVMC_STORAGE_MODIFIED;
+    });
+    tx->InstallGetStorageHandler([this](
+        const evmc::address &addr, 
+        const evmc::bytes32 &key
+    ) {
+        auto _key  = std::make_tuple(addr, key);
+        auto value = evmc::bytes32{0};
+        auto version = size_t{0};
+        for (auto& tup: tx->tuples_put | std::views::reverse) {
+            if (tup.key != _key) { continue; }
+            DLOG(INFO) << "spectrum tx " << tx->id << " has key " << KeyHasher()(_key) % 1000 << " in tuples_put. ";
+            return tup.value;
+        }
+        for (auto& tup: tx->tuples_get) {
+            if (tup.key != _key) { continue; }
+            DLOG(INFO) << "spectrum tx " << tx->id << " has key " << KeyHasher()(_key) % 1000 << " in tuples_get. ";
+            return tup.value;
+        }
+        DLOG(INFO) << "tx " << tx->id << " " << 
+            " read(" << tx->tuples_get.size() << ")" << 
+            " key(" << KeyHasher()(_key) % 1000 << ")" << std::endl;
+        table.Get(tx.get(), _key, value, version);
+        tx->tuples_get.push_back({
+            .key            = _key, 
+            .value          = value, 
+            .version        = version,
+            .tuples_put_len = tx->tuples_put.size(),
+            .checkpoint_id  = tx->MakeCheckpoint()
+        });
+        // we have to break after make checkpoint
+        //   , or we will snapshot the break signal into the checkpoint!
+        if (tx->HasRerunKeys()) {
+            DLOG(INFO) << "spectrum tx " << tx->id << " break" << std::endl;
+            tx->Break();
+        }
+        return value;
+    });
+    DLOG(INFO) << "spectrum execute " << tx->id;
+    tx->Execute();
+    statistics.JournalExecute();
+    // commit all results if possible & necessary
+    for (auto entry: tx->tuples_put) {
+        // if (tx->HasRerunKeys()) { break; }
+        if (entry.is_committed) { continue; }
+        table.Put(tx.get(), entry.key, entry.value);
+        entry.is_committed = true;
     }
 }
 

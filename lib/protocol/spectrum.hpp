@@ -8,8 +8,6 @@
 #include <vector>
 #include <unordered_set>
 #include <thread>
-#include <queue>
-#include <optional>
 #include <barrier>
 
 namespace spectrum {

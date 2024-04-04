@@ -79,15 +79,16 @@ class SpectrumPreSchedExecutor;
 class SpectrumPreSched: public Protocol {
 
     private:
-    size_t              num_executors;
-    Workload&           workload;
-    SpectrumPreSchedTable       table;
-    Statistics&         statistics;
-    std::atomic<size_t> last_execute{1};
-    std::atomic<size_t> last_finalized{0};
-    std::atomic<bool>   stop_flag{false};
-    std::vector<std::thread>    executors{};
-    std::barrier<std::function<void()>>            stop_latch;
+    size_t                  num_executors;
+    Workload&               workload;
+    SpectrumPreSchedTable   table;
+    Statistics&             statistics;
+    std::atomic<size_t>     last_execute{1};
+    std::atomic<size_t>     last_finalized{0};
+    std::atomic<bool>       stop_flag{false};
+    std::vector<SpectrumPreSchedQueue>              queue_bundle;
+    std::vector<std::thread>                        executors{};
+    std::barrier<std::function<void()>>             stop_latch;
     friend class SpectrumPreSchedExecutor;
 
     public:
@@ -101,14 +102,15 @@ class SpectrumPreSchedExecutor {
 
     private:
     Workload&               workload;
-    SpectrumPreSchedTable&          table;
+    SpectrumPreSchedTable&  table;
     Statistics&             statistics;
     std::atomic<size_t>&    last_execute;
     std::atomic<size_t>&    last_finalized;
     std::atomic<bool>&      stop_flag;
-    SpectrumPreSchedQueue           queue;
-    std::unique_ptr<T>      tx{nullptr};
-    std::barrier<std::function<void()>>&           stop_latch;
+    SpectrumPreSchedQueue&  queue;
+    std::vector<SpectrumPreSchedQueue>&             queue_bundle;
+    std::unique_ptr<T>                              tx{nullptr};
+    std::barrier<std::function<void()>>&            stop_latch;
 
     public:
     SpectrumPreSchedExecutor(SpectrumPreSched& spectrum);
