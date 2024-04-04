@@ -12,6 +12,7 @@
 #include <spectrum/workload/ycsb.hpp>
 #include "macros.hpp"
 #include <ranges>
+#include <iostream>
 
 // expanding macros to assignments and use them later
 #define ASSGIN_ARGS_HELPER(X, ...) __VA_OPT__(auto NAME(__VA_ARGS__) = (X);)
