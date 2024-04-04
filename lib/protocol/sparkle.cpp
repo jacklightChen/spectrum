@@ -352,8 +352,11 @@ void SparkleExecutor::Generate() {
     statistics.JournalExecute();
     for (auto i = size_t{0}; i < tx->tuples_put.size(); ++i) {
         auto& entry = tx->tuples_put[i];
-        table.Put(tx.get(), std::get<0>(entry), std::get<1>(entry));
         table.Unlock(tx.get(), std::get<0>(entry));
+    }
+    for (auto i = size_t{0}; i < tx->tuples_put.size(); ++i) {
+        auto& entry = tx->tuples_put[i];
+        table.Put(tx.get(), std::get<0>(entry), std::get<1>(entry));
         if (tx->HasRerunFlag()) break;
     }
 }
@@ -377,8 +380,11 @@ void SparkleExecutor::ReExecute() {
     statistics.JournalExecute();
     for (auto i = size_t{0}; i < tx->tuples_put.size(); ++i) {
         auto& entry = tx->tuples_put[i];
-        table.Put(tx.get(), std::get<0>(entry), std::get<1>(entry));
         table.Unlock(tx.get(), std::get<0>(entry));
+    }
+    for (auto i = size_t{0}; i < tx->tuples_put.size(); ++i) {
+        auto& entry = tx->tuples_put[i];
+        table.Put(tx.get(), std::get<0>(entry), std::get<1>(entry));
         if (tx->HasRerunFlag()) break;
     }
 }
