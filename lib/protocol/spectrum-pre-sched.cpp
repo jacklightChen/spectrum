@@ -284,22 +284,25 @@ SpectrumPreSchedExecutor::SpectrumPreSchedExecutor(SpectrumPreSched& spectrum, S
 /// @brief generate a transaction and execute it
 void SpectrumPreSchedExecutor::Generate() {
     while (queue.Size() == 0) {
-        auto tx = std::make_unique<T>(workload.Next(), last_execute.fetch_add(1));
-        tx->start_time = steady_clock::now();
-        auto next = false;
-        for (auto k: tx->predicted_get_storage) {
-            if (k >= 20) continue;
-            queue_bundle[k % queue_bundle.size()].Push(std::move(tx));
-            next = true; break;
+        auto _tx = std::make_unique<T>(workload.Next(), last_execute.fetch_add(1));
+        _tx->start_time = steady_clock::now();
+        auto is_dispatched = false;
+        for (auto k: _tx->predicted_get_storage) {
+            if (k >= 20 || is_dispatched) continue;
+            queue_bundle[k % queue_bundle.size()].Push(std::move(_tx));
+            is_dispatched = true; break;
         }
-        for (auto k: tx->predicted_set_storage) {
-            if (k >= 20) continue;
-            queue_bundle[k % queue_bundle.size()].Push(std::move(tx));
-            next = true; break;
+        if (is_dispatched) continue;
+        for (auto k: _tx->predicted_set_storage) {
+            if (k >= 20 || is_dispatched) continue;
+            queue_bundle[k % queue_bundle.size()].Push(std::move(_tx));
+            is_dispatched = true; break;
         }
-        queue.Push(std::move(tx));
+        if (is_dispatched) continue;
+        queue.Push(std::move(_tx));
     }
     tx = queue.Pop();
+    DLOG(INFO) << "pop tx " << tx->id << " from local queue" << std::endl;
     if (tx->berun_flag.load()) { return; }
     tx->berun_flag.store(true);
     tx->InstallSetStorageHandler([this](
