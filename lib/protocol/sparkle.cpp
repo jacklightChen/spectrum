@@ -323,7 +323,7 @@ void SparkleExecutor::Generate() {
     ) {
         DLOG(INFO) << tx->id << " set";
         auto _key = std::make_tuple(addr, key);
-        table.Lock(tx.get(), _key);
+        while (!table.Lock(tx.get(), _key)) continue;
         tx->tuples_put.push_back(std::make_tuple(_key, value));
         if (tx->HasRerunFlag()) { tx->Break(); }
         return evmc_storage_status::EVMC_STORAGE_MODIFIED;
@@ -373,6 +373,7 @@ void SparkleExecutor::ReExecute() {
     }
     for (auto entry: tx->tuples_put) {
         table.RegretPut(tx.get(), std::get<0>(entry));
+        table.Unlock(tx.get(), std::get<0>(entry));
     }
     tx->tuples_put.resize(0);
     tx->tuples_get.resize(0);
