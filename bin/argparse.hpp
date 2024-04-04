@@ -5,6 +5,7 @@
 #include <spectrum/protocol/serial.hpp>
 #include <spectrum/protocol/calvin.hpp>
 #include <spectrum/protocol/dummy.hpp>
+#include <spectrum/protocol/spectrum-pre-sched.hpp>
 #include <spectrum/protocol/spectrum-sched.hpp>
 #include <spectrum/protocol/spectrum-cache.hpp>
 #include <spectrum/workload/abstraction.hpp>
@@ -107,14 +108,15 @@ inline std::unique_ptr<Protocol> ParseProtocol(const char* arg, Workload& worklo
         if (dist != n) THROW("protocol {} has {} args -- ({}), but we found {} args", #X, n, #Y, dist); \
         return static_cast<std::unique_ptr<Protocol>>(std::make_unique<X>(workload, statistics, FILLIN_ARGS(Y)));  \
     };
-    OPT(Aria,           INT, INT, INT, BOOL)
-    OPT(Sparkle,        INT, INT)
-    OPT(Spectrum,       INT, INT, EVMTYPE)
-    OPT(SpectrumSched,  INT, INT, EVMTYPE)
-    OPT(SpectrumCache,  INT, INT, EVMTYPE)
-    OPT(Serial,         EVMTYPE,  INT)
-    OPT(Calvin,         INT, INT, INT)
-    OPT(Dummy,          INT, INT, EVMTYPE)
+    OPT(Aria,               INT, INT, INT, BOOL)
+    OPT(Sparkle,            INT, INT)
+    OPT(Spectrum,           INT, INT, EVMTYPE)
+    OPT(SpectrumSched,      INT, INT, EVMTYPE)
+    OPT(SpectrumCache,      INT, INT, EVMTYPE)
+    OPT(SpectrumPreSched,   INT, INT, EVMTYPE)
+    OPT(Serial,             EVMTYPE,  INT)
+    OPT(Calvin,             INT, INT, INT)
+    OPT(Dummy,              INT, INT, EVMTYPE)
     // Calvin num_threads, num_dispatchers(default 1), table_partitions
     #undef OPT
     // fallback to an error

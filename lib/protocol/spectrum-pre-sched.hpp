@@ -79,6 +79,7 @@ struct SpectrumPreSchedLockTable: private Table<K, V, KeyHasher> {
     void Get(T* tx, const K& k);
     void Put(T* tx, const K& k);
     void ClearPut(T* tx, const K& k);
+    void ClearGet(T* tx, const K& k);
 
 };
 
@@ -94,7 +95,7 @@ class SpectrumPreSched: public Protocol {
     Statistics&             statistics;
     std::atomic<size_t>     last_executed{1};
     std::atomic<size_t>     last_finalized{0};
-    std::atomic<size_t>     last_scheduled{1};
+    std::atomic<size_t>     last_scheduled{0};
     std::atomic<bool>       stop_flag{false};
     SpectrumPreSchedLockTable                       lock_table;
     std::vector<SpectrumPreSchedQueue>              queue_bundle;

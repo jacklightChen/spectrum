@@ -9,7 +9,7 @@ varthread() {
             eval    "p=\"${p//_/$i}\""
             echo    "@$p $b"
 	    sleep 	2
-	    $EXECUTABLE  $p $b $T || (echo "crash"; exit)
+	    $EXECUTABLE  $p $b $T --logtostderr || (echo "crash"; exit)
         done
     done
 }
@@ -22,7 +22,7 @@ varskew() {
                 x=${b//_/$x}
                 echo    @$p $x
 		sleep 	2
-                $EXECUTABLE  $p $x $T || (echo "crash"; exit)
+                $EXECUTABLE  $p $x $T --logtostderr || (echo "crash"; exit)
             done
         done
     done
@@ -39,9 +39,9 @@ case $1 in
         YCSB:1000000:2
         "
         # varthread "$BENCH" 'Aria:$((_*4)):1024:4:FALSE'
-        varthread "$BENCH" 'Sparkle:$((_*4)):1024'
-        varthread "$BENCH" 'Spectrum:$((_*4)):1024:COPYONWRITE'
-        # varthread "$BENCH" 'SpectrumSched:$((_*4)):1024:COPYONWRITE'
+        # varthread "$BENCH" 'Sparkle:$((_*4)):1024'
+        # varthread "$BENCH" 'Spectrum:$((_*4)):1024:COPYONWRITE'
+        varthread "$BENCH" 'SpectrumPreSched:$((_*4)):1024:COPYONWRITE'
     ;;
     skew-tps)
         BENCH="
