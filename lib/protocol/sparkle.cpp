@@ -303,14 +303,14 @@ SparkleExecutor::SparkleExecutor(Sparkle& sparkle):
     statistics{sparkle.statistics},
     stop_flag{sparkle.stop_flag},
     workload{sparkle.workload},
-    last_execute{sparkle.last_execute},
+    last_executed{sparkle.last_executed},
     stop_latch{sparkle.stop_latch}
 {}
 
 /// @brief generate a transaction and execute it
 void SparkleExecutor::Generate() {
     if (queue.Size() != 0) { this->tx = queue.Pop(); return; }
-    tx = std::make_unique<T>(workload.Next(), last_execute.fetch_add(1));
+    tx = std::make_unique<T>(workload.Next(), last_executed.fetch_add(1));
     tx->start_time = steady_clock::now();
     tx->InstallSetStorageHandler([this](
         const evmc::address &addr, 

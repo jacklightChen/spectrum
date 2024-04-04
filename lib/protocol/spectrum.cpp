@@ -33,14 +33,14 @@ SpectrumTransaction::SpectrumTransaction(Transaction&& inner, size_t id):
 
 /// @brief determine transaction has to rerun
 /// @return if transaction has to rerun
-bool SpectrumTransaction::HasRerunKeys() {
+bool SpectrumTransaction::HasWAR() {
     auto guard = Guard{rerun_keys_mu};
     return rerun_keys.size() != 0;
 }
 
 /// @brief call the transaction to rerun providing the key that caused it
 /// @param key the key that caused rerun
-void SpectrumTransaction::AddRerunKeys(const K& key, size_t cause_id) {
+void SpectrumTransaction::SetWAR(const K& key, size_t cause_id) {
     auto guard = Guard{rerun_keys_mu};
     rerun_keys.push_back(key);
     should_wait = std::max(should_wait, cause_id);
@@ -98,7 +98,7 @@ void SpectrumTable::Put(T* tx, const K& k, const evmc::bytes32& v) {
                 DLOG(INFO) << KeyHasher()(k) % 1000 << " has read dependency " << "(" << _tx << ")" << std::endl;
                 if (_tx->id > tx->id) {
                     DLOG(INFO) << tx->id << " abort " << _tx->id << std::endl;
-                    _tx->AddRerunKeys(k, tx->id);
+                    _tx->SetWAR(k, tx->id);
                 }
             }
             break;
@@ -107,7 +107,7 @@ void SpectrumTable::Put(T* tx, const K& k, const evmc::bytes32& v) {
             DLOG(INFO) << KeyHasher()(k) % 1000 << " has read dependency " << "(" << _tx << ")" << std::endl;
             if (_tx->id > tx->id) {
                 DLOG(INFO) << tx->id << " abort " << _tx->id << std::endl;
-                _tx->AddRerunKeys(k, tx->id);
+                _tx->SetWAR(k, tx->id);
             }
         }
         // handle duplicated write on the same key
@@ -176,7 +176,7 @@ void SpectrumTable::RegretPut(T* tx, const K& k) {
             for (auto _tx: vit->readers) {
                 DLOG(INFO) << KeyHasher()(k) % 1000 << " has read dependency " << "(" << _tx << ")" << std::endl;
                 DLOG(INFO) << tx->id << " abort " << _tx->id << std::endl;
-                _tx->AddRerunKeys(k, tx->id);
+                _tx->SetWAR(k, tx->id);
             }
             break;
         }
@@ -274,14 +274,14 @@ SpectrumExecutor::SpectrumExecutor(Spectrum& spectrum):
     stop_flag{spectrum.stop_flag},
     statistics{spectrum.statistics},
     workload{spectrum.workload},
-    last_execute{spectrum.last_execute},
+    last_executed{spectrum.last_executed},
     stop_latch{spectrum.stop_latch}
 {}
 
 /// @brief generate a transaction and execute it
 void SpectrumExecutor::Generate() {
     if (queue.Size() == 0) {
-        tx = std::make_unique<T>(workload.Next(), last_execute.fetch_add(1));
+        tx = std::make_unique<T>(workload.Next(), last_executed.fetch_add(1));
         tx->start_time = steady_clock::now();
         tx->berun_flag.store(true);
         tx->InstallSetStorageHandler([this](
@@ -295,7 +295,7 @@ void SpectrumExecutor::Generate() {
                 .value = value, 
                 .is_committed=false
             });
-            if (tx->HasRerunKeys()) {
+            if (tx->HasWAR()) {
                 DLOG(INFO) << "spectrum tx " << tx->id << " break" << std::endl;
                 tx->Break();
             }
@@ -334,7 +334,7 @@ void SpectrumExecutor::Generate() {
             });
             // we have to break after make checkpoint
             //   , or we will snapshot the break signal into the checkpoint!
-            if (tx->HasRerunKeys()) {
+            if (tx->HasWAR()) {
                 DLOG(INFO) << "spectrum tx " << tx->id << " break" << std::endl;
                 tx->Break();
             }
@@ -345,7 +345,7 @@ void SpectrumExecutor::Generate() {
         statistics.JournalExecute();
         // commit all results if possible & necessary
         for (auto entry: tx->tuples_put) {
-            // if (tx->HasRerunKeys()) { break; }
+            // if (tx->HasWAR()) { break; }
             if (entry.is_committed) { continue; }
             table.Put(tx.get(), entry.key, entry.value);
             entry.is_committed = true;
@@ -401,7 +401,7 @@ void SpectrumExecutor::ReExecute() {
     statistics.JournalExecute();
     // commit all results if possible & necessary
     for (auto entry: tx->tuples_put) {
-        if (tx->HasRerunKeys()) { break; }
+        if (tx->HasWAR()) { break; }
         if (entry.is_committed) { continue; }
         table.Put(tx.get(), entry.key, entry.value);
         entry.is_committed = true;
@@ -427,12 +427,12 @@ void SpectrumExecutor::Run() {
     while (!stop_flag.load()) {
         // first generate a transaction
         Generate();
-        if (tx->HasRerunKeys()) {
+        if (tx->HasWAR()) {
             // if there are some re-run keys, re-execute to obtain the correct result
             ReExecute();
             queue.Push(std::move(tx));
         }
-        else if (last_finalized.load() + 1 == tx->id && !tx->HasRerunKeys()) {
+        else if (last_finalized.load() + 1 == tx->id && !tx->HasWAR()) {
             // if last transaction has finalized, and currently i don't have to re-execute, 
             // then i can final commit and do another transaction. 
             Finalize();

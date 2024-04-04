@@ -32,14 +32,14 @@ SpectrumCacheTransaction::SpectrumCacheTransaction(Transaction&& inner, size_t i
 
 /// @brief determine transaction has to rerun
 /// @return if transaction has to rerun
-bool SpectrumCacheTransaction::HasRerunKeys() {
+bool SpectrumCacheTransaction::HasWAR() {
     auto guard = Guard{rerun_keys_mu};
     return rerun_keys.size() != 0;
 }
 
 /// @brief call the transaction to rerun providing the key that caused it
 /// @param key the key that caused rerun
-void SpectrumCacheTransaction::AddRerunKeys(const K& key, const evmc::bytes32* value, size_t version) {
+void SpectrumCacheTransaction::SetWAR(const K& key, const evmc::bytes32* value, size_t version) {
     auto guard = Guard{rerun_keys_mu};
     rerun_keys.push_back(key);
     should_wait = std::max(should_wait, version);
@@ -120,7 +120,7 @@ void SpectrumCacheTable::Put(T* tx, const K& k, const evmc::bytes32& v) {
                 DLOG(INFO) << KeyHasher()(k) % 1000 << " has read dependency " << "(" << _tx << ")" << std::endl;
                 if (_tx->id < tx->id) { ++tit; continue; }
                 DLOG(INFO) << tx->id << " abort " << _tx->id << std::endl;
-                _tx->AddRerunKeys(k, &v, tx->id);
+                _tx->SetWAR(k, &v, tx->id);
                 readers_.insert(_tx);
                 tit = rit->readers.erase(tit);
             }
@@ -131,7 +131,7 @@ void SpectrumCacheTable::Put(T* tx, const K& k, const evmc::bytes32& v) {
             DLOG(INFO) << KeyHasher()(k) % 1000 << " has read dependency " << "(" << _tx << ")" << std::endl;
             if (_tx->id < tx->id) { ++tit; continue; }
             DLOG(INFO) << tx->id << " abort " << _tx->id << std::endl;
-            _tx->AddRerunKeys(k, &v, tx->id);
+            _tx->SetWAR(k, &v, tx->id);
             readers_.insert(_tx);
             tit = _v.readers_default.erase(tit);
         }
@@ -207,9 +207,9 @@ void SpectrumCacheTable::RegretPut(T* tx, const K& k) {
                 DLOG(INFO) << KeyHasher()(k) % 1000 << " has read dependency " << "(" << _tx << ")" << std::endl;
                 if (_tx->id < tx->id) { ++tit; continue; }
                 DLOG(INFO) << tx->id << " abort " << _tx->id << std::endl;
-                _tx->AddRerunKeys(k, nullptr, tx->id);
+                _tx->SetWAR(k, nullptr, tx->id);
                 readers_->insert(_tx);
-                _tx->AddRerunKeys(k, &last_value, tx->id);
+                _tx->SetWAR(k, &last_value, tx->id);
                 tit = vit->readers.erase(tit);
             }
             break;
@@ -308,13 +308,13 @@ SpectrumCacheExecutor::SpectrumCacheExecutor(SpectrumCache& spectrum):
     stop_flag{spectrum.stop_flag},
     statistics{spectrum.statistics},
     workload{spectrum.workload},
-    last_execute{spectrum.last_execute},
+    last_executed{spectrum.last_executed},
     stop_latch{spectrum.stop_latch}
 {}
 
 /// @brief generate a transaction and execute it
 void SpectrumCacheExecutor::Generate() {
-    tx = std::make_unique<T>(workload.Next(), last_execute.fetch_add(1));
+    tx = std::make_unique<T>(workload.Next(), last_executed.fetch_add(1));
     tx->start_time = steady_clock::now();
     tx->berun_flag.store(true);
     tx->InstallSetStorageHandler([this](
@@ -322,7 +322,7 @@ void SpectrumCacheExecutor::Generate() {
         const evmc::bytes32 &key, 
         const evmc::bytes32 &value
     ) {
-        if (tx->HasRerunKeys()) { tx->Break(); }
+        if (tx->HasWAR()) { tx->Break(); }
         auto _key = std::make_tuple(addr, key);
         tx->tuples_put.push_back({
             .key = _key, 
@@ -335,7 +335,7 @@ void SpectrumCacheExecutor::Generate() {
         const evmc::address &addr, 
         const evmc::bytes32 &key
     ) {
-        if (tx->HasRerunKeys()) { tx->Break(); return evmc::bytes32{0}; }
+        if (tx->HasWAR()) { tx->Break(); return evmc::bytes32{0}; }
         auto _key  = std::make_tuple(addr, key);
         auto value = evmc::bytes32{0};
         auto version = size_t{0};
@@ -383,7 +383,7 @@ void SpectrumCacheExecutor::Generate() {
     statistics.JournalExecute();
     // commit all results if possible & necessary
     for (auto entry: tx->tuples_put) {
-        if (tx->HasRerunKeys()) { break; }
+        if (tx->HasWAR()) { break; }
         if (entry.is_committed) { continue; }
         table.Put(tx.get(), entry.key, entry.value);
         entry.is_committed = true;
@@ -425,7 +425,7 @@ void SpectrumCacheExecutor::ReExecute() {
     statistics.JournalExecute();
     // commit all results if possible & necessary
     for (auto entry: tx->tuples_put) {
-        if (tx->HasRerunKeys()) { break; }
+        if (tx->HasWAR()) { break; }
         if (entry.is_committed) { continue; }
         table.Put(tx.get(), entry.key, entry.value);
         entry.is_committed = true;
@@ -453,11 +453,11 @@ void SpectrumCacheExecutor::Run() {
     // first generate a transaction
     Generate();
     while (!stop_flag.load()) {
-        if (tx->HasRerunKeys()) {
+        if (tx->HasWAR()) {
             // if there are some re-run keys, re-execute to obtain the correct result
             ReExecute();
         }
-        else if (last_finalized.load() + 1 == tx->id && !tx->HasRerunKeys()) {
+        else if (last_finalized.load() + 1 == tx->id && !tx->HasWAR()) {
             // if last transaction has finalized, and currently i don't have to re-execute, 
             // then i can final commit and do another transaction. 
             Finalize();

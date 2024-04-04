@@ -43,8 +43,8 @@ struct SpectrumPreSchedTransaction: public Transaction {
     std::vector<SpectrumPreSchedGetTuple>       tuples_get{};
     std::vector<SpectrumPreSchedPutTuple>       tuples_put{};
     SpectrumPreSchedTransaction(Transaction&& inner, size_t id);
-    bool HasRerunKeys();
-    void AddRerunKeys(const K& key, size_t cause_id);
+    bool HasWAR();
+    void SetWAR(const K& key, size_t cause_id, bool pre_schedule);
 };
 
 struct SpectrumPreSchedEntry {
@@ -73,6 +73,15 @@ struct SpectrumPreSchedTable: private Table<K, V, KeyHasher> {
 
 };
 
+struct SpectrumPreSchedLockTable: private Table<K, V, KeyHasher> {
+
+    SpectrumPreSchedLockTable(size_t partitions);
+    void Get(T* tx, const K& k);
+    void Put(T* tx, const K& k);
+    void ClearPut(T* tx, const K& k);
+
+};
+
 using SpectrumPreSchedQueue = LockPriorityQueue<T>;
 class SpectrumPreSchedExecutor;
 
@@ -83,9 +92,11 @@ class SpectrumPreSched: public Protocol {
     Workload&               workload;
     SpectrumPreSchedTable   table;
     Statistics&             statistics;
-    std::atomic<size_t>     last_execute{1};
+    std::atomic<size_t>     last_executed{1};
     std::atomic<size_t>     last_finalized{0};
+    std::atomic<size_t>     last_scheduled{1};
     std::atomic<bool>       stop_flag{false};
+    SpectrumPreSchedLockTable                       lock_table;
     std::vector<SpectrumPreSchedQueue>              queue_bundle;
     std::vector<std::thread>                        executors{};
     std::barrier<std::function<void()>>             stop_latch;
@@ -104,10 +115,12 @@ class SpectrumPreSchedExecutor {
     Workload&               workload;
     SpectrumPreSchedTable&  table;
     Statistics&             statistics;
-    std::atomic<size_t>&    last_execute;
+    std::atomic<size_t>&    last_executed;
+    std::atomic<size_t>&    last_scheduled;
     std::atomic<size_t>&    last_finalized;
     std::atomic<bool>&      stop_flag;
     SpectrumPreSchedQueue&  queue;
+    SpectrumPreSchedLockTable&                      lock_table;
     std::vector<SpectrumPreSchedQueue>&             queue_bundle;
     std::unique_ptr<T>                              tx{nullptr};
     std::barrier<std::function<void()>>&            stop_latch;

@@ -43,8 +43,8 @@ struct SpectrumTransaction: public Transaction {
     std::vector<SpectrumGetTuple>       tuples_get{};
     std::vector<SpectrumPutTuple>       tuples_put{};
     SpectrumTransaction(Transaction&& inner, size_t id);
-    bool HasRerunKeys();
-    void AddRerunKeys(const K& key, size_t cause_id);
+    bool HasWAR();
+    void SetWAR(const K& key, size_t cause_id);
 };
 
 struct SpectrumEntry {
@@ -83,7 +83,7 @@ class Spectrum: public Protocol {
     Workload&           workload;
     SpectrumTable       table;
     Statistics&         statistics;
-    std::atomic<size_t> last_execute{1};
+    std::atomic<size_t> last_executed{1};
     std::atomic<size_t> last_finalized{0};
     std::atomic<bool>   stop_flag{false};
     std::vector<std::thread>    executors{};
@@ -103,7 +103,7 @@ class SpectrumExecutor {
     Workload&               workload;
     SpectrumTable&          table;
     Statistics&             statistics;
-    std::atomic<size_t>&    last_execute;
+    std::atomic<size_t>&    last_executed;
     std::atomic<size_t>&    last_finalized;
     std::atomic<bool>&      stop_flag;
     SpectrumQueue           queue;

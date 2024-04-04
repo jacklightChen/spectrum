@@ -51,8 +51,8 @@ struct SpectrumCacheTransaction: public Transaction {
     std::vector<SpectrumCachePutTuple>              tuples_put{};
     std::unordered_map<K, std::list<CacheTuple>, KeyHasher>    local_cache;
     SpectrumCacheTransaction(Transaction&& inner, size_t id);
-    bool HasRerunKeys();
-    void AddRerunKeys(const K& key, const evmc::bytes32* value, size_t cause_id);
+    bool HasWAR();
+    void SetWAR(const K& key, const evmc::bytes32* value, size_t cause_id);
 };
 
 struct SpectrumCacheEntry {
@@ -91,7 +91,7 @@ class SpectrumCache: public Protocol {
     Workload&           workload;
     SpectrumCacheTable  table;
     Statistics&         statistics;
-    std::atomic<size_t> last_execute{1};
+    std::atomic<size_t> last_executed{1};
     std::atomic<size_t> last_finalized{0};
     std::atomic<bool>   stop_flag{false};
     std::vector<std::thread>                executors{};
@@ -111,7 +111,7 @@ class SpectrumCacheExecutor {
     Workload&               workload;
     SpectrumCacheTable&     table;
     Statistics&             statistics;
-    std::atomic<size_t>&    last_execute;
+    std::atomic<size_t>&    last_executed;
     std::atomic<size_t>&    last_finalized;
     std::atomic<bool>&      stop_flag;
     std::unique_ptr<T>      tx{nullptr};

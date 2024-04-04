@@ -32,14 +32,14 @@ SpectrumSchedTransaction::SpectrumSchedTransaction(Transaction&& inner, size_t i
 
 /// @brief determine transaction has to rerun
 /// @return if transaction has to rerun
-bool SpectrumSchedTransaction::HasRerunKeys() {
+bool SpectrumSchedTransaction::HasWAR() {
     auto guard = Guard{rerun_keys_mu};
     return rerun_keys.size() != 0;
 }
 
 /// @brief call the transaction to rerun providing the key that caused it
 /// @param key the key that caused rerun
-void SpectrumSchedTransaction::AddRerunKeys(const K& key, size_t cause_id) {
+void SpectrumSchedTransaction::SetWAR(const K& key, size_t cause_id) {
     auto guard = Guard{rerun_keys_mu};
     rerun_keys.push_back(key);
     should_wait = std::max(should_wait, cause_id);
@@ -96,7 +96,7 @@ void SpectrumSchedTable::Put(T* tx, const K& k, const evmc::bytes32& v) {
                 DLOG(INFO) << KeyHasher()(k) % 1000 << " has read dependency " << "(" << _tx << ")" << std::endl;
                 if (_tx->id > tx->id) {
                     DLOG(INFO) << tx->id << " abort " << _tx->id << std::endl;
-                    _tx->AddRerunKeys(k, tx->id);
+                    _tx->SetWAR(k, tx->id);
                 }
             }
             break;
@@ -105,7 +105,7 @@ void SpectrumSchedTable::Put(T* tx, const K& k, const evmc::bytes32& v) {
             DLOG(INFO) << KeyHasher()(k) % 1000 << " has read dependency " << "(" << _tx << ")" << std::endl;
             if (_tx->id > tx->id) {
                 DLOG(INFO) << tx->id << " abort " << _tx->id << std::endl;
-                _tx->AddRerunKeys(k, tx->id);
+                _tx->SetWAR(k, tx->id);
             }
         }
         // handle duplicated write on the same key
@@ -174,7 +174,7 @@ void SpectrumSchedTable::RegretPut(T* tx, const K& k) {
             for (auto _tx: vit->readers) {
                 DLOG(INFO) << KeyHasher()(k) % 1000 << " has read dependency " << "(" << _tx << ")" << std::endl;
                 DLOG(INFO) << tx->id << " abort " << _tx->id << std::endl;
-                _tx->AddRerunKeys(k, tx->id);
+                _tx->SetWAR(k, tx->id);
             }
             break;
         }
@@ -272,13 +272,13 @@ SpectrumSchedExecutor::SpectrumSchedExecutor(SpectrumSched& spectrum):
     stop_flag{spectrum.stop_flag},
     statistics{spectrum.statistics},
     workload{spectrum.workload},
-    last_execute{spectrum.last_execute},
+    last_executed{spectrum.last_executed},
     stop_latch{spectrum.stop_latch}
 {}
 
 /// @brief generate a transaction and execute it
 void SpectrumSchedExecutor::Generate() {
-    tx = std::make_unique<T>(workload.Next(), last_execute.fetch_add(1));
+    tx = std::make_unique<T>(workload.Next(), last_executed.fetch_add(1));
     tx->start_time = steady_clock::now();
     tx->berun_flag.store(true);
     auto tx_ref = tx.get();
@@ -294,7 +294,7 @@ void SpectrumSchedExecutor::Generate() {
             .value = value, 
             .is_committed=false
         });
-        if (tx->HasRerunKeys()) { tx->Break(); }
+        if (tx->HasWAR()) { tx->Break(); }
         return evmc_storage_status::EVMC_STORAGE_MODIFIED;
     });
     tx->InstallGetStorageHandler([tx_ref, this](
@@ -311,7 +311,7 @@ void SpectrumSchedExecutor::Generate() {
         for (auto& tup: tx->tuples_get) {
             if (tup.key == _key) { return tup.value; }
         }
-        if (tx->HasRerunKeys()) { tx->Break(); }
+        if (tx->HasWAR()) { tx->Break(); }
         table.Get(tx, _key, value, version);
         size_t checkpoint_id = tx->MakeCheckpoint();
         tx->tuples_get.push_back({
@@ -328,7 +328,7 @@ void SpectrumSchedExecutor::Generate() {
     statistics.JournalExecute();
     // commit all results if possible & necessary
     for (auto entry: tx->tuples_put) {
-        if (tx->HasRerunKeys()) { break; }
+        if (tx->HasWAR()) { break; }
         if (entry.is_committed) { continue; }
         table.Put(tx.get(), entry.key, entry.value);
         entry.is_committed = true;
@@ -372,7 +372,7 @@ void SpectrumSchedExecutor::ReExecute() {
     statistics.JournalExecute();
     // commit all results if possible & necessary
     for (auto entry: tx->tuples_put) {
-        if (tx->HasRerunKeys()) { break; }
+        if (tx->HasWAR()) { break; }
         if (entry.is_committed) { continue; }
         table.Put(tx.get(), entry.key, entry.value);
         entry.is_committed = true;
@@ -417,10 +417,10 @@ void SpectrumSchedExecutor::Run() {
     Generate();
     while (!stop_flag.load()) {
         Schedule();
-        if (tx->HasRerunKeys()) {
+        if (tx->HasWAR()) {
             ReExecute();
         }
-        else if (last_finalized.load() + 1 == tx->id && !tx->HasRerunKeys()) {
+        else if (last_finalized.load() + 1 == tx->id && !tx->HasWAR()) {
             Finalize();
         }
     }

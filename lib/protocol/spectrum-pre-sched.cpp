@@ -1,4 +1,5 @@
 #include "evmc/evmc.hpp"
+#include <memory>
 #include <spectrum/protocol/spectrum-pre-sched.hpp>
 #include <spectrum/common/lock-util.hpp>
 #include <spectrum/common/hex.hpp>
@@ -9,6 +10,7 @@
 #include <glog/logging.h>
 #include <ranges>
 #include <fmt/core.h>
+#include <unordered_set>
 
 /*
     This is a implementation of "SpectrumPreSched: Speculative Deterministic Concurrency Control for Partially Replicated Transactional Data Stores" (Zhongmiao Li, Peter Van Roy and Paolo Romano). 
@@ -33,17 +35,138 @@ SpectrumPreSchedTransaction::SpectrumPreSchedTransaction(Transaction&& inner, si
 
 /// @brief determine transaction has to rerun
 /// @return if transaction has to rerun
-bool SpectrumPreSchedTransaction::HasRerunKeys() {
+bool SpectrumPreSchedTransaction::HasWAR() {
     auto guard = Guard{rerun_keys_mu};
     return rerun_keys.size() != 0;
 }
 
 /// @brief call the transaction to rerun providing the key that caused it
 /// @param key the key that caused rerun
-void SpectrumPreSchedTransaction::AddRerunKeys(const K& key, size_t cause_id) {
+void SpectrumPreSchedTransaction::SetWAR(const K& key, size_t cause_id, bool pre_schedule) {
     auto guard = Guard{rerun_keys_mu};
-    rerun_keys.push_back(key);
+    if (!pre_schedule) rerun_keys.push_back(key);
     should_wait = std::max(should_wait, cause_id);
+}
+
+/// @brief the multi-version table for spectrum
+/// @param partitions the number of partitions
+SpectrumPreSchedLockTable::SpectrumPreSchedLockTable(size_t partitions):
+    Table<K, V, KeyHasher>{partitions}
+{}
+
+/// @brief get a value
+/// @param tx the transaction that reads the value
+/// @param k the key of the read entry
+/// @param version (mutated to be) the version of read entry
+void SpectrumPreSchedLockTable::Get(T* tx, const K& k) {
+    Table::Put(k, [&](V& _v) {
+        auto rit = _v.entries.rbegin();
+        auto end = _v.entries.rend();
+        while (rit != end) {
+            if (rit->version > tx->id) {
+                ++rit; continue;
+            }
+            rit->readers.insert(tx);
+            DLOG(INFO) << tx->id << "(" << tx << ")" << " read " << KeyHasher()(k) % 1000 << " version " << rit->version << std::endl;
+            return;
+        }
+        DLOG(INFO) << tx->id << "(" << tx << ")" << " read " << KeyHasher()(k) % 1000 << " version 0" << std::endl;
+        _v.readers_default.insert(tx);
+    });
+}
+
+/// @brief put a value
+/// @param tx the transaction that writes the value
+/// @param k the key of the written entry
+void SpectrumPreSchedLockTable::Put(T* tx, const K& k) {
+    CHECK(tx->id > 0) << "we reserve version(0) for default value";
+    DLOG(INFO) << tx->id << "(" << tx << ")" << " write " << KeyHasher()(k) % 1000 << std::endl;
+    Table::Put(k, [&](V& _v) {
+        auto rit = _v.entries.rbegin();
+        auto end = _v.entries.rend();
+        auto readers_ = std::unordered_set<T*>();
+        // search from insertion position
+        while (rit != end) {
+            if (rit->version > tx->id) {
+                ++rit; continue;
+            }
+            // abort transactions that read outdated keys
+            for (auto it = rit->readers.begin(); it != rit->readers.end();) {
+                DLOG(INFO) << KeyHasher()(k) % 1000 << " has read dependency " << "(" << (*it) << ")" << std::endl;
+                if ((*it)->id <= tx->id) { ++it; continue; }
+                DLOG(INFO) << tx->id << " abort " << (*it)->id << std::endl;
+                (*it)->SetWAR(k, tx->id, true);
+                readers_.insert(*it);
+                it = rit->readers.erase(it);
+            }
+            break;
+        }
+        for (auto it = _v.readers_default.begin(); it != _v.readers_default.end();) {
+            DLOG(INFO) << KeyHasher()(k) % 1000 << " has read dependency " << "(" << (*it) << ")" << std::endl;
+            if ((*it)->id <= tx->id) { ++it; continue; }
+            DLOG(INFO) << tx->id << " abort " << (*it)->id << std::endl;
+            (*it)->SetWAR(k, tx->id, true);
+            readers_.insert(*it);
+            it = _v.readers_default.erase(it);
+        }
+        // handle duplicated write on the same key
+        if (rit != end && rit->version == tx->id) {
+            DCHECK(readers_.size() == 0);
+            return;
+        }
+        // insert an entry
+        _v.entries.insert(rit.base(), SpectrumPreSchedEntry {
+            .value   = evmc::bytes32{0},
+            .version = tx->id,
+            .readers = readers_
+        });
+    });
+}
+
+/// @brief remove versions preceeding current transaction
+/// @param tx the transaction the previously wrote this entry
+/// @param k the key of written entry
+void SpectrumPreSchedLockTable::ClearPut(T* tx, const K& k) {
+    DLOG(INFO) << "remove write record before " << tx->id << "(" << tx << ")" << " from " << KeyHasher()(k) % 1000 << std::endl;
+    Table::Put(k, [&](V& _v) {
+        while (_v.entries.size() && _v.entries.front().version < tx->id) {
+            _v.entries.pop_front();
+        }
+    });
+}
+/// @brief remove a read dependency from this entry
+/// @param tx the transaction that previously read this entry
+/// @param k the key of read entry
+void SpectrumPreSchedLockTable::ClearGet(T* tx, const K& k) {
+    DLOG(INFO) << "remove read record " << tx->id << "(" << tx << ")" << " from " << KeyHasher()(k) % 1000 << std::endl;
+    Table::Put(k, [&](V& _v) {
+        auto rit = _v.entries.rbegin();
+        auto end = _v.entries.rend();
+        while (rit != end) {
+            if (rit->version >= tx->id) {
+                ++rit; continue;
+            }
+            DLOG(INFO) << "remove " << tx->id << "(" << tx << ")" << " from version " << rit->version << std::endl; 
+            rit->readers.erase(tx);
+            break;
+        }
+        _v.readers_default.erase(tx);
+        // run an extra check in debug mode
+        #if !defined(NDEBUG)
+        {
+            auto end = _v.entries.end();
+            for (auto vit = _v.entries.begin(); vit != end; ++vit) {
+                DLOG(INFO) << "spot version " << vit->version << std::endl;
+                if (vit->readers.contains(tx)) {
+                    DLOG(FATAL) << "didn't remove " << tx->id << "(" << tx << ")" << " still on version " << vit->version  << std::endl;
+                }
+            }
+            if (_v.readers_default.contains(tx)) {
+                DLOG(FATAL) << "didn't remove " << tx->id << "(" << tx << ")" << " still on version 0" << std::endl;
+            }
+        }
+        #endif
+    });
 }
 
 /// @brief the multi-version table for spectrum
@@ -98,7 +221,7 @@ void SpectrumPreSchedTable::Put(T* tx, const K& k, const evmc::bytes32& v) {
                 DLOG(INFO) << KeyHasher()(k) % 1000 << " has read dependency " << "(" << _tx << ")" << std::endl;
                 if (_tx->id > tx->id) {
                     DLOG(INFO) << tx->id << " abort " << _tx->id << std::endl;
-                    _tx->AddRerunKeys(k, tx->id);
+                    _tx->SetWAR(k, tx->id, false);
                 }
             }
             break;
@@ -107,7 +230,7 @@ void SpectrumPreSchedTable::Put(T* tx, const K& k, const evmc::bytes32& v) {
             DLOG(INFO) << KeyHasher()(k) % 1000 << " has read dependency " << "(" << _tx << ")" << std::endl;
             if (_tx->id > tx->id) {
                 DLOG(INFO) << tx->id << " abort " << _tx->id << std::endl;
-                _tx->AddRerunKeys(k, tx->id);
+                _tx->SetWAR(k, tx->id, false);
             }
         }
         // handle duplicated write on the same key
@@ -176,7 +299,7 @@ void SpectrumPreSchedTable::RegretPut(T* tx, const K& k) {
             for (auto _tx: vit->readers) {
                 DLOG(INFO) << KeyHasher()(k) % 1000 << " has read dependency " << "(" << _tx << ")" << std::endl;
                 DLOG(INFO) << tx->id << " abort " << _tx->id << std::endl;
-                _tx->AddRerunKeys(k, tx->id);
+                _tx->SetWAR(k, tx->id, false);
             }
             break;
         }
@@ -242,6 +365,7 @@ SpectrumPreSched::SpectrumPreSched(Workload& workload, Statistics& statistics, s
     statistics{statistics},
     num_executors{num_executors},
     table{table_partitions},
+    lock_table{table_partitions},
     stop_latch{static_cast<ptrdiff_t>(num_executors), []{}},
     queue_bundle{num_executors}
 {
@@ -271,11 +395,13 @@ void SpectrumPreSched::Stop() {
 /// @param spectrum spectrum initialization paremeters
 SpectrumPreSchedExecutor::SpectrumPreSchedExecutor(SpectrumPreSched& spectrum, SpectrumPreSchedQueue& queue):
     table{spectrum.table},
-    last_finalized{spectrum.last_finalized},
+    lock_table{spectrum.lock_table},
     stop_flag{spectrum.stop_flag},
     statistics{spectrum.statistics},
     workload{spectrum.workload},
-    last_execute{spectrum.last_execute},
+    last_executed{spectrum.last_executed},
+    last_scheduled{spectrum.last_scheduled},
+    last_finalized{spectrum.last_finalized},
     stop_latch{spectrum.stop_latch},
     queue_bundle{spectrum.queue_bundle},
     queue{queue}
@@ -283,19 +409,30 @@ SpectrumPreSchedExecutor::SpectrumPreSchedExecutor(SpectrumPreSched& spectrum, S
 
 /// @brief generate a transaction and execute it
 void SpectrumPreSchedExecutor::Generate() {
-    while (queue.Size() == 0) {
-        auto tx = std::make_unique<T>(workload.Next(), last_execute.fetch_add(1));
-        tx->start_time = steady_clock::now();
-        auto key = ~size_t{0};
-        for (auto k: tx->predicted_get_storage) { key = std::min(k, key); }
-        for (auto k: tx->predicted_set_storage) { key = std::min(k, key); }
-        if (key <= 20) {
-            queue_bundle[key % queue_bundle.size()].Push(std::move(tx));
+    if (queue.Size() == 0) {
+        // conceptually add lock
+        auto tx = std::make_unique<T>(workload.Next(), last_executed.fetch_add(1));
+        for (auto k: tx->predicted_get_storage) {
+            auto key = std::tuple(evmc::address{0}, evmc::bytes32{k});
+            lock_table.Get(tx.get(), key);
         }
-        else {
-            queue.Push(std::move(tx));
-            break;
+        for (auto k: tx->predicted_set_storage) {
+            auto key = std::tuple(evmc::address{0}, evmc::bytes32{k});
+            lock_table.Put(tx.get(), key);
         }
+        // wait until tx->should_wait stablized
+        while (last_scheduled.load() + 1 != tx->id && !stop_flag.load()) {
+            DLOG(INFO) << tx->id << " wait should wait to finalize" << std::endl;
+            continue;
+        }
+        last_scheduled.fetch_add(1);
+        // wait until the transaction that tx->should_wait refers to finalized
+        while (last_finalized.load() < tx->should_wait && !stop_flag.load()) {
+            DLOG(INFO) << tx->id << " wait " << tx->should_wait << std::endl;
+            continue;
+        }
+        // put it in executable queue
+        queue.Push(std::move(tx));
     }
     tx = queue.Pop();
     DLOG(INFO) << "pop tx " << tx->id << " from local queue" << std::endl;
@@ -312,7 +449,7 @@ void SpectrumPreSchedExecutor::Generate() {
             .value = value, 
             .is_committed=false
         });
-        if (tx->HasRerunKeys()) {
+        if (tx->HasWAR()) {
             DLOG(INFO) << "spectrum tx " << tx->id << " break" << std::endl;
             tx->Break();
         }
@@ -351,7 +488,7 @@ void SpectrumPreSchedExecutor::Generate() {
         });
         // we have to break after make checkpoint
         //   , or we will snapshot the break signal into the checkpoint!
-        if (tx->HasRerunKeys()) {
+        if (tx->HasWAR()) {
             DLOG(INFO) << "spectrum tx " << tx->id << " break" << std::endl;
             tx->Break();
         }
@@ -361,7 +498,7 @@ void SpectrumPreSchedExecutor::Generate() {
     statistics.JournalExecute();
     // commit all results if possible & necessary
     for (auto entry: tx->tuples_put) {
-        // if (tx->HasRerunKeys()) { break; }
+        if (tx->HasWAR()) { break; }
         if (entry.is_committed) { continue; }
         table.Put(tx.get(), entry.key, entry.value);
         entry.is_committed = true;
@@ -411,7 +548,7 @@ void SpectrumPreSchedExecutor::ReExecute() {
     statistics.JournalExecute();
     // commit all results if possible & necessary
     for (auto entry: tx->tuples_put) {
-        if (tx->HasRerunKeys()) { break; }
+        if (tx->HasWAR()) { break; }
         if (entry.is_committed) { continue; }
         table.Put(tx.get(), entry.key, entry.value);
         entry.is_committed = true;
@@ -428,6 +565,14 @@ void SpectrumPreSchedExecutor::Finalize() {
     for (auto entry: tx->tuples_put) {
         table.ClearPut(tx.get(), entry.key);
     }
+    for (auto k: tx->predicted_get_storage) {
+        auto key = std::tuple(evmc::address{0}, evmc::bytes32{k});
+        lock_table.ClearGet(tx.get(), key);
+    }
+    for (auto k: tx->predicted_set_storage) {
+        auto key = std::tuple(evmc::address{0}, evmc::bytes32{k});
+        lock_table.ClearPut(tx.get(), key);
+    }
     auto latency = duration_cast<microseconds>(steady_clock::now() - tx->start_time).count();
     statistics.JournalCommit(latency);
 }
@@ -437,12 +582,12 @@ void SpectrumPreSchedExecutor::Run() {
     while (!stop_flag.load()) {
         // first generate a transaction
         Generate();
-        if (tx->HasRerunKeys()) {
+        if (tx->HasWAR()) {
             // if there are some re-run keys, re-execute to obtain the correct result
             ReExecute();
             queue.Push(std::move(tx));
         }
-        else if (last_finalized.load() + 1 == tx->id && !tx->HasRerunKeys()) {
+        else if (last_finalized.load() + 1 == tx->id && !tx->HasWAR()) {
             // if last transaction has finalized, and currently i don't have to re-execute, 
             // then i can final commit and do another transaction. 
             Finalize();

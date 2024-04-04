@@ -45,8 +45,8 @@ struct SpectrumSchedTransaction: public Transaction {
     std::vector<SpectrumSchedGetTuple>       tuples_get{};
     std::vector<SpectrumSchedPutTuple>       tuples_put{};
     SpectrumSchedTransaction(Transaction&& inner, size_t id);
-    bool HasRerunKeys();
-    void AddRerunKeys(const K& key, size_t cause_id);
+    bool HasWAR();
+    void SetWAR(const K& key, size_t cause_id);
 };
 
 struct SpectrumSchedEntry {
@@ -85,7 +85,7 @@ class SpectrumSched: public Protocol {
     Workload&           workload;
     SpectrumSchedTable  table;
     Statistics&         statistics;
-    std::atomic<size_t> last_execute{1};
+    std::atomic<size_t> last_executed{1};
     std::atomic<size_t> last_finalized{0};
     std::atomic<bool>   stop_flag{false};
     std::vector<std::thread>    executors{};
@@ -110,7 +110,7 @@ class SpectrumSchedExecutor {
     Workload&               workload;
     SpectrumSchedTable&     table;
     Statistics&             statistics;
-    std::atomic<size_t>&    last_execute;
+    std::atomic<size_t>&    last_executed;
     std::atomic<size_t>&    last_finalized;
     std::atomic<bool>&      stop_flag;
     std::set<TP, CMP>       idle_queue;

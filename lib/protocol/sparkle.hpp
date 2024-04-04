@@ -72,7 +72,7 @@ class Sparkle: public Protocol {
     Workload&           workload;
     SparkleTable        table;
     Statistics&         statistics;
-    std::atomic<size_t> last_execute{1};
+    std::atomic<size_t> last_executed{1};
     std::atomic<size_t> last_finalized{0};
     std::atomic<bool>   stop_flag{false};
     std::vector<std::thread>    executors{};
@@ -94,7 +94,7 @@ class SparkleExecutor {
     Workload&               workload;
     SparkleTable&           table;
     Statistics&             statistics;
-    std::atomic<size_t>&    last_execute;
+    std::atomic<size_t>&    last_executed;
     std::atomic<size_t>&    last_finalized;
     std::atomic<bool>&      stop_flag;
     SparkleQueue            queue;
