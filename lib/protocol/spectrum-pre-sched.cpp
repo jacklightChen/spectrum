@@ -286,21 +286,16 @@ void SpectrumPreSchedExecutor::Generate() {
     while (queue.Size() == 0) {
         auto tx = std::make_unique<T>(workload.Next(), last_execute.fetch_add(1));
         tx->start_time = steady_clock::now();
-        auto is_dispatched = false;
-        // note: when tx is moved, tx->... can no longer be accessed!
-        for (auto k: tx->predicted_get_storage) {
-            if (k >= 20 || is_dispatched) continue;
-            queue_bundle[k % queue_bundle.size()].Push(std::move(tx));
-            is_dispatched = true; break; // note: that's why we have to 'break' here
+        auto key = ~size_t{0};
+        for (auto k: tx->predicted_get_storage) { key = std::min(k, key); }
+        for (auto k: tx->predicted_set_storage) { key = std::min(k, key); }
+        if (key <= 20) {
+            queue_bundle[key % queue_bundle.size()].Push(std::move(tx));
         }
-        if (is_dispatched) continue;
-        for (auto k: tx->predicted_set_storage) {
-            if (k >= 20 || is_dispatched) continue;
-            queue_bundle[k % queue_bundle.size()].Push(std::move(tx));
-            is_dispatched = true; break;
+        else {
+            queue.Push(std::move(tx));
+            break;
         }
-        if (is_dispatched) continue;
-        queue.Push(std::move(tx));
     }
     tx = queue.Pop();
     DLOG(INFO) << "pop tx " << tx->id << " from local queue" << std::endl;
