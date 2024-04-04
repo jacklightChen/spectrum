@@ -133,10 +133,6 @@ bool SparkleTable::Lock(T* tx, const K& k) {
             _v.tx->SetRerunFlag(true);
             DLOG(INFO) << tx->id << " abort " << _v.tx->id;
         }
-        else if (_v.tx && _v.tx->id < tx->id) {
-            tx->SetRerunFlag(true);
-            DLOG(INFO) << _v.tx->id << " abort " << tx->id;
-        }
         if ((succeed = _v.tx == nullptr || _v.tx->id >= tx->id)) { _v.tx = tx; }
     });
     return succeed;
