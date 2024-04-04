@@ -431,14 +431,6 @@ void SpectrumPreSchedExecutor::Generate() {
             DLOG(INFO) << tx->id << " wait " << tx->should_wait << std::endl;
             continue;
         }
-        for (auto k: tx->predicted_get_storage) {
-            auto key = std::tuple(evmc::address{0}, evmc::bytes32{k});
-            lock_table.ClearGet(tx.get(), key);
-        }
-        for (auto k: tx->predicted_set_storage) {
-            auto key = std::tuple(evmc::address{0}, evmc::bytes32{k});
-            lock_table.ClearPut(tx.get(), key);
-        }
         // put it in executable queue
         queue.Push(std::move(tx));
     }
@@ -572,6 +564,14 @@ void SpectrumPreSchedExecutor::Finalize() {
     }
     for (auto entry: tx->tuples_put) {
         table.ClearPut(tx.get(), entry.key);
+    }
+    for (auto k: tx->predicted_get_storage) {
+        auto key = std::tuple(evmc::address{0}, evmc::bytes32{k});
+        lock_table.ClearGet(tx.get(), key);
+    }
+    for (auto k: tx->predicted_set_storage) {
+        auto key = std::tuple(evmc::address{0}, evmc::bytes32{k});
+        lock_table.ClearPut(tx.get(), key);
     }
     auto latency = duration_cast<microseconds>(steady_clock::now() - tx->start_time).count();
     statistics.JournalCommit(latency);
