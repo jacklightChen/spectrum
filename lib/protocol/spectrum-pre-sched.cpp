@@ -283,12 +283,25 @@ SpectrumPreSchedExecutor::SpectrumPreSchedExecutor(SpectrumPreSched& spectrum, S
 
 /// @brief generate a transaction and execute it
 void SpectrumPreSchedExecutor::Generate() {
-    if (queue.Size() != 0) {
-        tx = queue.Pop();
-        return;
+    while (queue.Size() == 0) {
+        auto tx = std::make_unique<T>(workload.Next(), last_execute.fetch_add(1));
+        tx->start_time = steady_clock::now();
+        auto next = false;
+        for (auto k: tx->predicted_get_storage) {
+            if (k >= 20) continue;
+            queue_bundle[k % queue_bundle.size()].Push(std::move(tx));
+            next = true; break;
+        }
+        for (auto k: tx->predicted_set_storage) {
+            if (k >= 20) continue;
+            queue_bundle[k % queue_bundle.size()].Push(std::move(tx));
+            next = true; break;
+        }
+        queue.Push(std::move(tx));
     }
-    tx = std::make_unique<T>(workload.Next(), last_execute.fetch_add(1));
-    tx->start_time = steady_clock::now();
+    tx = queue.Pop();
+    if (tx->berun_flag.load()) { return; }
+    tx->berun_flag.store(true);
     tx->InstallSetStorageHandler([this](
         const evmc::address &addr, 
         const evmc::bytes32 &key, 
@@ -345,7 +358,6 @@ void SpectrumPreSchedExecutor::Generate() {
         }
         return value;
     });
-    DLOG(INFO) << "spectrum execute " << tx->id;
     tx->Execute();
     statistics.JournalExecute();
     // commit all results if possible & necessary
