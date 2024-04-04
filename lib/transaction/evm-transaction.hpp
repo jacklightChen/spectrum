@@ -9,6 +9,7 @@
 #include <fmt/core.h>
 #include <span>
 #include <stdexcept>
+#include <unordered_set>
 #include <variant>
 #include <vector>
 
@@ -47,6 +48,8 @@ class Transaction {
     
 
     public:
+    std::unordered_set<size_t>  predicted_get_storage;
+    std::unordered_set<size_t>  predicted_set_storage;
     Transaction(EVMType evm_type, evmc::address from, evmc::address to,
                 std::span<uint8_t> code, std::span<uint8_t> input);
     void InstallSetStorageHandler(spectrum::SetStorage &&handler);
