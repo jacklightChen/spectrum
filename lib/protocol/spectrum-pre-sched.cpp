@@ -536,6 +536,7 @@ void SpectrumPreSchedExecutor::Schedule() {
     }
     INSERT(tx);
     while (!stop_flag.load() && tx == nullptr) {
+        // extract one transaction from queue
         for (auto it = idle_queue.begin(); it != idle_queue.end(); ++it) {
             if ((*it)->should_wait > last_finalized.load()) { continue; }
             tx = std::move(*it); idle_queue.erase(it);
@@ -546,14 +547,17 @@ void SpectrumPreSchedExecutor::Schedule() {
         // no available transaction, so we have to generate one!
         auto tx = std::make_unique<T>(workload.Next(), last_executed.fetch_add(1));
         tx->start_time = steady_clock::now();
+        // prepare lock table, and gather lock information
         for (auto k: tx->predicted_get_storage) {
             lock_table.Get(tx.get(), {evmc::address{0}, evmc::bytes32{k}});
         }
         for (auto k: tx->predicted_set_storage) {
             lock_table.Put(tx.get(), {evmc::address{0}, evmc::bytes32{k}});
         }
+        // wait lock table to stablize
         while (!stop_flag.load() && last_scheduled.load() + 1 != tx->id) continue;
         last_scheduled.fetch_add(1);
+        // put the generated transaction to queue
         INSERT(std::move(tx));
     }
     #undef INSERT
