@@ -99,6 +99,7 @@ class SpectrumPreSched: public Protocol {
     std::atomic<size_t>         last_executed{1};
     std::atomic<size_t>         last_finalized{0};
     std::atomic<size_t>         last_scheduled{0};
+    std::atomic<size_t>         last_committed{0};
     std::atomic<bool>           stop_flag{false};
     std::vector<std::thread>    executors{};
     std::barrier<std::function<void()>>  stop_latch;
@@ -123,6 +124,7 @@ class SpectrumPreSchedExecutor {
     std::atomic<size_t>&        last_executed;
     std::atomic<size_t>&        last_finalized;
     std::atomic<size_t>&        last_scheduled;
+    std::atomic<size_t>&        last_committed;
     std::atomic<bool>&          stop_flag;
     std::list<TP>               idle_queue;
     std::unique_ptr<T>          tx;
