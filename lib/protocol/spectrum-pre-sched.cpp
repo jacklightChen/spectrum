@@ -468,7 +468,9 @@ void SpectrumPreSchedExecutor::Execute() {
         table.Put(tx.get(), entry.key, entry.value);
         entry.is_committed = true;
     }
-    last_committed.compare_exchange_weak(tx->id, tx->id+1);
+    if (last_committed.load() == tx->id) {
+        last_committed.fetch_add(1);
+    }
 }
 
 /// @brief rollback transaction with given rollback signal
@@ -513,7 +515,9 @@ void SpectrumPreSchedExecutor::ReExecute() {
         table.Put(tx.get(), entry.key, entry.value);
         entry.is_committed = true;
     }
-    last_committed.compare_exchange_weak(tx->id, tx->id+1);
+    if (last_committed.load() == tx->id) {
+        last_committed.fetch_add(1);
+    }
 }
 
 /// @brief finalize a spectrum transaction
