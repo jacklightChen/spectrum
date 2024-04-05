@@ -4,6 +4,9 @@
 #include <glog/logging.h>
 #include <optional>
 #include <unordered_set>
+#include <iomanip>
+#include <iostream>
+#include <sstream>
 
 namespace spectrum {
 
@@ -39,9 +42,13 @@ Transaction YCSB::Next() {
         auto s = std::string{"f3d7af72"};
         auto v = std::vector<size_t>(11, 0);
         SampleUniqueN(*rng, v);
-        for (int i = 0; i <= 10; i++) { s += to_string(v[i]); }
-        for (int i = 0; i < 5; i++) predicted_get_storage.insert(v[i]);
-        for (int i = 0; i < 5; i++) predicted_set_storage.insert(v[i+5]);
+        for (int i = 0; i <= 10; i++) {
+            s += to_string(v[i]);
+            switch (i % 2) {
+                case 0: predicted_get_storage.insert(v[i]); break;
+                case 1: predicted_set_storage.insert(v[i]); break;
+            }
+        }
         return s;
     }()).value();
     #undef X

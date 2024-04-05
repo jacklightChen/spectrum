@@ -296,7 +296,7 @@ void AriaExecutor::Verify(T* tx) {
         DLOG(INFO) << "abort " << tx->batch_id << ":" << tx->id << std::endl;
     }
     else {
-        tx->flag_conflict = waw || war;
+        tx->flag_conflict = waw || raw;
         DLOG(INFO) << "abort " << tx->batch_id << ":" << tx->id << std::endl;
     }
 }
