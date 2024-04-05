@@ -44,8 +44,9 @@ struct SpectrumPreSchedTransaction: public Transaction {
     std::vector<SpectrumPreSchedGetTuple>       tuples_get{};
     std::vector<SpectrumPreSchedPutTuple>       tuples_put{};
     SpectrumPreSchedTransaction(Transaction&& inner, size_t id);
-    bool HasWAR();
-    void SetWAR(const K& key, size_t writer_id, bool pre_schedule);
+    bool    HasWAR();
+    void    SetWAR(const K& key, size_t writer_id, bool pre_schedule);
+    size_t  ShouldWait(const K& key);
 };
 
 struct SpectrumPreSchedEntry {

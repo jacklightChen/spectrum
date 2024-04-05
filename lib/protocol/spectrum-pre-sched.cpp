@@ -445,7 +445,7 @@ void SpectrumPreSchedExecutor::Execute() {
         }
         if (tx->HasWAR()) { tx->Break(); }
         // wait until the writer transcation to finalize
-        while (!stop_flag.load() && tx->ShouldWait(_key) < last_finalized.load()) continue;
+        while (!stop_flag.load() && tx->ShouldWait(_key) > last_finalized.load()) continue;
         table.Get(tx, _key, value, version);
         size_t checkpoint_id = tx->MakeCheckpoint();
         tx->tuples_get.push_back({
