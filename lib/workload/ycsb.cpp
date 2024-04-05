@@ -1,8 +1,11 @@
 #include "ycsb.hpp"
+#include "evmc/evmc.hpp"
+#include "spectrum/transaction/evm-hash.hpp"
 #include <spectrum/common/hex.hpp>
 #include <fmt/core.h>
 #include <glog/logging.h>
 #include <optional>
+#include <tuple>
 #include <unordered_set>
 #include <iomanip>
 #include <iostream>
@@ -35,8 +38,8 @@ inline std::string to_string(uint32_t key) {
 
 Transaction YCSB::Next() {
     DLOG(INFO) << "ycsb next" << std::endl;
-    auto predicted_get_storage = std::unordered_set<size_t>();
-    auto predicted_set_storage = std::unordered_set<size_t>();
+    auto predicted_get_storage = std::unordered_set<std::tuple<evmc::address, evmc::bytes32>, KeyHasher>();
+    auto predicted_set_storage = std::unordered_set<std::tuple<evmc::address, evmc::bytes32>, KeyHasher>();
     auto input = spectrum::from_hex([&]() {
         //  10 key 5 read 5 write(may be blind)
         auto s = std::string{"f3d7af72"};
@@ -45,8 +48,8 @@ Transaction YCSB::Next() {
         for (int i = 0; i <= 10; i++) {
             s += to_string(v[i]);
             switch (i % 2) {
-                case 0: predicted_get_storage.insert(v[i]); break;
-                case 1: predicted_set_storage.insert(v[i]); break;
+                case 0: predicted_get_storage.insert({evmc::address{0x1}, evmc::bytes32{v[i]}}); break;
+                case 1: predicted_set_storage.insert({evmc::address{0x1}, evmc::bytes32{v[i]}}); break;
             }
         }
         return s;

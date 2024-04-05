@@ -5,6 +5,7 @@
 #include <list>
 #include <atomic>
 #include <tuple>
+#include <unordered_map>
 #include <vector>
 #include <unordered_set>
 #include <thread>
@@ -35,16 +36,16 @@ struct SpectrumPreSchedGetTuple {
 
 struct SpectrumPreSchedTransaction: public Transaction {
     size_t      id;
-    size_t      should_wait{0};
     SpinLock            rerun_keys_mu;
     std::vector<K>      rerun_keys;
     std::atomic<bool>   berun_flag{false};
-    time_point<steady_clock>                start_time;
-    std::vector<SpectrumPreSchedGetTuple>      tuples_get{};
-    std::vector<SpectrumPreSchedPutTuple>      tuples_put{};
+    std::unordered_map<K, size_t, KeyHasher>    should_wait;
+    time_point<steady_clock>                    start_time;
+    std::vector<SpectrumPreSchedGetTuple>       tuples_get{};
+    std::vector<SpectrumPreSchedPutTuple>       tuples_put{};
     SpectrumPreSchedTransaction(Transaction&& inner, size_t id);
     bool HasWAR();
-    void SetWAR(const K& key, size_t cause_id, bool pre_schedule);
+    void SetWAR(const K& key, size_t writer_id, bool pre_schedule);
 };
 
 struct SpectrumPreSchedEntry {
