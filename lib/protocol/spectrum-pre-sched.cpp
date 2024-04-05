@@ -468,8 +468,8 @@ void SpectrumPreSchedExecutor::Execute() {
         table.Put(tx.get(), entry.key, entry.value);
         entry.is_committed = true;
     }
-    if (last_committed.load() == tx->id + 1) {
-        last_committed.fetch_add(1);
+    if (last_committed.load() < tx->id) {
+        last_committed.store(tx->id + 1);
     }
 }
 
@@ -515,8 +515,8 @@ void SpectrumPreSchedExecutor::ReExecute() {
         table.Put(tx.get(), entry.key, entry.value);
         entry.is_committed = true;
     }
-    if (last_committed.load() == tx->id + 1) {
-        last_committed.fetch_add(1);
+    if (last_committed.load() < tx->id) {
+        last_committed.store(tx->id + 1);
     }
 }
 
