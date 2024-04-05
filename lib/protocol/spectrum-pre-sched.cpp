@@ -403,6 +403,7 @@ SpectrumPreSchedExecutor::SpectrumPreSchedExecutor(SpectrumPreSched& spectrum):
     lock_table{spectrum.lock_table},
     last_finalized{spectrum.last_finalized},
     last_scheduled{spectrum.last_scheduled},
+    last_committed{spectrum.last_committed},
     stop_flag{spectrum.stop_flag},
     statistics{spectrum.statistics},
     workload{spectrum.workload},
@@ -445,7 +446,7 @@ void SpectrumPreSchedExecutor::Execute() {
         }
         if (tx->HasWAR()) { tx->Break(); }
         // wait until the writer transcation to finalize
-        while (!stop_flag.load() && tx->ShouldWait(_key) > last_finalized.load()) continue;
+        while (!stop_flag.load() && tx->ShouldWait(_key) > last_committed.load()) continue;
         table.Get(tx, _key, value, version);
         size_t checkpoint_id = tx->MakeCheckpoint();
         tx->tuples_get.push_back({
@@ -467,6 +468,7 @@ void SpectrumPreSchedExecutor::Execute() {
         table.Put(tx.get(), entry.key, entry.value);
         entry.is_committed = true;
     }
+    last_committed.compare_exchange_weak(tx->id, tx->id+1);
 }
 
 /// @brief rollback transaction with given rollback signal
@@ -511,6 +513,7 @@ void SpectrumPreSchedExecutor::ReExecute() {
         table.Put(tx.get(), entry.key, entry.value);
         entry.is_committed = true;
     }
+    last_committed.compare_exchange_weak(tx->id, tx->id+1);
 }
 
 /// @brief finalize a spectrum transaction
