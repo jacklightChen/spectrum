@@ -402,7 +402,6 @@ SpectrumPreSchedExecutor::SpectrumPreSchedExecutor(SpectrumPreSched& spectrum):
 
 /// @brief generate a transaction and execute it
 void SpectrumPreSchedExecutor::Execute() {
-    if (tx->berun_flag.load()) { return; }
     tx->berun_flag.store(true);
     auto tx_ref = tx.get();
     tx->InstallSetStorageHandler([tx_ref](
@@ -512,6 +511,12 @@ void SpectrumPreSchedExecutor::Finalize() {
     for (auto entry: tx->tuples_put) {
         table.ClearPut(tx.get(), entry.key);
     }
+    for (auto k: tx->predicted_get_storage) {
+        lock_table.ClearGet(tx.get(), {evmc::address{0}, evmc::bytes32{k}});
+    }
+    for (auto k: tx->predicted_set_storage) {
+        lock_table.ClearPut(tx.get(), {evmc::address{0}, evmc::bytes32{k}});
+    }
     auto latency = duration_cast<microseconds>(steady_clock::now() - tx->start_time).count();
     statistics.JournalCommit(latency);
     tx = nullptr;
@@ -530,7 +535,7 @@ void SpectrumPreSchedExecutor::Schedule() {
         idle_queue.insert(idle_queue.end(), std::move(tx));\
     }
     INSERT(tx);
-    while (tx == nullptr) {
+    while (!stop_flag.load() && tx == nullptr) {
         for (auto it = idle_queue.begin(); it != idle_queue.end(); ++it) {
             if ((*it)->should_wait > last_finalized.load()) { continue; }
             tx = std::move(*it); idle_queue.erase(it);
@@ -547,22 +552,23 @@ void SpectrumPreSchedExecutor::Schedule() {
         for (auto k: tx->predicted_set_storage) {
             lock_table.Put(tx.get(), {evmc::address{0}, evmc::bytes32{k}});
         }
-        while (last_scheduled.load() + 1 != tx->id) continue;
+        while (!stop_flag.load() && last_scheduled.load() + 1 != tx->id) continue;
         last_scheduled.fetch_add(1);
         INSERT(std::move(tx));
     }
     #undef INSERT
-    // if we cannot find one, we just keep the incoming one in idle_queue and generate another. 
-    Execute();
 }
 
 /// @brief start an executor
 void SpectrumPreSchedExecutor::Run() {
-    // find smallest workable transaction
-    Execute();
     while (!stop_flag.load()) {
+        // find smallest workable transaction
         Schedule();
-        if (tx->HasWAR()) {
+        if (stop_flag.load()) break;
+        if (!tx->berun_flag.load()) {
+            Execute();
+        }
+        else if (tx->HasWAR()) {
             ReExecute();
         }
         else if (last_finalized.load() + 1 == tx->id && !tx->HasWAR()) {

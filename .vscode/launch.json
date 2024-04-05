@@ -1,11 +1,11 @@
 {
     "configurations": [
         {
-            "name": "Launch (bench spectrum)",
+            "name": "Launch (bench spectrum-pre-sched)",
             "type": "lldb",
             "request": "launch",
             "program": "${workspaceFolder}/build/bin/bench",
-            "args": ["SpectrumSched:12:1024:COPYONWRITE", "YCSB:100:0.0", "1s"]
+            "args": ["SpectrumPreSched:12:1024:COPYONWRITE", "YCSB:100:0.0", "1s"]
         }
     ]
 }
