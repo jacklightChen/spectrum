@@ -39,9 +39,9 @@ struct SpectrumPreSchedTransaction: public Transaction {
     SpinLock            rerun_keys_mu;
     std::vector<K>      rerun_keys;
     std::atomic<bool>   berun_flag{false};
-    time_point<steady_clock>            start_time;
-    std::vector<SpectrumPreSchedGetTuple>       tuples_get{};
-    std::vector<SpectrumPreSchedPutTuple>       tuples_put{};
+    time_point<steady_clock>                start_time;
+    std::vector<SpectrumPreSchedGetTuple>      tuples_get{};
+    std::vector<SpectrumPreSchedPutTuple>      tuples_put{};
     SpectrumPreSchedTransaction(Transaction&& inner, size_t id);
     bool HasWAR();
     void SetWAR(const K& key, size_t cause_id, bool pre_schedule);
@@ -61,6 +61,16 @@ struct SpectrumPreSchedVersionList {
     std::unordered_set<T*>  readers_default;
 };
 
+struct SpectrumPreSchedLockTable: private Table<K, V, KeyHasher> {
+
+    SpectrumPreSchedLockTable(size_t partitions);
+    void Get(T* tx, const K& k);
+    void Put(T* tx, const K& k);
+    void ClearPut(T* tx, const K& k);
+    void ClearGet(T* tx, const K& k);
+
+};
+
 struct SpectrumPreSchedTable: private Table<K, V, KeyHasher> {
 
     SpectrumPreSchedTable(size_t partitions);
@@ -73,34 +83,23 @@ struct SpectrumPreSchedTable: private Table<K, V, KeyHasher> {
 
 };
 
-struct SpectrumPreSchedLockTable: private Table<K, V, KeyHasher> {
-
-    SpectrumPreSchedLockTable(size_t partitions);
-    void Get(T* tx, const K& k);
-    void Put(T* tx, const K& k);
-    void ClearPut(T* tx, const K& k);
-    void ClearGet(T* tx, const K& k);
-
-};
-
 using SpectrumPreSchedQueue = LockPriorityQueue<T>;
 class SpectrumPreSchedExecutor;
 
 class SpectrumPreSched: public Protocol {
 
     private:
-    size_t                  num_executors;
-    Workload&               workload;
-    SpectrumPreSchedTable   table;
-    Statistics&             statistics;
-    std::atomic<size_t>     last_executed{1};
-    std::atomic<size_t>     last_finalized{0};
-    std::atomic<size_t>     last_scheduled{0};
-    std::atomic<bool>       stop_flag{false};
-    SpectrumPreSchedLockTable                       lock_table;
-    std::vector<SpectrumPreSchedQueue>              queue_bundle;
-    std::vector<std::thread>                        executors{};
-    std::barrier<std::function<void()>>             stop_latch;
+    size_t                      num_executors;
+    Workload&                   workload;
+    SpectrumPreSchedTable       table;
+    SpectrumPreSchedLockTable   lock_table;
+    Statistics&                 statistics;
+    std::atomic<size_t>         last_executed{1};
+    std::atomic<size_t>         last_finalized{0};
+    std::atomic<size_t>         last_scheduled{0};
+    std::atomic<bool>           stop_flag{false};
+    std::vector<std::thread>    executors{};
+    std::barrier<std::function<void()>>  stop_latch;
     friend class SpectrumPreSchedExecutor;
 
     public:
@@ -112,23 +111,25 @@ class SpectrumPreSched: public Protocol {
 
 class SpectrumPreSchedExecutor {
 
+    using TP = std::unique_ptr<T>;
+
     private:
-    Workload&               workload;
-    SpectrumPreSchedTable&  table;
-    Statistics&             statistics;
-    std::atomic<size_t>&    last_executed;
-    std::atomic<size_t>&    last_scheduled;
-    std::atomic<size_t>&    last_finalized;
-    std::atomic<bool>&      stop_flag;
-    SpectrumPreSchedQueue&  queue;
-    SpectrumPreSchedLockTable&                      lock_table;
-    std::vector<SpectrumPreSchedQueue>&             queue_bundle;
-    std::unique_ptr<T>                              tx{nullptr};
-    std::barrier<std::function<void()>>&            stop_latch;
+    Workload&                   workload;
+    SpectrumPreSchedTable&      table;
+    SpectrumPreSchedLockTable&  lock_table;
+    Statistics&                 statistics;
+    std::atomic<size_t>&        last_executed;
+    std::atomic<size_t>&        last_finalized;
+    std::atomic<size_t>&        last_scheduled;
+    std::atomic<bool>&          stop_flag;
+    std::list<TP>               idle_queue;
+    std::unique_ptr<T>          tx;
+    std::barrier<std::function<void()>>& stop_latch;
 
     public:
-    SpectrumPreSchedExecutor(SpectrumPreSched& spectrum, SpectrumPreSchedQueue& queue);
+    SpectrumPreSchedExecutor(SpectrumPreSched& spectrum);
     void Finalize();
+    void Execute();
     void Schedule();
     void ReExecute();
     void Run();

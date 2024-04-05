@@ -1,6 +1,4 @@
 #include "evmc/evmc.hpp"
-#include <cstddef>
-#include <memory>
 #include <spectrum/protocol/spectrum-pre-sched.hpp>
 #include <spectrum/common/lock-util.hpp>
 #include <spectrum/common/hex.hpp>
@@ -11,11 +9,6 @@
 #include <glog/logging.h>
 #include <ranges>
 #include <fmt/core.h>
-#include <unordered_set>
-
-/*
-    This is a implementation of "SpectrumPreSched: Speculative Deterministic Concurrency Control for Partially Replicated Transactional Data Stores" (Zhongmiao Li, Peter Van Roy and Paolo Romano). 
- */
 
 namespace spectrum {
 
@@ -136,6 +129,7 @@ void SpectrumPreSchedLockTable::ClearPut(T* tx, const K& k) {
         }
     });
 }
+
 /// @brief remove a read dependency from this entry
 /// @param tx the transaction that previously read this entry
 /// @param k the key of read entry
@@ -368,8 +362,7 @@ SpectrumPreSched::SpectrumPreSched(Workload& workload, Statistics& statistics, s
     num_executors{num_executors},
     table{table_partitions},
     lock_table{table_partitions},
-    stop_latch{static_cast<ptrdiff_t>(num_executors), []{}},
-    queue_bundle{num_executors}
+    stop_latch{static_cast<ptrdiff_t>(num_executors), []{}}
 {
     LOG(INFO) << fmt::format("SpectrumPreSched(num_executors={}, table_partitions={}, evm_type={})", num_executors, table_partitions, evm_type);
     workload.SetEVMType(evm_type);
@@ -380,8 +373,8 @@ SpectrumPreSched::SpectrumPreSched(Workload& workload, Statistics& statistics, s
 void SpectrumPreSched::Start() {
     stop_flag.store(false);
     for (size_t i = 0; i != num_executors; ++i) {
-        executors.push_back(std::thread([this, i]{
-            std::make_unique<SpectrumPreSchedExecutor>(*this, queue_bundle[i])->Run();
+        executors.push_back(std::thread([this]{
+            std::make_unique<SpectrumPreSchedExecutor>(*this)->Run();
         }));
         PinRoundRobin(executors[i], i);
     }
@@ -395,110 +388,65 @@ void SpectrumPreSched::Stop() {
 
 /// @brief spectrum executor
 /// @param spectrum spectrum initialization paremeters
-SpectrumPreSchedExecutor::SpectrumPreSchedExecutor(SpectrumPreSched& spectrum, SpectrumPreSchedQueue& queue):
+SpectrumPreSchedExecutor::SpectrumPreSchedExecutor(SpectrumPreSched& spectrum):
     table{spectrum.table},
     lock_table{spectrum.lock_table},
+    last_finalized{spectrum.last_finalized},
+    last_scheduled{spectrum.last_scheduled},
     stop_flag{spectrum.stop_flag},
     statistics{spectrum.statistics},
     workload{spectrum.workload},
     last_executed{spectrum.last_executed},
-    last_scheduled{spectrum.last_scheduled},
-    last_finalized{spectrum.last_finalized},
-    stop_latch{spectrum.stop_latch},
-    queue_bundle{spectrum.queue_bundle},
-    queue{queue}
+    stop_latch{spectrum.stop_latch}
 {}
 
 /// @brief generate a transaction and execute it
-void SpectrumPreSchedExecutor::Schedule() {
-    if (tx != nullptr) {
-        queue.Push(std::move(tx));
-    }
-    if (queue.Size() == 0) {
-        // conceptually add lock
-        auto tx = std::make_unique<T>(workload.Next(), last_executed.fetch_add(1));
-        for (auto k: tx->predicted_get_storage) {
-            auto key = std::tuple(evmc::address{0}, evmc::bytes32{k});
-            lock_table.Get(tx.get(), key);
-        }
-        for (auto k: tx->predicted_set_storage) {
-            auto key = std::tuple(evmc::address{0}, evmc::bytes32{k});
-            lock_table.Put(tx.get(), key);
-        }
-        // wait until tx->should_wait stablized
-        while (last_scheduled.load() + 1 != tx->id && !stop_flag.load()) {
-            DLOG(INFO) << tx->id << " wait should wait to finalize" << std::endl;
-            continue;
-        }
-        last_scheduled.fetch_add(1);
-        // wait until the transaction that tx->should_wait refers to finalized
-        while (last_finalized.load() < tx->should_wait && !stop_flag.load()) {
-            DLOG(INFO) << tx->id << " wait " << tx->should_wait << std::endl;
-            continue;
-        }
-        // put it in executable queue
-        queue.Push(std::move(tx));
-    }
-    tx = queue.Pop();
-    DLOG(INFO) << "pop tx " << tx->id << " from local queue" << std::endl;
+void SpectrumPreSchedExecutor::Execute() {
     if (tx->berun_flag.load()) { return; }
     tx->berun_flag.store(true);
-    tx->InstallSetStorageHandler([this](
+    auto tx_ref = tx.get();
+    tx->InstallSetStorageHandler([tx_ref](
         const evmc::address &addr, 
         const evmc::bytes32 &key, 
         const evmc::bytes32 &value
     ) {
-        auto _key = std::make_tuple(addr, key);
+        auto tx = tx_ref;
+        auto _key   = std::make_tuple(addr, key);
         tx->tuples_put.push_back({
             .key = _key, 
             .value = value, 
             .is_committed=false
         });
-        if (tx->HasWAR()) {
-            DLOG(INFO) << "spectrum tx " << tx->id << " break" << std::endl;
-            tx->Break();
-        }
-        DLOG(INFO) << "tx " << tx->id <<
-            " tuples put: " << tx->tuples_put.size() <<
-            " tuples get: " << tx->tuples_get.size();
+        if (tx->HasWAR()) { tx->Break(); }
         return evmc_storage_status::EVMC_STORAGE_MODIFIED;
     });
-    tx->InstallGetStorageHandler([this](
+    tx->InstallGetStorageHandler([tx_ref, this](
         const evmc::address &addr, 
         const evmc::bytes32 &key
     ) {
-        auto _key  = std::make_tuple(addr, key);
-        auto value = evmc::bytes32{0};
+        auto tx = tx_ref;
+        auto _key   = std::make_tuple(addr, key);
+        auto value  = evmc::bytes32{0};
         auto version = size_t{0};
         for (auto& tup: tx->tuples_put | std::views::reverse) {
-            if (tup.key != _key) { continue; }
-            DLOG(INFO) << "spectrum tx " << tx->id << " has key " << KeyHasher()(_key) % 1000 << " in tuples_put. ";
-            return tup.value;
+            if (tup.key == _key) { return tup.value; }
         }
         for (auto& tup: tx->tuples_get) {
-            if (tup.key != _key) { continue; }
-            DLOG(INFO) << "spectrum tx " << tx->id << " has key " << KeyHasher()(_key) % 1000 << " in tuples_get. ";
-            return tup.value;
+            if (tup.key == _key) { return tup.value; }
         }
-        DLOG(INFO) << "tx " << tx->id << " " << 
-            " read(" << tx->tuples_get.size() << ")" << 
-            " key(" << KeyHasher()(_key) % 1000 << ")" << std::endl;
-        table.Get(tx.get(), _key, value, version);
+        if (tx->HasWAR()) { tx->Break(); }
+        table.Get(tx, _key, value, version);
+        size_t checkpoint_id = tx->MakeCheckpoint();
         tx->tuples_get.push_back({
             .key            = _key, 
             .value          = value, 
             .version        = version,
             .tuples_put_len = tx->tuples_put.size(),
-            .checkpoint_id  = tx->MakeCheckpoint()
+            .checkpoint_id  = checkpoint_id
         });
-        // we have to break after make checkpoint
-        //   , or we will snapshot the break signal into the checkpoint!
-        if (tx->HasWAR()) {
-            DLOG(INFO) << "spectrum tx " << tx->id << " break" << std::endl;
-            tx->Break();
-        }
         return value;
     });
+    DLOG(INFO) << "spectrum execute " << tx->id;
     tx->Execute();
     statistics.JournalExecute();
     // commit all results if possible & necessary
@@ -528,11 +476,8 @@ void SpectrumPreSchedExecutor::ReExecute() {
             back_to = std::min(i, back_to); break;
         }
     }
-    // good news: we don't have to rollback, so just resume execution
-    if (back_to == ~size_t{0}) {
-        DLOG(INFO) << "tx " << tx->id << " do not have to rollback" << std::endl;
-        tx->Execute(); return;
-    }
+    // good news: we don't have to rollback
+    if (back_to == ~size_t{0}) { return; }
     // bad news: we have to rollback
     auto& tup = tx->tuples_get[back_to];
     tx->ApplyCheckpoint(tup.checkpoint_id);
@@ -546,9 +491,6 @@ void SpectrumPreSchedExecutor::ReExecute() {
     }
     tx->tuples_put.resize(tup.tuples_put_len);
     tx->tuples_get.resize(back_to);
-    DLOG(INFO) << "tx " << tx->id <<
-        " tuples put: " << tx->tuples_put.size() <<
-        " tuples get: " << tx->tuples_get.size();
     tx->Execute();
     statistics.JournalExecute();
     // commit all results if possible & necessary
@@ -570,30 +512,60 @@ void SpectrumPreSchedExecutor::Finalize() {
     for (auto entry: tx->tuples_put) {
         table.ClearPut(tx.get(), entry.key);
     }
-    for (auto k: tx->predicted_get_storage) {
-        auto key = std::tuple(evmc::address{0}, evmc::bytes32{k});
-        lock_table.ClearGet(tx.get(), key);
-    }
-    for (auto k: tx->predicted_set_storage) {
-        auto key = std::tuple(evmc::address{0}, evmc::bytes32{k});
-        lock_table.ClearPut(tx.get(), key);
-    }
     auto latency = duration_cast<microseconds>(steady_clock::now() - tx->start_time).count();
     statistics.JournalCommit(latency);
+    tx = nullptr;
+}
+
+/// @brief schedule a transaction (put back to queue, swap a nullptr into it)
+void SpectrumPreSchedExecutor::Schedule() {
+    #define INSERT(tx) \
+    if (tx != nullptr) {\
+        for (auto it = idle_queue.begin(); it != idle_queue.end(); ++it) {\
+            if ((*it)->id < tx->id) continue;\
+            idle_queue.insert(it, std::move(tx)); break; \
+        }\
+    }\
+    if (tx != nullptr) {\
+        idle_queue.insert(idle_queue.end(), std::move(tx));\
+    }
+    INSERT(tx);
+    while (tx == nullptr) {
+        for (auto it = idle_queue.begin(); it != idle_queue.end(); ++it) {
+            if ((*it)->should_wait > last_finalized.load()) { continue; }
+            tx = std::move(*it); idle_queue.erase(it);
+            DLOG(INFO) << "spectrum schedule " << tx->id << std::endl;
+            break;
+        }
+        if (tx != nullptr) break;
+        // no available transaction, so we have to generate one!
+        auto tx = std::make_unique<T>(workload.Next(), last_executed.fetch_add(1));
+        tx->start_time = steady_clock::now();
+        for (auto k: tx->predicted_get_storage) {
+            lock_table.Get(tx.get(), {evmc::address{0}, evmc::bytes32{k}});
+        }
+        for (auto k: tx->predicted_set_storage) {
+            lock_table.Put(tx.get(), {evmc::address{0}, evmc::bytes32{k}});
+        }
+        while (last_scheduled.load() + 1 != tx->id) continue;
+        last_scheduled.fetch_add(1);
+        INSERT(std::move(tx));
+    }
+    #undef INSERT
+    // if we cannot find one, we just keep the incoming one in idle_queue and generate another. 
+    Execute();
 }
 
 /// @brief start an executor
 void SpectrumPreSchedExecutor::Run() {
+    // find smallest workable transaction
+    Execute();
     while (!stop_flag.load()) {
-        // first generate a transaction
         Schedule();
         if (tx->HasWAR()) {
-            // if there are some re-run keys, re-execute to obtain the correct result
             ReExecute();
         }
         else if (last_finalized.load() + 1 == tx->id && !tx->HasWAR()) {
-            // if last transaction has finalized, and currently i don't have to re-execute, 
-            // then i can final commit and do another transaction. 
             Finalize();
         }
     }
