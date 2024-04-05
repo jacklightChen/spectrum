@@ -154,7 +154,7 @@ GitHub(
 if(NDEBUG)
     add_compile_options(
         -O3 -Werror -Wno-attributes
-        -DNDEBUG -g
+        -DNDEBUG
         -DPROJECT_VERSION=""
         -DEVMONE_X86_64_ARCH_LEVEL=2
     )
@@ -162,7 +162,7 @@ else()
     add_compile_options(-fsanitize=address)
     add_link_options(-fsanitize=address)
     add_compile_options(
-        -O0 -g -Werror -Wno-attributes
+        -O0 -ggdb -Werror -Wno-attributes
         -DPROJECT_VERSION=""
         -DEVMONE_X86_64_ARCH_LEVEL=2
     )

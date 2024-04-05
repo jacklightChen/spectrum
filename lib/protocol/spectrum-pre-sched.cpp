@@ -1,4 +1,5 @@
 #include "evmc/evmc.hpp"
+#include <cstddef>
 #include <memory>
 #include <spectrum/protocol/spectrum-pre-sched.hpp>
 #include <spectrum/common/lock-util.hpp>
@@ -67,6 +68,7 @@ void SpectrumPreSchedLockTable::Get(T* tx, const K& k) {
                 ++rit; continue;
             }
             rit->readers.insert(tx);
+            tx->SetWAR(k, rit->version, true);
             DLOG(INFO) << tx->id << "(" << tx << ")" << " read " << KeyHasher()(k) % 1000 << " version " << rit->version << std::endl;
             return;
         }
@@ -408,7 +410,10 @@ SpectrumPreSchedExecutor::SpectrumPreSchedExecutor(SpectrumPreSched& spectrum, S
 {}
 
 /// @brief generate a transaction and execute it
-void SpectrumPreSchedExecutor::Generate() {
+void SpectrumPreSchedExecutor::Schedule() {
+    if (tx != nullptr) {
+        queue.Push(std::move(tx));
+    }
     if (queue.Size() == 0) {
         // conceptually add lock
         auto tx = std::make_unique<T>(workload.Next(), last_executed.fetch_add(1));
@@ -581,19 +586,15 @@ void SpectrumPreSchedExecutor::Finalize() {
 void SpectrumPreSchedExecutor::Run() {
     while (!stop_flag.load()) {
         // first generate a transaction
-        Generate();
+        Schedule();
         if (tx->HasWAR()) {
             // if there are some re-run keys, re-execute to obtain the correct result
             ReExecute();
-            queue.Push(std::move(tx));
         }
         else if (last_finalized.load() + 1 == tx->id && !tx->HasWAR()) {
             // if last transaction has finalized, and currently i don't have to re-execute, 
             // then i can final commit and do another transaction. 
             Finalize();
-        }
-        else {
-            queue.Push(std::move(tx));
         }
     }
     stop_latch.arrive_and_wait();

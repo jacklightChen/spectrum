@@ -8,8 +8,6 @@
 #include <vector>
 #include <unordered_set>
 #include <thread>
-#include <queue>
-#include <optional>
 #include <barrier>
 
 namespace spectrum {
@@ -41,9 +39,9 @@ struct SpectrumSchedTransaction: public Transaction {
     SpinLock            rerun_keys_mu;
     std::vector<K>      rerun_keys;
     std::atomic<bool>   berun_flag{false};
-    time_point<steady_clock>            start_time;
-    std::vector<SpectrumSchedGetTuple>       tuples_get{};
-    std::vector<SpectrumSchedPutTuple>       tuples_put{};
+    time_point<steady_clock>                start_time;
+    std::vector<SpectrumSchedGetTuple>      tuples_get{};
+    std::vector<SpectrumSchedPutTuple>      tuples_put{};
     SpectrumSchedTransaction(Transaction&& inner, size_t id);
     bool HasWAR();
     void SetWAR(const K& key, size_t cause_id);
@@ -102,9 +100,6 @@ class SpectrumSched: public Protocol {
 class SpectrumSchedExecutor {
 
     using TP = std::unique_ptr<T>;
-    struct CMP {
-        bool operator()(const TP& a, const TP& b) const { return a->id < b->id; }
-    };
 
     private:
     Workload&               workload;
@@ -113,7 +108,7 @@ class SpectrumSchedExecutor {
     std::atomic<size_t>&    last_executed;
     std::atomic<size_t>&    last_finalized;
     std::atomic<bool>&      stop_flag;
-    std::set<TP, CMP>       idle_queue;
+    std::list<TP>           idle_queue;
     std::unique_ptr<T>      tx;
     std::barrier<std::function<void()>>& stop_latch;
 

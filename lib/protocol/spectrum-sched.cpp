@@ -9,10 +9,6 @@
 #include <ranges>
 #include <fmt/core.h>
 
-/*
-    This is a implementation of "SpectrumSched: Speculative Deterministic Concurrency Control for Partially Replicated Transactional Data Stores" (Zhongmiao Li, Peter Van Roy and Paolo Romano). 
- */
-
 namespace spectrum {
 
 using namespace std::chrono;
@@ -398,14 +394,20 @@ void SpectrumSchedExecutor::Finalize() {
 void SpectrumSchedExecutor::Schedule() {
     // find the earliest transaction that is waited
     if (tx != nullptr) {
-        idle_queue.insert(std::move(tx));
+        for (auto it = idle_queue.begin(); it != idle_queue.end(); ++it) {
+            if ((*it)->id < tx->id) continue;
+            idle_queue.insert(it, std::move(tx)); break; 
+        }
+    }
+    if (tx != nullptr) {
+        idle_queue.insert(idle_queue.end(), std::move(tx));
     }
     auto mark = last_finalized.load();
     for (auto it = idle_queue.begin(); it != idle_queue.end(); ++it) {
         if ((*it)->should_wait > mark) { continue; }
-        tx = std::move(const_cast<TP&>(*it));
+        tx = std::move(*it); idle_queue.erase(it);
         DLOG(INFO) << "spectrum schedule " << tx->id << std::endl;
-        idle_queue.erase(it); return;
+        return;
     }
     // if we cannot find one, we just keep the incoming one in idle_queue and generate another. 
     Generate();

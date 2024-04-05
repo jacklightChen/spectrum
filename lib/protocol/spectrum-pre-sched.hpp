@@ -129,7 +129,7 @@ class SpectrumPreSchedExecutor {
     public:
     SpectrumPreSchedExecutor(SpectrumPreSched& spectrum, SpectrumPreSchedQueue& queue);
     void Finalize();
-    void Generate();
+    void Schedule();
     void ReExecute();
     void Run();
 
