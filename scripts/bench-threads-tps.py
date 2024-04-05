@@ -10,7 +10,7 @@ from plot.plot import MyPlot
 
 keys = 1000000
 workload = 'YCSB'
-zipf = 0.99
+zipf = 1.2
 times_to_tun = 2
 timestamp = int(time.time())
 
@@ -23,12 +23,12 @@ if __name__ == '__main__':
         for num_threads in list(range(6, 42, 6)):
             table_partitions    = 9973
             protocols       = [
-                f"Calvin:{num_threads}:{table_partitions}:{batch_size // num_threads}",
-                f"Aria:{num_threads}:{table_partitions}:{batch_size // num_threads}:FALSE", 
-                f"Aria:{num_threads}:{table_partitions}:{batch_size // num_threads}:TRUE",
+                # f"Calvin:{num_threads}:{table_partitions}:{batch_size // num_threads}",
+                # f"Aria:{num_threads}:{table_partitions}:{batch_size // num_threads}:FALSE", 
+                # f"Aria:{num_threads}:{table_partitions}:{batch_size // num_threads}:TRUE",
                 f"Sparkle:{num_threads}:{table_partitions}", 
                 f"Spectrum:{num_threads}:{table_partitions}:COPYONWRITE",
-                # f"SpectrumSched:{num_threads}:{table_partitions}:COPYONWRITE",
+                f"SpectrumPreSched:{num_threads}:{table_partitions}:COPYONWRITE",
                 # f"Dummy:{num_threads}:{table_partitions}:COPYONWRITE",
                 # f"Serial:BASIC:{1}",
             ]

@@ -9,6 +9,7 @@
 #include <glog/logging.h>
 #include <ranges>
 #include <fmt/core.h>
+#include <iostream>
 
 namespace spectrum {
 
@@ -446,7 +447,10 @@ void SpectrumPreSchedExecutor::Execute() {
         }
         if (tx->HasWAR()) { tx->Break(); }
         // wait until the writer transcation to finalize
-        while (!stop_flag.load() && tx->ShouldWait(_key) > last_committed.load()) continue;
+        while (!stop_flag.load() && tx->ShouldWait(_key) > last_committed.load()) {
+            std::this_thread::sleep_for(std::chrono::nanoseconds(10));
+            continue;
+        }
         table.Get(tx, _key, value, version);
         size_t checkpoint_id = tx->MakeCheckpoint();
         tx->tuples_get.push_back({
