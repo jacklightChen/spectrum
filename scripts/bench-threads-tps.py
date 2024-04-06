@@ -10,7 +10,7 @@ from plot.plot import MyPlot
 
 keys = 1000000
 workload = 'YCSB'
-zipf = 1.2
+zipf = 0.99
 times_to_tun = 2
 timestamp = int(time.time())
 

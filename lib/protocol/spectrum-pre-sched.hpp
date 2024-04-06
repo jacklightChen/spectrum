@@ -120,6 +120,7 @@ class SpectrumPreSchedExecutor {
     Workload&                   workload;
     SpectrumPreSchedTable&      table;
     SpectrumPreSchedLockTable&  lock_table;
+    SpectrumPreSchedQueue       queue;
     Statistics&                 statistics;
     std::atomic<size_t>&        last_executed;
     std::atomic<size_t>&        last_finalized;

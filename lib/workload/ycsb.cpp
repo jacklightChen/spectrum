@@ -87,7 +87,7 @@ Transaction YCSB::Next() {
         SampleUniqueN(*rng, v);
         for (int i = 0; i <= 10; i++) {
             s += to_string(v[i]);
-            if(v[i] >= 1 && v[i] <= 1){
+            if(v[i] >= 5 && v[i] <= 7){
                 switch (i % 2) {
                     case 0: predicted_get_storage.insert({evmc::address{0x1}, pred_keys[v[i]]}); break;
                     case 1: predicted_set_storage.insert({evmc::address{0x1}, pred_keys[v[i]]}); break;

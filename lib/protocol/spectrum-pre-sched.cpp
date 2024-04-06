@@ -38,8 +38,11 @@ bool SpectrumPreSchedTransaction::HasWAR() {
 /// @brief call the transaction to rerun providing the key that caused it
 /// @param key the key that caused rerun
 void SpectrumPreSchedTransaction::SetWAR(const K& key, size_t writer_id, bool pre_schedule) {
-    auto guard = Guard{rerun_keys_mu};
-    if (!pre_schedule) rerun_keys.push_back(key);
+    if (!pre_schedule) {
+        auto guard = Guard{rerun_keys_mu};
+        rerun_keys.push_back(key);
+        return;
+    }
     if (should_wait.contains(key)) {
         should_wait[key] = std::max(should_wait[key], writer_id);
     }
@@ -49,7 +52,7 @@ void SpectrumPreSchedTransaction::SetWAR(const K& key, size_t writer_id, bool pr
 }
 
 size_t SpectrumPreSchedTransaction::ShouldWait(const K& key) {
-    auto guard = Guard{rerun_keys_mu};
+    // auto guard = Guard{rerun_keys_mu};
     return should_wait.contains(key) ? should_wait[key] : 0;
 }
 
@@ -447,8 +450,7 @@ void SpectrumPreSchedExecutor::Execute() {
         }
         if (tx->HasWAR()) { tx->Break(); }
         // wait until the writer transcation to finalize
-        while (!stop_flag.load() && tx->ShouldWait(_key) > last_committed.load()) {
-            std::this_thread::sleep_for(std::chrono::nanoseconds(10));
+        while (!stop_flag.load() && tx->ShouldWait(_key) > last_finalized.load()) {
             continue;
         }
         table.Get(tx, _key, value, version);
@@ -472,9 +474,9 @@ void SpectrumPreSchedExecutor::Execute() {
         table.Put(tx.get(), entry.key, entry.value);
         entry.is_committed = true;
     }
-    if (last_committed.load() < tx->id) {
-        last_committed.store(tx->id + 1);
-    }
+    // if (last_committed.load() < tx->id) {
+    //     last_committed.store(tx->id + 1);
+    // }
 }
 
 /// @brief rollback transaction with given rollback signal
@@ -519,9 +521,9 @@ void SpectrumPreSchedExecutor::ReExecute() {
         table.Put(tx.get(), entry.key, entry.value);
         entry.is_committed = true;
     }
-    if (last_committed.load() < tx->id) {
-        last_committed.store(tx->id + 1);
-    }
+    // if (last_committed.load() < tx->id) {
+    //     last_committed.store(tx->id + 1);
+    // }
 }
 
 /// @brief finalize a spectrum transaction
