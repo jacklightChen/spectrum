@@ -309,7 +309,7 @@ SparkleExecutor::SparkleExecutor(Sparkle& sparkle):
 
 /// @brief generate a transaction and execute it
 void SparkleExecutor::Generate() {
-    if (queue.Size() != 0) { this->tx = queue.Pop(); return; }
+    if(tx != nullptr) return;
     tx = std::make_unique<T>(workload.Next(), last_executed.fetch_add(1));
     tx->start_time = steady_clock::now();
     tx->InstallSetStorageHandler([this](
@@ -401,6 +401,7 @@ void SparkleExecutor::Finalize() {
     }
     auto latency = duration_cast<microseconds>(steady_clock::now() - tx->start_time).count();
     statistics.JournalCommit(latency);
+    tx = nullptr;
 }
 
 /// @brief start an executor
@@ -409,13 +410,9 @@ void SparkleExecutor::Run() {
         Generate();
         if (tx->HasRerunFlag()) {
             ReExecute();
-            queue.Push(std::move(this->tx));
         }
         else if (last_finalized.load() + 1 == tx->id && !tx->HasRerunFlag()) {
             Finalize();
-        }
-        else {
-            queue.Push(std::move(this->tx));
         }
     }
     stop_latch.arrive_and_wait();
