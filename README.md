@@ -1,12 +1,3 @@
-# Implementation Roadmap
-
-- [x] Zipf
-- [x] Aria w/o Reordering
-- [x] Calvin
-- [x] Serial
-- [ ] TPC-C
-- [ ] Pre-scheduling
-
 # Building Instructions
 
 We use `cmake` as the building system.

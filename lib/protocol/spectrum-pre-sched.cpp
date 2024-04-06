@@ -11,6 +11,10 @@
 #include <fmt/core.h>
 #include <iostream>
 
+/*
+    This is a implementation of "Spectrum: Speedy and Strictly-Deterministic Smart Contract Transactions for Blockchain Ledgers" (Zhihao Chen, Tianji Yang, Yixiao Zheng, Zhao Zhang, Cheqing Jin and Aoying Zhou). 
+ */
+
 namespace spectrum {
 
 using namespace std::chrono;
@@ -544,13 +548,13 @@ void SpectrumPreSchedExecutor::Finalize() {
     }
     auto latency = duration_cast<microseconds>(steady_clock::now() - tx->start_time).count();
     statistics.JournalCommit(latency);
-    tx = nullptr;
+    // tx = nullptr;
 }
 
 /// @brief schedule a transaction (put back to queue, swap a nullptr into it)
 void SpectrumPreSchedExecutor::Schedule() {
-    if (tx != nullptr) return;
     // no available transaction, so we have to generate one!
+    if(queue.Size() != 0) { tx = queue.Pop(); return; }
     tx = std::make_unique<T>(workload.Next(), last_executed.fetch_add(1));
     tx->start_time = steady_clock::now();
     // prepare lock table, and gather lock information
@@ -565,6 +569,7 @@ void SpectrumPreSchedExecutor::Schedule() {
     last_scheduled.fetch_add(1);
 }
 
+
 /// @brief start an executor
 void SpectrumPreSchedExecutor::Run() {
     while (!stop_flag.load()) {
@@ -573,11 +578,14 @@ void SpectrumPreSchedExecutor::Run() {
         if (!tx->berun_flag.load()) {
             Execute();
         }
-        else if (tx->HasWAR()) {
+        if (tx->HasWAR()) {
             ReExecute();
+            queue.Push(std::move(tx));
         }
         else if (last_finalized.load() + 1 == tx->id && !tx->HasWAR()) {
             Finalize();
+        }else {
+            queue.Push(std::move(tx));
         }
     }
     stop_latch.arrive_and_wait();

@@ -120,15 +120,15 @@ class SpectrumPreSchedExecutor {
     Workload&                   workload;
     SpectrumPreSchedTable&      table;
     SpectrumPreSchedLockTable&  lock_table;
-    SpectrumPreSchedQueue       queue;
     Statistics&                 statistics;
     std::atomic<size_t>&        last_executed;
     std::atomic<size_t>&        last_finalized;
     std::atomic<size_t>&        last_scheduled;
     std::atomic<size_t>&        last_committed;
     std::atomic<bool>&          stop_flag;
+    SpectrumPreSchedQueue       queue;
     std::list<TP>               idle_queue;
-    std::unique_ptr<T>          tx;
+    std::unique_ptr<T>          tx{nullptr};
     std::barrier<std::function<void()>>& stop_latch;
 
     public:
