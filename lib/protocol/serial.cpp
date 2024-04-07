@@ -40,7 +40,7 @@ void Serial::Start() {
         for (size_t i = 0; i < repeat; ++i) {
             transaction.Execute();
             statistics.JournalExecute();
-            statistics.JournalCommit(duration_cast<milliseconds>(steady_clock::now() - start_time).count());
+            statistics.JournalCommit(duration_cast<microseconds>(steady_clock::now() - start_time).count());
         }
     }});
 }
