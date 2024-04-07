@@ -1,10 +1,95 @@
 #include <spectrum/workload/tpcc.hpp>
+#include <spectrum/common/hex.hpp>
+#include <fmt/core.h>
+#include <glog/logging.h>
+#include <optional>
+#include <iomanip>
+#include <iostream>
+#include <sstream>
+
+const static char* CODE = 
+    #include "../../contracts/tpcc.bin"
+;
 
 namespace spectrum {
 
-TPCC::TPCC(size_t scale_factor, size_t num_warehouses):
-    scale_factor{scale_factor},
-    num_warehouses{num_warehouses}
-{}
+// we fix warehouse = 0, district = 0 now
+TPCC::TPCC(size_t num_items, size_t num_orders):
+    evm_type{EVMType::STRAWMAN},
+    rng{std::unique_ptr<Random>(new ThreadLocalRandom([&]{return (
+        std::unique_ptr<Random>(new Unif(num_items))
+    );}, std::thread::hardware_concurrency()))},
+    num_orders{num_orders}
+{
+    LOG(INFO) << fmt::format("TPCC({}, {})", num_items, num_orders);
+    this->code = spectrum::from_hex(std::string{CODE}).value();
+}
+
+void TPCC::SetEVMType(EVMType ty) { this->evm_type = ty; }
+
+inline std::string to_hex_string(uint32_t key) {
+    auto ss = std::ostringstream();
+    ss << std::hex << std::setw(64) << std::setfill('0') << key;
+    return ss.str();
+}
+
+std::basic_string<uint8_t> TPCC::NewOrder() { return spectrum::from_hex([&]() {
+    auto s = std::string{"fb2bdc7d"};
+    // fix warehouse = 0
+    auto w_id = to_hex_string(0);
+    // fix district = 0
+    auto d_id = to_hex_string(0);
+    s = s + w_id + d_id;
+    // customer id and order entry date are random now
+    auto c_id = rng->Next();
+    auto o_entry_d = rng->Next();
+    s = s + to_hex_string(c_id) + to_hex_string(o_entry_d);
+    // compute last three params index
+    // the first index are fixed: 224
+    auto i_ids_idx_num = 224;
+    auto i_w_ids_idx_num = i_ids_idx_num + 32 * (num_orders + 1);
+    auto i_qtys_idx_num = i_w_ids_idx_num + 32 * (num_orders + 1);
+    auto i_ids_idx = to_hex_string(i_ids_idx_num);
+    auto i_w_ids_idx = to_hex_string(i_w_ids_idx_num);
+    auto i_qtys_idx = to_hex_string(i_qtys_idx_num);
+    s = s + i_ids_idx + i_w_ids_idx + i_qtys_idx;
+    // generate num_orders random items
+    auto i_ids = std::vector<size_t>(num_orders, 0);
+    SampleUniqueN(*rng, i_ids);
+    s += to_hex_string(num_orders);
+    for (int i = 0; i < num_orders; i++) { s += to_hex_string(i_ids[i]); }
+    // fix all items' warehouse id to 0
+    auto i_w_ids = std::vector<size_t>(num_orders, 0);
+    s += to_hex_string(num_orders);
+    for (int i = 0; i < num_orders; i++) { s += to_hex_string(i_w_ids[i]); }
+    // fix all items' quantity to 1
+    auto i_qtys = std::vector<size_t>(num_orders, 1);
+    s += to_hex_string(num_orders);
+    for (int i = 0; i < num_orders; i++) { s += to_hex_string(i_qtys[i]); }
+    // LOG(ERROR) << s;
+    return s;
+}()).value(); }
+
+std::basic_string<uint8_t> TPCC::Payment() { return spectrum::from_hex([&]() {
+    auto s = std::string{"7c3f9309"};
+    // customer id and h_amount are random now, h_amount is in [0, 1000)
+    auto c_id = rng->Next();
+    auto h_amount = rng->Next() % 1000;
+    s = s + to_hex_string(c_id) + to_hex_string(h_amount);
+    // LOG(ERROR) << s;
+    return s;
+}()).value(); }
+
+Transaction TPCC::Next() {
+    auto option = rng->Next() % 2;
+    if (option < 1) {
+        auto input = NewOrder();
+        return Transaction(this->evm_type, evmc::address{0x1}, evmc::address{0x1}, std::span{code}, std::span{input});
+    }
+    else {
+        auto input = Payment();
+        return Transaction(this->evm_type, evmc::address{0x1}, evmc::address{0x1}, std::span{code}, std::span{input});
+    }
+}
 
 } // namespace spectrum

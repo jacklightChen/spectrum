@@ -11,6 +11,7 @@
 #include <spectrum/workload/abstraction.hpp>
 #include <spectrum/workload/smallbank.hpp>
 #include <spectrum/workload/ycsb.hpp>
+#include <spectrum/workload/tpcc.hpp>
 #include "macros.hpp"
 #include <ranges>
 #include <iostream>
@@ -91,6 +92,7 @@ inline std::unique_ptr<Workload> ParseWorkload(const char* arg) {
     };
     OPT(Smallbank, INT, DOUBLE)
     OPT(YCSB     , INT, DOUBLE)
+    OPT(TPCC     , INT, INT)
     #undef OPT
     // fallback to an error
     THROW("unknown workload option ({})", std::string{name});
