@@ -154,7 +154,7 @@ GitHub(
 if(NDEBUG)
     add_compile_options(
         -O3 -Werror -Wno-attributes
-        -DNDEBUG
+        -DNDEBUG=1
         -DPROJECT_VERSION=""
         -DEVMONE_X86_64_ARCH_LEVEL=2
     )
@@ -178,12 +178,12 @@ file(GLOB_RECURSE INC_TEST lib/*.test.hpp lib/*.test.h)
 list(REMOVE_ITEM SRC ${SRC_TEST}) # remove *.test.cpp and *.test.hpp from target
 list(REMOVE_ITEM INC ${INC_TEST})
 
-foreach(F ${INC}) # headers
+foreach(F ${INC}) # copy headers
     file(RELATIVE_PATH R ${CMAKE_CURRENT_SOURCE_DIR}/lib ${F})
     configure_file(lib/${R} include/spectrum/${R} COPYONLY)
 endforeach(F R)
 
-add_library(spectrum SHARED ${SRC})
+add_library(spectrum STATIC ${SRC})
 
 target_include_directories(
     spectrum
