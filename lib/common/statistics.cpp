@@ -100,7 +100,7 @@ std::string Statistics::PrintWithDuration(std::chrono::milliseconds duration) {
         "duration      {}\n"
         "commit        {:.4f} tx/s\n"
         "execution     {:.4f} tx/s\n"
-        "operation          {}\n"
+        "operation     {:.4f} op/s\n"
         "25us          {:.4f} tx/s\n"
         "50us          {:.4f} tx/s\n"
         "100us         {:.4f} tx/s\n"
