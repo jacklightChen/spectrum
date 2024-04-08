@@ -95,6 +95,7 @@ std::string Statistics::PrintWithDuration(std::chrono::milliseconds duration) {
         "duration      {}\n"
         "commit        {:.4f} tx/s\n"
         "execution     {:.4f} tx/s\n"
+        "operation          {}\n"
         "25us          {:.4f} tx/s\n"
         "50us          {:.4f} tx/s\n"
         "100us         {:.4f} tx/s\n"
@@ -107,6 +108,7 @@ std::string Statistics::PrintWithDuration(std::chrono::milliseconds duration) {
         duration,
         AVG(count_commit),
         AVG(count_execution),
+        AVG(count_operation),
         AVG(count_latency_25us),
         AVG(count_latency_50us),
         AVG(count_latency_100us),
