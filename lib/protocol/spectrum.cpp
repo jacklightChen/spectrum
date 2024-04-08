@@ -346,7 +346,7 @@ void SpectrumExecutor::Generate() {
     statistics.JournalOperations(tx->CountOperations());
     // commit all results if possible & necessary
     for (auto entry: tx->tuples_put) {
-        // if (tx->HasWAR()) { break; }
+        if (tx->HasWAR()) { break; }
         if (entry.is_committed) { continue; }
         table.Put(tx.get(), entry.key, entry.value);
         entry.is_committed = true;
