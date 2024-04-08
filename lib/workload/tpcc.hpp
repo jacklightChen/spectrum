@@ -11,6 +11,7 @@ class TPCC : public Workload {
     std::unique_ptr<Random>     rng;
     size_t                      num_items;
     size_t                      num_orders;
+    std::atomic<size_t>         order_count{0};
     std::atomic<bool>           is_first_transaction;
     std::basic_string<uint8_t> CreateTable();
     std::basic_string<uint8_t> Payment();

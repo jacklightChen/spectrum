@@ -33,6 +33,10 @@ inline std::string to_hex_string(uint32_t key) {
     return ss.str();
 }
 
+inline size_t non_uniform(Random &rng, size_t A, size_t x, size_t y) {
+    return (((rng.Next() % A) | (rng.Next() % y + x)) % (y - x + 1)) + x;
+}
+
 std::basic_string<uint8_t> TPCC::NewOrder() { return spectrum::from_hex([&]() {
     auto s = std::string{"fb2bdc7d"};
     // fix warehouse = 0
@@ -40,9 +44,10 @@ std::basic_string<uint8_t> TPCC::NewOrder() { return spectrum::from_hex([&]() {
     // fix district = 0
     auto d_id = to_hex_string(0);
     s = s + w_id + d_id;
-    // customer id and order entry date are random now
-    auto c_id = rng->Next();
-    auto o_entry_d = rng->Next();
+    // customer id are random now
+    auto c_id = non_uniform(*rng, 1023, 1, 3000);
+    // order entry date is the order count
+    auto o_entry_d = order_count.fetch_add(1);
     s = s + to_hex_string(c_id) + to_hex_string(o_entry_d);
     // compute last three params index
     // the first index are fixed: 224
@@ -55,7 +60,7 @@ std::basic_string<uint8_t> TPCC::NewOrder() { return spectrum::from_hex([&]() {
     s = s + i_ids_idx + i_w_ids_idx + i_qtys_idx;
     // generate num_orders random items
     auto i_ids = std::vector<size_t>(num_orders, 0);
-    SampleUniqueN(*rng, i_ids);
+    for (int i = 0; i < num_orders; i++) { i_ids[i] = non_uniform(*rng, 8191, 1, 100000); }
     s += to_hex_string(num_orders);
     for (int i = 0; i < num_orders; i++) { s += to_hex_string(i_ids[i]); }
     // fix all items' warehouse id to 0
