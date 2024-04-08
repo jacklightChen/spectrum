@@ -96,6 +96,7 @@ size_t Transaction::MakeCheckpoint() {
 /// @param checkpoint_id the checkpoint id to go back to
 void Transaction::ApplyCheckpoint(size_t checkpoint_id) {
     DLOG(INFO) << "transaction apply checkpoint " << checkpoint_id << std::endl;
+    FlushOperations();
     if (evm_type == EVMType::BASIC) {
         vm.emplace<evmone::VM>();
         return;
@@ -190,6 +191,27 @@ void Transaction::Analyze(Prediction& prediction) {
     // restore access storage handlers
     host.get_storage_inner = _get_storage_handler;
     host.set_storage_inner = _set_storage_handler;
+}
+
+/// @brief flush operations from inner vm to transaction, useful when vm is exchanged
+void Transaction::FlushOperations() {
+    if (evm_type == EVMType::BASIC || evm_type == EVMType::STRAWMAN) {
+        auto& _vm = std::get<evmone::VM>(vm);
+        op_count += _vm.op_count;
+        _vm.op_count = 0; return;
+    }
+    if (evm_type == EVMType::COPYONWRITE) {
+        auto& _vm = std::get<evmcow::VM>(vm);
+        op_count += _vm.op_count;
+        _vm.op_count = 0; return;
+    }
+}
+
+/// @brief return currently executed #operations
+size_t Transaction::CountOperations() {
+    FlushOperations();
+    size_t _op_count = op_count; op_count = 0;
+    return _op_count;
 }
 
 /// @brief result of evmc

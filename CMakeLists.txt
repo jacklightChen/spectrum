@@ -12,6 +12,7 @@ set(ENV{CC}     ${CMAKE_C_COMPILER})
 set(ENV{CXX}    ${CMAKE_CXX_COMPILER})
 
 option(NDEBUG ON)
+
 find_package(Threads REQUIRED) # we need threads support for OS. 
 
 # -- Manage External Dependencies Using Github

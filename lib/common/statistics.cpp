@@ -54,6 +54,7 @@ std::string Statistics::Print() {
         "{}\n"
         "commit             {}\n"
         "execution          {}\n"
+        "operation          {}\n"
         "25us               {}\n"
         "50us               {}\n"
         "100us              {}\n"
@@ -65,6 +66,7 @@ std::string Statistics::Print() {
         std::chrono::system_clock::now(),
         count_commit.load(),
         count_execution.load(),
+        count_operation.load(),
         count_latency_25us.load(),
         count_latency_50us.load(),
         count_latency_100us.load(),
@@ -116,6 +118,10 @@ std::string Statistics::PrintWithDuration(std::chrono::milliseconds duration) {
     ));
     #undef AVG
     #undef PERCENTILE
+}
+
+void Statistics::JournalOperations(size_t count) {
+    count_operation.fetch_add(count);
 }
 
 } // namespace spectrum

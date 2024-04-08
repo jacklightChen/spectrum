@@ -350,6 +350,7 @@ void SparkleExecutor::Generate() {
     });
     tx->Execute();
     statistics.JournalExecute();
+    statistics.JournalOperations(tx->CountOperations());
     for (auto i = size_t{0}; i < tx->tuples_put.size(); ++i) {
         auto& entry = tx->tuples_put[i];
         table.Unlock(tx.get(), std::get<0>(entry));
@@ -378,6 +379,7 @@ void SparkleExecutor::ReExecute() {
     tx->tuples_get.resize(0);
     tx->Execute();
     statistics.JournalExecute();
+    statistics.JournalOperations(tx->CountOperations());
     for (auto i = size_t{0}; i < tx->tuples_put.size(); ++i) {
         auto& entry = tx->tuples_put[i];
         table.Unlock(tx.get(), std::get<0>(entry));

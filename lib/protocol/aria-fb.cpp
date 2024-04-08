@@ -179,6 +179,7 @@ void AriaExecutor::Run() {
             this->Execute(&tx);
             this->Reserve(&tx);
             statistics.JournalExecute();
+            statistics.JournalOperations(tx.CountOperations());
         }
         // -- stage 2: verify + commit (or prepare fallback)
         barrier.arrive_and_wait();
@@ -203,6 +204,7 @@ void AriaExecutor::Run() {
             if (tx.flag_conflict) {
                 this->Fallback(&tx);
                 statistics.JournalExecute();
+                statistics.JournalOperations(tx.CountOperations());
                 statistics.JournalCommit(LATENCY);
             }
         }

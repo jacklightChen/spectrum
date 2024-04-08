@@ -29,6 +29,8 @@ public:
     bool cgoto = EVMONE_CGOTO_SUPPORTED;
     bool validate_eof = false;
 
+    size_t op_count{0};
+
 private:
     std::unique_ptr<Tracer> m_first_tracer;
 

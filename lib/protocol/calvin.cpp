@@ -125,6 +125,7 @@ void CalvinExecutor::Run() {
             tx.Execute();
             tx.committed.store(true);
             statistics.JournalExecute();
+            statistics.JournalOperations(tx.CountOperations());
             statistics.JournalCommit(LATENCY);
             ++count_committed;
         }}

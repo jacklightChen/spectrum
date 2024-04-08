@@ -343,6 +343,7 @@ void SpectrumExecutor::Generate() {
     DLOG(INFO) << "spectrum execute " << tx->id;
     tx->Execute();
     statistics.JournalExecute();
+    statistics.JournalOperations(tx->CountOperations());
     // commit all results if possible & necessary
     for (auto entry: tx->tuples_put) {
         // if (tx->HasWAR()) { break; }
@@ -393,6 +394,7 @@ void SpectrumExecutor::ReExecute() {
         " tuples get: " << tx->tuples_get.size();
     tx->Execute();
     statistics.JournalExecute();
+    statistics.JournalOperations(tx->CountOperations());
     // commit all results if possible & necessary
     for (auto entry: tx->tuples_put) {
         if (tx->HasWAR()) { break; }

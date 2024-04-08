@@ -29,6 +29,7 @@ void Dummy::Start() {
         });
         tx.Execute();
         statistics.JournalExecute();
+        statistics.JournalOperations(tx.CountOperations());
         statistics.JournalCommit(duration_cast<microseconds>(steady_clock::now() - start_time).count());
     }}));}
 }

@@ -226,7 +226,7 @@ template <Opcode Op>
 
 template <bool TracingEnabled>
 int64_t dispatch(const CostTable& cost_table, ExecutionState& state, int64_t gas,
-    const uint8_t* code, Tracer* tracer = nullptr) noexcept
+    const uint8_t* code, VM& vm, Tracer* tracer = nullptr) noexcept
 {
     const auto stack_bottom = state.stack_space.bottom();
 
@@ -246,6 +246,9 @@ int64_t dispatch(const CostTable& cost_table, ExecutionState& state, int64_t gas
 
     while (true)  // Guaranteed to terminate because padded code ends with STOP.
     {
+
+        vm.op_count += 1;
+
         state.position = position;
         if constexpr (TracingEnabled)
         {
@@ -319,11 +322,11 @@ evmc_result execute(VM& vm, int64_t gas, ExecutionState& state) noexcept
     if (INTX_UNLIKELY(tracer != nullptr))
     {
         tracer->notify_execution_start(state.rev, *state.msg, vm.analysis->executable_code);
-        gas = dispatch<true>(cost_table, state, gas, code.data(), tracer);
+        gas = dispatch<true>(cost_table, state, gas, code.data(), vm, tracer);
     }
     else
     {
-        gas = dispatch<false>(cost_table, state, gas, code.data());
+        gas = dispatch<false>(cost_table, state, gas, code.data(), vm);
     }
 
     const auto gas_left = (state.status == EVMC_SUCCESS || state.status == EVMC_REVERT) ? gas : 0;

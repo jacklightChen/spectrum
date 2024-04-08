@@ -46,7 +46,7 @@ class Transaction {
     std::span<uint8_t> code;
     std::vector<uint8_t> input;
     evmc_message message;
-    
+    size_t  op_count{0};
 
     public:
     std::unordered_set<K, KeyHasher>  predicted_get_storage;
@@ -60,6 +60,9 @@ class Transaction {
     void Break();
     void ApplyCheckpoint(size_t checkpoint_id);
     size_t MakeCheckpoint();
+
+    size_t CountOperations();
+    void   FlushOperations();
 
 };
 
