@@ -1,3 +1,4 @@
+#include <atomic>
 #include <spectrum/common/statistics.hpp>
 #include <fmt/core.h>
 #include <fmt/chrono.h>
@@ -6,8 +7,8 @@
 #include <iostream>
 #include <glog/logging.h>
 #include <cstdlib>
-#include <thread>
 #include <ethash/keccak.hpp>
+
 namespace spectrum {
 
 void Statistics::JournalCommit(size_t latency) {
@@ -38,6 +39,10 @@ void Statistics::JournalCommit(size_t latency) {
 
 void Statistics::JournalExecute() {
     count_execution.fetch_add(1, std::memory_order_relaxed);
+}
+
+void Statistics::JournalOperations(size_t count) {
+    count_operation.fetch_add(count, std::memory_order_relaxed);
 }
 
 std::string Statistics::Print() {
@@ -120,10 +125,6 @@ std::string Statistics::PrintWithDuration(std::chrono::milliseconds duration) {
     ));
     #undef AVG
     #undef PERCENTILE
-}
-
-void Statistics::JournalOperations(size_t count) {
-    count_operation.fetch_add(count);
 }
 
 } // namespace spectrum
