@@ -127,6 +127,7 @@ void CalvinExecutor::Run() {
             statistics.JournalExecute();
             statistics.JournalOperations(tx.CountOperations());
             statistics.JournalCommit(LATENCY);
+            statistics.JournalMemory(tx.mm_count);
             ++count_committed;
         }}
         // -- stage 4: release lock

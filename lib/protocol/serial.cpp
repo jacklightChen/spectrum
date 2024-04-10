@@ -42,6 +42,7 @@ void Serial::Start() {
             statistics.JournalExecute();
             statistics.JournalOperations(transaction.CountOperations());
             statistics.JournalCommit(duration_cast<microseconds>(steady_clock::now() - start_time).count());
+            statistics.JournalMemory(transaction.mm_count);
         }
     }});
 }

@@ -192,6 +192,7 @@ void AriaExecutor::Run() {
             else {
                 this->Commit(&tx);
                 statistics.JournalCommit(LATENCY);
+                statistics.JournalMemory(tx.mm_count);
             }
         }
         // -- stage 3: fallback (skipped if no conflicts occur)
@@ -206,6 +207,7 @@ void AriaExecutor::Run() {
                 statistics.JournalExecute();
                 statistics.JournalOperations(tx.CountOperations());
                 statistics.JournalCommit(LATENCY);
+                statistics.JournalMemory(tx.mm_count);
             }
         }
         // -- stage 4: clean up lock table

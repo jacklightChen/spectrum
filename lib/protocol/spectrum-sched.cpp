@@ -389,6 +389,7 @@ void SpectrumSchedExecutor::Finalize() {
     }
     auto latency = duration_cast<microseconds>(steady_clock::now() - tx->start_time).count();
     statistics.JournalCommit(latency);
+    statistics.JournalMemory(tx->mm_count);
     tx = nullptr;
 }
 

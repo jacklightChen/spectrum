@@ -37,6 +37,10 @@ void Statistics::JournalCommit(size_t latency) {
     }
 }
 
+void Statistics::JournalMemory(size_t count) {
+    count_memory.fetch_add(count, std::memory_order_relaxed);
+}
+
 void Statistics::JournalExecute() {
     count_execution.fetch_add(1, std::memory_order_relaxed);
 }

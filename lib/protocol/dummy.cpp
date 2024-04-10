@@ -31,6 +31,7 @@ void Dummy::Start() {
         statistics.JournalExecute();
         statistics.JournalOperations(tx.CountOperations());
         statistics.JournalCommit(duration_cast<microseconds>(steady_clock::now() - start_time).count());
+                statistics.JournalMemory(tx.mm_count);
     }}));}
 }
 

@@ -47,9 +47,9 @@ class Transaction {
     std::vector<uint8_t> input;
     evmc_message message;
     size_t  op_count{0};
-    size_t  mm_count{0};
 
     public:
+    size_t  mm_count{0};
     std::unordered_set<K, KeyHasher>  predicted_get_storage;
     std::unordered_set<K, KeyHasher>  predicted_set_storage;
     Transaction(EVMType evm_type, evmc::address from, evmc::address to,

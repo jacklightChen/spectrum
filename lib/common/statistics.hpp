@@ -14,6 +14,7 @@ class Statistics {
     private:
     static const int SAMPLE = 1000;
     std::atomic<size_t> count_commit{0};
+    std::atomic<size_t> count_memory{0};
     std::atomic<size_t> count_execution{0};
     std::atomic<size_t> count_operation{0};
     std::atomic<size_t> count_latency_25us{0};
@@ -25,6 +26,7 @@ class Statistics {
     public:
     Statistics() = default;
     Statistics(const Statistics& statistics) = delete;
+    void JournalMemory(size_t count);
     void JournalCommit(size_t latency);
     void JournalExecute();
     void JournalOperations(size_t count);
