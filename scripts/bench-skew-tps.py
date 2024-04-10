@@ -9,46 +9,78 @@ sys.path.extend(['.', '..', '../..'])
 from plot.plot import MyPlot
 
 keys = 1000000
-workload = 'Smallbank'
-threads = 30
+workload = 'TPCC'
+repeat = 10
+threads = 36
 times_to_tun = 2
 timestamp = int(time.time())
 
 if __name__ == '__main__':
-    df = pd.DataFrame(columns=['protocol', 'threads', 'zipf', 'table_partition', 'commit', 'abort'])
+    df = pd.DataFrame(columns=['protocol', 'threads', 'zipf', 'table_partition', 'commit', 'abort', 'operation', 'latency_50', 'latency_75', 'latency_95', 'latency_99'])
     conf = {'stdout': subprocess.PIPE, 'stderr': subprocess.PIPE}
     hash = subprocess.run(["git", "rev-parse", "HEAD"], **conf).stdout.decode('utf-8').strip()
+    batch_size = 100
     with open(f'./exp_results/bench_results_{timestamp}', 'w') as f:
-        for zipf in [0.7, 0.8, 0.9, 1.0, 1.1, 1.2, 1.3]:
+        f.write(f"Schedule 10 to 20\n")
+        # for zipf in [0.9, 1.0, 1.1, 1.2, 1.3]:
+        for zipf in [10, 15, 20, 25, 30]:
             table_partitions    = 9973
-            num_dispatchers       = 6
-            # spectrum_dispatcher = num_threads // 6
             protocols       = [
-                f"Calvin:{threads}:{num_dispatchers}:{table_partitions}",
-                f"Aria:{threads}:{table_partitions}:FALSE", 
-                f"Aria:{threads}:{table_partitions}:TRUE",
-                f"Sparkle:{threads}:{num_dispatchers}:{table_partitions}", 
-                f"Spectrum:{threads}:{num_dispatchers}:{table_partitions}:COPYONWRITE"
+                # f"Calvin:{threads}:{table_partitions}:{batch_size // threads}",
+                # f"Aria:{threads}:{table_partitions}:{batch_size // threads}:FALSE", 
+                # f"Aria:{threads}:{table_partitions}:{batch_size // threads}:TRUE",
+                # f"Sparkle:{threads}:{table_partitions}", 
+                f"SpectrumNoPartial:{threads}:{table_partitions}:BASIC",
+                f"Spectrum:{threads}:{table_partitions}:COPYONWRITE",
+                # f"SpectrumPreSched:{threads}:{table_partitions}:COPYONWRITE",
+                # f"SpectrumNoPartial:{threads}:{table_partitions}:BASIC",
             ]
             for cc in protocols:
                 print(f"#COMMIT-{hash}",  f"CONFIG-{cc}")
-                f.write(f"#COMMIT-{hash} CONFIG-{cc}")
+                f.write(f"#COMMIT-{hash} CONFIG-{cc}\n")
                 print(f'../bench {cc} {workload}:{keys}:{zipf} {times_to_tun}s')
-                f.write(f'../bench {cc} {workload}:{keys}:{zipf} {times_to_tun}s')
-                result = subprocess.run(["../build/bench", cc, f"{workload}:{keys}:{zipf}", f"{times_to_tun}s"], **conf)
-                result_str = result.stderr.decode('utf-8').strip()
-                print(result_str)
-                f.write(result_str)
-                commit = float(re.search(r'commit\s+([\d.]+)', result_str).group(1))
-                execution = float(re.search(r'execution\s+([\d.]+)', result_str).group(1))
+                f.write(f'../bench {cc} {workload}:{keys}:{zipf} {times_to_tun}s\n')
+
+                sum_commit = 0
+                sum_execution = 0
+                sum_operation = 0
+                sum_latency_50 = 0
+                sum_latency_75 = 0
+                sum_latency_95 = 0
+                sum_latency_99 = 0
+
+                succeed_repeat = 0
+                for _ in range(repeat):
+                    try:
+                        result = subprocess.run(["../build/bin/bench", cc, f"{workload}:{keys}:{zipf}", f"{times_to_tun}s"], **conf)
+                        result_str = result.stderr.decode('utf-8').strip()
+                        f.write(result_str + '\n')
+                        sum_commit += float(re.search(r'commit\s+([\d.]+)', result_str).group(1))
+                        sum_execution += float(re.search(r'execution\s+([\d.]+)', result_str).group(1))
+                        sum_operation += float(re.search(r'operation\s+([\d.]+)', result_str).group(1))
+                        sum_latency_50 += float(re.search(r'latency\(50%\)\s+(\d+)us', result_str).group(1))
+                        sum_latency_75 += float(re.search(r'latency\(75%\)\s+(\d+)us', result_str).group(1))
+                        sum_latency_95 += float(re.search(r'latency\(95%\)\s+(\d+)us', result_str).group(1))
+                        sum_latency_99 += float(re.search(r'latency\(99%\)\s+(\d+)us', result_str).group(1))
+                        succeed_repeat += 1
+                    except Exception as e:
+                        print(e)
                 df.loc[len(df)] = {
-                    'protocol': cc.split(':')[0] if cc.split(':')[-1] != 'TRUE' else 'AriaRe', 
+                    # 'protocol': cc.split(':')[0] + cc.split(':')[-1], 
+                    'protocol': cc.split(':')[0] if cc.split(':')[-1] != 'FALSE' else 'AriaFB', 
                     'threads': threads, 
                     'zipf': zipf, 
                     'table_partition': table_partitions, 
-                    'commit': commit,
-                    'abort': execution - commit
+                    'commit': sum_commit / succeed_repeat,
+                    'abort': (sum_execution - sum_commit) / succeed_repeat,
+                    'operation': sum_operation / succeed_repeat,
+                    'latency_50': sum_latency_50 / succeed_repeat,
+                    'latency_75': sum_latency_75 / succeed_repeat,
+                    'latency_95': sum_latency_95 / succeed_repeat,
+                    'latency_99': sum_latency_99 / succeed_repeat,
                 }
+                print(df)
+
     df.to_csv(f'./exp_results/bench_results_{timestamp}.csv')
 
     recs = df
