@@ -62,6 +62,7 @@ std::string Statistics::Print() {
     return std::string(fmt::format(
         "{}\n"
         "commit             {}\n"
+        "memory             {}\n"
         "execution          {}\n"
         "operation          {}\n"
         "25us               {}\n"
@@ -74,6 +75,7 @@ std::string Statistics::Print() {
         "latency(99%)       {}us\n",
         std::chrono::system_clock::now(),
         count_commit.load(),
+        count_memory.load(),
         count_execution.load(),
         count_operation.load(),
         count_latency_25us.load(),
@@ -103,6 +105,7 @@ std::string Statistics::PrintWithDuration(std::chrono::milliseconds duration) {
         "{}\n"
         "duration      {}\n"
         "commit        {:.4f} tx/s\n"
+        "memory        {:.4f} cp/s\n"
         "execution     {:.4f} tx/s\n"
         "operation     {:.4f} op/s\n"
         "25us          {:.4f} tx/s\n"
@@ -116,6 +119,7 @@ std::string Statistics::PrintWithDuration(std::chrono::milliseconds duration) {
         std::chrono::system_clock::now(),
         duration,
         AVG(count_commit),
+        AVG(count_memory),
         AVG(count_execution),
         AVG(count_operation),
         AVG(count_latency_25us),
