@@ -59,6 +59,7 @@ Transaction::Transaction(
         .input_size = this->input.size(),
         .value{0},
     };
+    mm_count += 32 * 1024;
 }
 
 // update set_storage handler
@@ -77,15 +78,21 @@ size_t Transaction::MakeCheckpoint() {
     DLOG(INFO) << "transaction make checkpoint " << std::endl;
     // can only be called inside execution
     if (evm_type == EVMType::BASIC) {
+        mm_count += 32 * 1024;
         return 0;
     }
     if (evm_type == EVMType::STRAWMAN) {
         auto& _vm = std::get<evmone::VM>(vm);
+        mm_count += 32 * 1024;
         _vm.checkpoints.push_back(std::make_unique<evmone::ExecutionState>(*_vm.state.value()));
         return _vm.checkpoints.size() - 1;
     }
     if (evm_type == EVMType::COPYONWRITE) {
         auto& _vm = std::get<evmcow::VM>(vm);
+        for (auto ownership: _vm.state.value()->stack_top.ownership) {
+            if (ownership) continue;
+            mm_count += evmcow::SLICE * 32;
+        }
         _vm.checkpoints.push_back(_vm.state.value()->save_checkpoint());
         return _vm.checkpoints.size() - 1;
     }
