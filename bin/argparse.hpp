@@ -5,6 +5,7 @@
 #include <spectrum/protocol/serial.hpp>
 #include <spectrum/protocol/calvin.hpp>
 #include <spectrum/protocol/dummy.hpp>
+#include <spectrum/protocol/spectrum-no-partial.hpp>
 #include <spectrum/protocol/spectrum-pre-sched.hpp>
 #include <spectrum/protocol/spectrum-sched.hpp>
 #include <spectrum/protocol/spectrum-cache.hpp>
@@ -116,6 +117,7 @@ inline std::unique_ptr<Protocol> ParseProtocol(const char* arg, Workload& worklo
     OPT(SpectrumSched,      INT, INT, EVMTYPE)
     OPT(SpectrumCache,      INT, INT, EVMTYPE)
     OPT(SpectrumPreSched,   INT, INT, EVMTYPE)
+    OPT(SpectrumNoPartial,  INT, INT, EVMTYPE)
     OPT(Serial,             EVMTYPE,  INT)
     OPT(Calvin,             INT, INT, INT)
     OPT(Dummy,              INT, INT, EVMTYPE)
