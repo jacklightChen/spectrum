@@ -90,7 +90,7 @@ size_t Transaction::MakeCheckpoint() {
     if (evm_type == EVMType::COPYONWRITE) {
         auto& _vm = std::get<evmcow::VM>(vm);
         for (auto ownership: _vm.state.value()->stack_top.ownership) {
-            if (ownership) continue;
+            if (!ownership) continue;
             mm_count += evmcow::SLICE * 32;
         }
         _vm.checkpoints.push_back(_vm.state.value()->save_checkpoint());
