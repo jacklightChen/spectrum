@@ -447,6 +447,9 @@ void SparklePartialExecutor::Finalize() {
         table.ClearGet(tx.get(), entry.key, entry.version);
     }
     for (auto entry: tx->tuples_put) {
+        table.Unlock(tx.get(), entry.key);
+    }
+    for (auto entry: tx->tuples_put) {
         table.ClearPut(tx.get(), entry.key);
     }
     auto latency = duration_cast<microseconds>(steady_clock::now() - tx->start_time).count();

@@ -8,3 +8,4 @@ perf*
 **.swp
 **/__pycache__
 .cache
+*.ans
