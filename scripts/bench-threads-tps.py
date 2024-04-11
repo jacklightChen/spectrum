@@ -10,8 +10,8 @@ from plot.plot import MyPlot
 
 keys = 1000000
 workload = 'YCSB'
-repeat = 10
-zipf = 1.1
+repeat = 1
+zipf = 0.9
 times_to_tun = 2
 timestamp = int(time.time())
 
@@ -24,17 +24,23 @@ if __name__ == '__main__':
         for num_threads in list(range(6, 42, 6)):
             table_partitions    = 9973
             protocols       = [
-                f"Calvin:{num_threads}:{table_partitions}:{batch_size // num_threads}",
-                f"Aria:{num_threads}:{table_partitions}:{batch_size // num_threads}:FALSE", 
-                f"Aria:{num_threads}:{table_partitions}:{batch_size // num_threads}:TRUE",
-                f"Sparkle:{num_threads}:{table_partitions}", 
-                f"Spectrum:{num_threads}:{table_partitions}:COPYONWRITE",
-                # f"SpectrumPreSched:{num_threads}:{table_partitions}:COPYONWRITE",
-                # f"Dummy:{num_threads}:{table_partitions}:COPYONWRITE",
-                f"Serial:BASIC:{1}",
+                # f"Calvin:{num_threads}:{table_partitions}:{batch_size // num_threads}",
+                # f"Aria:{num_threads}:{table_partitions}:{batch_size // num_threads}:FALSE", 
+                # f"Aria:{num_threads}:{table_partitions}:{batch_size // num_threads}:TRUE",
+                # f"Sparkle:{num_threads}:{table_partitions}", 
                 # f"Spectrum:{num_threads}:{table_partitions}:COPYONWRITE",
-                # f"Spectrum:{num_threads}:{table_partitions}:STRAWMAN",
-                # f"SpectrumNoPartial:{num_threads}:{table_partitions}:BASIC",
+                # # f"SpectrumPreSched:{num_threads}:{table_partitions}:COPYONWRITE",
+                # # f"Dummy:{num_threads}:{table_partitions}:COPYONWRITE",
+                # f"Serial:BASIC:{1}",
+                # # f"Spectrum:{num_threads}:{table_partitions}:COPYONWRITE",
+                # # f"Spectrum:{num_threads}:{table_partitions}:STRAWMAN",
+                # # f"SpectrumNoPartial:{num_threads}:{table_partitions}:BASIC",
+                f"SpectrumNoPartial:{num_threads}:{table_partitions}:BASIC",
+                f"Spectrum:{num_threads}:{table_partitions}:COPYONWRITE",
+                f"SpectrumPreSched:{num_threads}:{table_partitions}:COPYONWRITE",
+                f"Sparkle:{num_threads}:{table_partitions}",
+                f"SparklePreSched:{num_threads}:{table_partitions}:BASIC",
+                f"SparklePartial:{num_threads}:{table_partitions}:COPYONWRITE",
             ]
             for cc in protocols:
                 print(f"#COMMIT-{hash}",  f"CONFIG-{cc}")
