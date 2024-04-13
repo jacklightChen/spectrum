@@ -1,5 +1,5 @@
 #include "evmc/evmc.hpp"
-#include <spectrum/protocol/sparkle-pre-sched.hpp>
+#include <spectrum/protocol/spectrum-no-partial-pre-sched.hpp>
 #include <spectrum/common/lock-util.hpp>
 #include <spectrum/common/hex.hpp>
 #include <spectrum/common/thread-util.hpp>
@@ -9,9 +9,10 @@
 #include <glog/logging.h>
 #include <ranges>
 #include <fmt/core.h>
+#include <iostream>
 
 /*
-    This is a implementation of "SparklePreSched: Speedy and Strictly-Deterministic Smart Contract Transactions for Blockchain Ledgers" (Zhihao Chen, Tianji Yang, Yixiao Zheng, Zhao Zhang, Cheqing Jin and Aoying Zhou). 
+    This is a implementation of "Spectrum: Speedy and Strictly-Deterministic Smart Contract Transactions for Blockchain Ledgers" (Zhihao Chen, Tianji Yang, Yixiao Zheng, Zhao Zhang, Cheqing Jin and Aoying Zhou). 
  */
 
 namespace spectrum {
@@ -19,13 +20,13 @@ namespace spectrum {
 using namespace std::chrono;
 
 #define K std::tuple<evmc::address, evmc::bytes32>
-#define V SparklePreSchedVersionList
-#define T SparklePreSchedTransaction
+#define V SpectrumNoPartialPreSchedVersionList
+#define T SpectrumNoPartialPreSchedTransaction
 
 /// @brief wrap a base transaction into a spectrum transaction
 /// @param inner the base transaction
 /// @param id transaction id
-SparklePreSchedTransaction::SparklePreSchedTransaction(Transaction&& inner, size_t id):
+SpectrumNoPartialPreSchedTransaction::SpectrumNoPartialPreSchedTransaction(Transaction&& inner, size_t id):
     Transaction{std::move(inner)},
     id{id},
     start_time{std::chrono::steady_clock::now()}
@@ -33,14 +34,14 @@ SparklePreSchedTransaction::SparklePreSchedTransaction(Transaction&& inner, size
 
 /// @brief determine transaction has to rerun
 /// @return if transaction has to rerun
-bool SparklePreSchedTransaction::HasWAR() {
+bool SpectrumNoPartialPreSchedTransaction::HasWAR() {
     auto guard = Guard{rerun_keys_mu};
     return rerun_keys.size() != 0;
 }
 
 /// @brief call the transaction to rerun providing the key that caused it
 /// @param key the key that caused rerun
-void SparklePreSchedTransaction::SetWAR(const K& key, size_t writer_id, bool pre_schedule) {
+void SpectrumNoPartialPreSchedTransaction::SetWAR(const K& key, size_t writer_id, bool pre_schedule) {
     if (!pre_schedule) {
         auto guard = Guard{rerun_keys_mu};
         rerun_keys.push_back(key);
@@ -54,15 +55,14 @@ void SparklePreSchedTransaction::SetWAR(const K& key, size_t writer_id, bool pre
     }
 }
 
-size_t SparklePreSchedTransaction::ShouldWait(const K& key) {
+size_t SpectrumNoPartialPreSchedTransaction::ShouldWait(const K& key) {
     // auto guard = Guard{rerun_keys_mu};
     return should_wait.contains(key) ? should_wait[key] : 0;
 }
 
-
 /// @brief the multi-version table for spectrum
 /// @param partitions the number of partitions
-SparklePreSchedLockTable::SparklePreSchedLockTable(size_t partitions):
+SpectrumNoPartialPreSchedLockTable::SpectrumNoPartialPreSchedLockTable(size_t partitions):
     Table<K, V, KeyHasher>{partitions}
 {}
 
@@ -70,7 +70,7 @@ SparklePreSchedLockTable::SparklePreSchedLockTable(size_t partitions):
 /// @param tx the transaction that reads the value
 /// @param k the key of the read entry
 /// @param version (mutated to be) the version of read entry
-void SparklePreSchedLockTable::Get(T* tx, const K& k) {
+void SpectrumNoPartialPreSchedLockTable::Get(T* tx, const K& k) {
     Table::Put(k, [&](V& _v) {
         auto rit = _v.entries.rbegin();
         auto end = _v.entries.rend();
@@ -91,7 +91,7 @@ void SparklePreSchedLockTable::Get(T* tx, const K& k) {
 /// @brief put a value
 /// @param tx the transaction that writes the value
 /// @param k the key of the written entry
-void SparklePreSchedLockTable::Put(T* tx, const K& k) {
+void SpectrumNoPartialPreSchedLockTable::Put(T* tx, const K& k) {
     CHECK(tx->id > 0) << "we reserve version(0) for default value";
     DLOG(INFO) << tx->id << "(" << tx << ")" << " write " << KeyHasher()(k) % 1000 << std::endl;
     Table::Put(k, [&](V& _v) {
@@ -128,7 +128,7 @@ void SparklePreSchedLockTable::Put(T* tx, const K& k) {
             return;
         }
         // insert an entry
-        _v.entries.insert(rit.base(), SparklePreSchedEntry {
+        _v.entries.insert(rit.base(), SpectrumNoPartialPreSchedEntry {
             .value   = evmc::bytes32{0},
             .version = tx->id,
             .readers = readers_
@@ -139,7 +139,7 @@ void SparklePreSchedLockTable::Put(T* tx, const K& k) {
 /// @brief remove versions preceeding current transaction
 /// @param tx the transaction the previously wrote this entry
 /// @param k the key of written entry
-void SparklePreSchedLockTable::ClearPut(T* tx, const K& k) {
+void SpectrumNoPartialPreSchedLockTable::ClearPut(T* tx, const K& k) {
     DLOG(INFO) << "remove write record before " << tx->id << "(" << tx << ")" << " from " << KeyHasher()(k) % 1000 << std::endl;
     Table::Put(k, [&](V& _v) {
         while (_v.entries.size() && _v.entries.front().version < tx->id) {
@@ -151,7 +151,7 @@ void SparklePreSchedLockTable::ClearPut(T* tx, const K& k) {
 /// @brief remove a read dependency from this entry
 /// @param tx the transaction that previously read this entry
 /// @param k the key of read entry
-void SparklePreSchedLockTable::ClearGet(T* tx, const K& k) {
+void SpectrumNoPartialPreSchedLockTable::ClearGet(T* tx, const K& k) {
     DLOG(INFO) << "remove read record " << tx->id << "(" << tx << ")" << " from " << KeyHasher()(k) % 1000 << std::endl;
     Table::Put(k, [&](V& _v) {
         auto rit = _v.entries.rbegin();
@@ -185,7 +185,7 @@ void SparklePreSchedLockTable::ClearGet(T* tx, const K& k) {
 
 /// @brief the multi-version table for spectrum
 /// @param partitions the number of partitions
-SparklePreSchedTable::SparklePreSchedTable(size_t partitions):
+SpectrumNoPartialPreSchedTable::SpectrumNoPartialPreSchedTable(size_t partitions):
     Table<K, V, KeyHasher>{partitions}
 {}
 
@@ -194,7 +194,7 @@ SparklePreSchedTable::SparklePreSchedTable(size_t partitions):
 /// @param k the key of the read entry
 /// @param v (mutated to be) the value of read entry
 /// @param version (mutated to be) the version of read entry
-void SparklePreSchedTable::Get(T* tx, const K& k, evmc::bytes32& v, size_t& version) {
+void SpectrumNoPartialPreSchedTable::Get(T* tx, const K& k, evmc::bytes32& v, size_t& version) {
     Table::Put(k, [&](V& _v) {
         auto rit = _v.entries.rbegin();
         auto end = _v.entries.rend();
@@ -219,7 +219,7 @@ void SparklePreSchedTable::Get(T* tx, const K& k, evmc::bytes32& v, size_t& vers
 /// @param tx the transaction that writes the value
 /// @param k the key of the written entry
 /// @param v the value to write
-void SparklePreSchedTable::Put(T* tx, const K& k, const evmc::bytes32& v) {
+void SpectrumNoPartialPreSchedTable::Put(T* tx, const K& k, const evmc::bytes32& v) {
     CHECK(tx->id > 0) << "we reserve version(0) for default value";
     DLOG(INFO) << tx->id << "(" << tx << ")" << " write " << KeyHasher()(k) % 1000 << std::endl;
     Table::Put(k, [&](V& _v) {
@@ -253,7 +253,7 @@ void SparklePreSchedTable::Put(T* tx, const K& k, const evmc::bytes32& v) {
             return;
         }
         // insert an entry
-        _v.entries.insert(rit.base(), SparklePreSchedEntry {
+        _v.entries.insert(rit.base(), SpectrumNoPartialPreSchedEntry {
             .value   = v,
             .version = tx->id,
             .readers = std::unordered_set<T*>()
@@ -264,7 +264,7 @@ void SparklePreSchedTable::Put(T* tx, const K& k, const evmc::bytes32& v) {
 /// @brief remove a read dependency from this entry
 /// @param tx the transaction that previously read this entry
 /// @param k the key of read entry
-void SparklePreSchedTable::RegretGet(T* tx, const K& k, size_t version) {
+void SpectrumNoPartialPreSchedTable::RegretGet(T* tx, const K& k, size_t version) {
     DLOG(INFO) << "remove read record " << tx->id << "(" << tx << ")" << " from " << KeyHasher()(k) % 1000 << std::endl;
     Table::Put(k, [&](V& _v) {
         auto vit = _v.entries.begin();
@@ -300,7 +300,7 @@ void SparklePreSchedTable::RegretGet(T* tx, const K& k, size_t version) {
 /// @brief undo a put operation and abort all dependent transactions
 /// @param tx the transaction that previously put into this entry
 /// @param k the key of this put entry
-void SparklePreSchedTable::RegretPut(T* tx, const K& k) {
+void SpectrumNoPartialPreSchedTable::RegretPut(T* tx, const K& k) {
     DLOG(INFO) << "remove write record " << tx->id << "(" << tx << ")" << " from " << KeyHasher()(k) % 1000 << std::endl;
     Table::Put(k, [&](V& _v) {
         auto vit = _v.entries.begin();
@@ -325,7 +325,7 @@ void SparklePreSchedTable::RegretPut(T* tx, const K& k) {
 /// @param tx the transaction that previously read this entry
 /// @param k the key of read entry
 /// @param version the version of read entry, which indicates the transaction that writes this value
-void SparklePreSchedTable::ClearGet(T* tx, const K& k, size_t version) {
+void SpectrumNoPartialPreSchedTable::ClearGet(T* tx, const K& k, size_t version) {
     DLOG(INFO) << "remove read record " << tx->id << "(" << tx << ")" << " from " << KeyHasher()(k) % 1000 << std::endl;
     Table::Put(k, [&](V& _v) {
         auto vit = _v.entries.begin();
@@ -362,7 +362,7 @@ void SparklePreSchedTable::ClearGet(T* tx, const K& k, size_t version) {
 /// @brief remove versions preceeding current transaction
 /// @param tx the transaction the previously wrote this entry
 /// @param k the key of written entry
-void SparklePreSchedTable::ClearPut(T* tx, const K& k) {
+void SpectrumNoPartialPreSchedTable::ClearPut(T* tx, const K& k) {
     DLOG(INFO) << "remove write record before " << tx->id << "(" << tx << ")" << " from " << KeyHasher()(k) % 1000 << std::endl;
     Table::Put(k, [&](V& _v) {
         while (_v.entries.size() && _v.entries.front().version < tx->id) {
@@ -371,40 +371,10 @@ void SparklePreSchedTable::ClearPut(T* tx, const K& k) {
     });
 }
 
-/// @brief lock an entry for later writting
-/// @param tx the transaction containing write operation
-/// @param k the key of written entry
-/// @return true if lock succeeds
-bool SparklePreSchedTable::Lock(T* tx, const K& k) {
-    bool succeed = false;
-    Table::Put(k, [&](V& _v) {
-        DLOG(INFO) << "tx " << tx->id << " lock " << KeyHasher()(k) % 1000 << " see " << (_v.tx ? _v.tx->id : -1) << std::endl;
-        if (_v.tx && _v.tx->id > tx->id) {
-            _v.tx->SetWAR(k, tx->id, false);
-            DLOG(INFO) << tx->id << " abort " << _v.tx->id;
-        }
-        if ((succeed = _v.tx == nullptr || _v.tx->id >= tx->id)) { _v.tx = tx; }
-    });
-    return succeed;
-}
-
-/// @brief unlock an entry for finished write
-/// @param tx the transaction containing write operation
-/// @param k the key of written entry
-/// @return true if lock succeeds
-bool SparklePreSchedTable::Unlock(T* tx, const K& k) {
-    DLOG(INFO) << "tx " << tx->id << " unlock " << KeyHasher()(k) % 1000 << std::endl;
-    bool succeed = false;
-    Table::Put(k, [&](V& _v) {
-        if ((succeed = _v.tx == tx)) _v.tx = nullptr;
-    });
-    return succeed;
-}
-
 /// @brief spectrum initialization parameters
 /// @param workload the transaction generator
 /// @param table_partitions the number of parallel partitions to use in the hash table
-SparklePreSched::SparklePreSched(Workload& workload, Statistics& statistics, size_t num_executors, size_t table_partitions, EVMType evm_type):
+SpectrumNoPartialPreSched::SpectrumNoPartialPreSched(Workload& workload, Statistics& statistics, size_t num_executors, size_t table_partitions, EVMType evm_type):
     workload{workload},
     statistics{statistics},
     num_executors{num_executors},
@@ -412,31 +382,31 @@ SparklePreSched::SparklePreSched(Workload& workload, Statistics& statistics, siz
     lock_table{table_partitions},
     stop_latch{static_cast<ptrdiff_t>(num_executors), []{}}
 {
-    LOG(INFO) << fmt::format("SparklePreSched(num_executors={}, table_partitions={}, evm_type={})", num_executors, table_partitions, evm_type);
+    LOG(INFO) << fmt::format("SpectrumNoPartialPreSched(num_executors={}, table_partitions={}, evm_type={})", num_executors, table_partitions, evm_type);
     workload.SetEVMType(evm_type);
 }
 
 /// @brief start spectrum protocol
 /// @param num_executors the number of threads to start
-void SparklePreSched::Start() {
+void SpectrumNoPartialPreSched::Start() {
     stop_flag.store(false);
     for (size_t i = 0; i != num_executors; ++i) {
         executors.push_back(std::thread([this]{
-            std::make_unique<SparklePreSchedExecutor>(*this)->Run();
+            std::make_unique<SpectrumNoPartialPreSchedExecutor>(*this)->Run();
         }));
         PinRoundRobin(executors[i], i);
     }
 }
 
 /// @brief stop spectrum protocol
-void SparklePreSched::Stop() {
+void SpectrumNoPartialPreSched::Stop() {
     stop_flag.store(true);
     for (auto& x: executors) 	{ x.join(); }
 }
 
 /// @brief spectrum executor
 /// @param spectrum spectrum initialization paremeters
-SparklePreSchedExecutor::SparklePreSchedExecutor(SparklePreSched& spectrum):
+SpectrumNoPartialPreSchedExecutor::SpectrumNoPartialPreSchedExecutor(SpectrumNoPartialPreSched& spectrum):
     table{spectrum.table},
     lock_table{spectrum.lock_table},
     last_finalized{spectrum.last_finalized},
@@ -450,129 +420,55 @@ SparklePreSchedExecutor::SparklePreSchedExecutor(SparklePreSched& spectrum):
 {}
 
 /// @brief generate a transaction and execute it
-void SparklePreSchedExecutor::Execute() {
-    // if(tx != nullptr) return;
-    // tx = std::make_unique<T>(workload.Next(), last_executed.fetch_add(1));
-    tx->start_time = steady_clock::now();
+void SpectrumNoPartialPreSchedExecutor::Execute() {
     tx->berun_flag.store(true);
-    tx->InstallSetStorageHandler([this](
+    auto tx_ref = tx.get();
+    tx->InstallSetStorageHandler([tx_ref](
         const evmc::address &addr, 
         const evmc::bytes32 &key, 
         const evmc::bytes32 &value
     ) {
-        auto _key = std::make_tuple(addr, key);
-        table.Lock(tx.get(), _key);
+        auto tx = tx_ref;
+        auto _key   = std::make_tuple(addr, key);
         tx->tuples_put.push_back({
             .key = _key, 
             .value = value, 
             .is_committed=false
         });
-        if (tx->HasWAR()) {
-            DLOG(INFO) << "spectrum tx " << tx->id << " break" << std::endl;
-            tx->Break();
-        }
-        DLOG(INFO) << "tx " << tx->id <<
-            " tuples put: " << tx->tuples_put.size() <<
-            " tuples get: " << tx->tuples_get.size();
+        if (tx->HasWAR()) { tx->Break(); }
         return evmc_storage_status::EVMC_STORAGE_MODIFIED;
     });
-    tx->InstallGetStorageHandler([this](
+    tx->InstallGetStorageHandler([tx_ref, this](
         const evmc::address &addr, 
         const evmc::bytes32 &key
     ) {
-        auto _key  = std::make_tuple(addr, key);
-        auto value = evmc::bytes32{0};
+        auto tx = tx_ref;
+        auto _key   = std::make_tuple(addr, key);
+        auto value  = evmc::bytes32{0};
         auto version = size_t{0};
         for (auto& tup: tx->tuples_put | std::views::reverse) {
-            if (tup.key != _key) { continue; }
-            DLOG(INFO) << "spectrum tx " << tx->id << " has key " << KeyHasher()(_key) % 1000 << " in tuples_put. ";
-            return tup.value;
+            if (tup.key == _key) { return tup.value; }
         }
         for (auto& tup: tx->tuples_get) {
-            if (tup.key != _key) { continue; }
-            DLOG(INFO) << "spectrum tx " << tx->id << " has key " << KeyHasher()(_key) % 1000 << " in tuples_get. ";
-            return tup.value;
+            if (tup.key == _key) { return tup.value; }
         }
-        // we have to break after make checkpoint
-        //   , or we will snapshot the break signal into the checkpoint!
-        if (tx->HasWAR()) {
-            DLOG(INFO) << "spectrum tx " << tx->id << " break" << std::endl;
-            tx->Break();
-        }
+        if (tx->HasWAR()) { tx->Break(); }
         // wait until the writer transcation to finalize
         while (!stop_flag.load() && tx->ShouldWait(_key) > last_finalized.load()) {
             continue;
         }
-        DLOG(INFO) << "tx " << tx->id << " " << 
-            " read(" << tx->tuples_get.size() << ")" << 
-            " key(" << KeyHasher()(_key) % 1000 << ")" << std::endl;
-        table.Get(tx.get(), _key, value, version);
+        table.Get(tx, _key, value, version);
+        size_t checkpoint_id = tx->MakeCheckpoint();
         tx->tuples_get.push_back({
             .key            = _key, 
             .value          = value, 
             .version        = version,
             .tuples_put_len = tx->tuples_put.size(),
-            .checkpoint_id  = tx->MakeCheckpoint()
+            .checkpoint_id  = checkpoint_id
         });
-        
         return value;
     });
     DLOG(INFO) << "spectrum execute " << tx->id;
-    tx->Execute();
-    statistics.JournalExecute();
-    statistics.JournalOperations(tx->CountOperations());
-    for (auto i = size_t{0}; i < tx->tuples_put.size(); ++i) {
-        auto& entry = tx->tuples_put[i];
-        table.Unlock(tx.get(), entry.key);
-    }
-    // commit all results if possible & necessary
-    for (auto entry: tx->tuples_put) {
-        // if (tx->HasWAR()) { break; }
-        if (entry.is_committed) { continue; }
-        table.Put(tx.get(), entry.key, entry.value);
-        entry.is_committed = true;
-    }
-}
-
-/// @brief rollback transaction with given rollback signal
-/// @param tx the transaction to rollback
-void SparklePreSchedExecutor::ReExecute() {
-    DLOG(INFO) << "spectrum re-execute " << tx->id;
-    // get current rerun keys
-    std::vector<K> rerun_keys{};
-    {
-        auto guard = Guard{tx->rerun_keys_mu}; 
-        std::swap(tx->rerun_keys, rerun_keys);
-    }
-    auto back_to = ~size_t{0};
-    // find checkpoint
-    for (auto& key: rerun_keys) {
-        for (size_t i = 0; i < tx->tuples_get.size(); ++i) {
-            if (tx->tuples_get[i].key != key) { continue; }
-            back_to = std::min(i, back_to); break;
-        }
-    }
-    // good news: we don't have to rollback, so just resume execution
-    if (back_to == ~size_t{0}) {
-        DLOG(INFO) << "tx " << tx->id << " do not have to rollback" << std::endl;
-        tx->Execute(); return;
-    }
-    // bad news: we have to rollback
-    auto& tup = tx->tuples_get[back_to];
-    tx->ApplyCheckpoint(tup.checkpoint_id);
-    for (size_t i = tup.tuples_put_len; i < tx->tuples_put.size(); ++i) {
-        if (tx->tuples_put[i].is_committed) {
-            table.RegretPut(tx.get(), tx->tuples_put[i].key);
-        }
-    }
-    for (size_t i = back_to; i < tx->tuples_get.size(); ++i) {
-        table.RegretGet(tx.get(), tx->tuples_get[i].key, tx->tuples_get[i].version);
-    }
-    tx->tuples_put.resize(tup.tuples_put_len);
-    tx->tuples_get.resize(back_to);
-    DLOG(INFO) << "tx " << tx->id <<
-        " tuples put: " << tx->tuples_put.size() <<
-        " tuples get: " << tx->tuples_get.size();
     tx->Execute();
     statistics.JournalExecute();
     statistics.JournalOperations(tx->CountOperations());
@@ -583,17 +479,39 @@ void SparklePreSchedExecutor::ReExecute() {
         table.Put(tx.get(), entry.key, entry.value);
         entry.is_committed = true;
     }
+    // if (last_committed.load() < tx->id) {
+    //     last_committed.store(tx->id + 1);
+    // }
+}
+
+void SpectrumNoPartialPreSchedExecutor::ReExecute() {
+    DLOG(INFO) << "spectrum-no-partial re-execute " << tx->id;
+    tx->rerun_keys.clear();
+    tx->ApplyCheckpoint(0);
+    for (auto entry: tx->tuples_get) {
+        table.RegretGet(tx.get(), entry.key, entry.version);
+    }
+    for (auto entry: tx->tuples_put) {
+        table.RegretPut(tx.get(), entry.key);
+    }
+    tx->tuples_put.resize(0);
+    tx->tuples_get.resize(0);
+    tx->Execute();
+    statistics.JournalExecute();
+    statistics.JournalOperations(tx->CountOperations());
+    for (auto i = size_t{0}; i < tx->tuples_put.size(); ++i) {
+        auto& entry = tx->tuples_put[i];
+        table.Put(tx.get(), entry.key, entry.value);
+        if (tx->HasWAR()) break;
+    }
 }
 
 /// @brief finalize a spectrum transaction
-void SparklePreSchedExecutor::Finalize() {
+void SpectrumNoPartialPreSchedExecutor::Finalize() {
     DLOG(INFO) << "spectrum finalize " << tx->id;
     last_finalized.fetch_add(1, std::memory_order_seq_cst);
     for (auto entry: tx->tuples_get) {
         table.ClearGet(tx.get(), entry.key, entry.version);
-    }
-    for (auto entry: tx->tuples_put) {
-        table.Unlock(tx.get(), entry.key);
     }
     for (auto entry: tx->tuples_put) {
         table.ClearPut(tx.get(), entry.key);
@@ -607,11 +525,11 @@ void SparklePreSchedExecutor::Finalize() {
     auto latency = duration_cast<microseconds>(steady_clock::now() - tx->start_time).count();
     statistics.JournalCommit(latency);
     statistics.JournalMemory(tx->mm_count);
-    tx = nullptr;
+    // tx = nullptr;
 }
 
 /// @brief schedule a transaction (put back to queue, swap a nullptr into it)
-void SparklePreSchedExecutor::Schedule() {
+void SpectrumNoPartialPreSchedExecutor::Schedule() {
     // no available transaction, so we have to generate one!
     if(queue.Size() != 0) { tx = queue.Pop(); return; }
     tx = std::make_unique<T>(workload.Next(), last_executed.fetch_add(1));
@@ -628,8 +546,9 @@ void SparklePreSchedExecutor::Schedule() {
     last_scheduled.fetch_add(1);
 }
 
+
 /// @brief start an executor
-void SparklePreSchedExecutor::Run() {
+void SpectrumNoPartialPreSchedExecutor::Run() {
     while (!stop_flag.load()) {
         // find smallest workable transaction
         Schedule();

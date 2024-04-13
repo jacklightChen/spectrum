@@ -8,6 +8,7 @@
 #include <spectrum/protocol/sparkle-partial.hpp>
 #include <spectrum/protocol/sparkle-pre-sched.hpp>
 #include <spectrum/protocol/spectrum-no-partial.hpp>
+#include <spectrum/protocol/spectrum-no-partial-pre-sched.hpp>
 #include <spectrum/protocol/spectrum-pre-sched.hpp>
 #include <spectrum/protocol/spectrum-sched.hpp>
 #include <spectrum/protocol/spectrum-cache.hpp>
@@ -122,6 +123,7 @@ inline std::unique_ptr<Protocol> ParseProtocol(const char* arg, Workload& worklo
     OPT(SpectrumCache,      INT, INT, EVMTYPE)
     OPT(SpectrumPreSched,   INT, INT, EVMTYPE)
     OPT(SpectrumNoPartial,  INT, INT, EVMTYPE)
+    OPT(SpectrumNoPartialPreSched, INT, INT, EVMTYPE)
     OPT(Serial,             EVMTYPE,  INT)
     OPT(Calvin,             INT, INT, INT)
     OPT(Dummy,              INT, INT, EVMTYPE)

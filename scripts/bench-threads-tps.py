@@ -10,8 +10,8 @@ from plot.plot import MyPlot
 
 keys = 1000000
 workload = 'YCSB'
-repeat = 1
-zipf = 0.9
+repeat = 10
+zipf = 1.1
 times_to_tun = 2
 timestamp = int(time.time())
 
@@ -35,12 +35,13 @@ if __name__ == '__main__':
                 # # f"Spectrum:{num_threads}:{table_partitions}:COPYONWRITE",
                 # # f"Spectrum:{num_threads}:{table_partitions}:STRAWMAN",
                 # # f"SpectrumNoPartial:{num_threads}:{table_partitions}:BASIC",
-                f"SpectrumNoPartial:{num_threads}:{table_partitions}:BASIC",
-                f"Spectrum:{num_threads}:{table_partitions}:COPYONWRITE",
+                # f"SpectrumNoPartial:{num_threads}:{table_partitions}:BASIC",
+                # f"SpectrumNoPartialPreSched:{num_threads}:{table_partitions}:BASIC",
+                # f"Spectrum:{num_threads}:{table_partitions}:COPYONWRITE",
                 f"SpectrumPreSched:{num_threads}:{table_partitions}:COPYONWRITE",
-                f"Sparkle:{num_threads}:{table_partitions}",
-                f"SparklePreSched:{num_threads}:{table_partitions}:BASIC",
-                f"SparklePartial:{num_threads}:{table_partitions}:COPYONWRITE",
+                # f"Sparkle:{num_threads}:{table_partitions}",
+                # f"SparklePreSched:{num_threads}:{table_partitions}:BASIC",
+                # f"SparklePartial:{num_threads}:{table_partitions}:COPYONWRITE",
             ]
             for cc in protocols:
                 print(f"#COMMIT-{hash}",  f"CONFIG-{cc}")
