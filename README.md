@@ -1,3 +1,10 @@
+# Spectrum
+Spectrum is the first concurrent deterministic execution scheme that preserves consensus-established ordering fairness (by ensuring strict determinism) with high performance for blockchain ledgers.
+
+This repo is for the reproducibility of Spectrum.
+
+Zhihao Chen, Tianji Yang, Yixiao Zheng, Zhao Zhang, Cheqing Jin, and Aoying Zhou. Spectrum: Speedy and Strictly-Deterministic Smart Contract Transactions for Blockchain Ledgers. (under revision)
+
 # Building Instructions
 
 We use `cmake` as the building system.

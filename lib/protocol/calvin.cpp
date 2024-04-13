@@ -3,8 +3,7 @@
 #include <fmt/core.h>
 
 /*
-    This is a implementation of "Calvin: A Fast and Practical Deterministic OLTP Database" (Yi Lu, Xiangyao Yu, Lei Cao, Samuel Madden). 
-    In this implementation we adopt the fallback strategy and reordering strategy discussed in this paper. 
+    This is a implementation of "Calvin: fast distributed transactions for partitioned database systems" (Alexander Thomson, Thaddeus Diamond, Shu-Chun Weng, Kun Ren, Philip Shao, Daniel J. Abadi). (single-partition)
  */
 
 namespace spectrum 

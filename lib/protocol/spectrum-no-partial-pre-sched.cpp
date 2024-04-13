@@ -15,6 +15,7 @@
     This is a implementation of "Spectrum: Speedy and Strictly-Deterministic Smart Contract Transactions for Blockchain Ledgers" (Zhihao Chen, Tianji Yang, Yixiao Zheng, Zhao Zhang, Cheqing Jin and Aoying Zhou). 
  */
 
+
 namespace spectrum {
 
 using namespace std::chrono;
