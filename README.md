@@ -1,4 +1,5 @@
 # Spectrum
+
 Spectrum is the first concurrent deterministic execution scheme that preserves consensus-established ordering fairness (by ensuring strict determinism) with high performance for blockchain ledgers.
 
 This repo is for the reproducibility of Spectrum.
@@ -35,6 +36,47 @@ The executable the we use is called bench. The basic usage is:
 ```sh
 ./build/bench [PROTOCOL] [WORKLOAD] [BENCH TIME]
 ```
+
+# Test
+
+The scripts folder contains scripts to test all protocols, including testing fixed zipf with varying threads and fixed threads with varying zipf.
+
+The parameters in bench-xxx-tps.py can be modified to test different benchmarks.
+
+| Parameter    | Meaning                           |
+| ------------ | --------------------------------- |
+| keys         | Number of keys                     |
+| workload     | Which workload to be tested        |
+| repeat       | Number of repetitions per bench, averaged at the end |
+| threads      | Number of threads                  |
+| zipf         | Zipf distribution parameter        |
+| times_to_run | Duration of each bench test        |
+
+The protocols list in bench-xxx-tps.py include different protocols in this bench.
+
+All Spectrum protocols and Sparkle protocols(except original Sparkle) has three parameters. The original Sparkle protocol does not need to add EVMType. Please pass parameters in the following way.
+
+```
+Spectrum:threads:table_partition:EVMType
+```
+
+The EVMType can be one of the following options: **EVMCOW, STRAWMAN, BASIC**
+
+
+For the Aria/AriaFB protocol, please pass parameters in the following way.
+
+```
+Aria:threads:table_partition:batchsize/threads:ReOrderingFlag(True or False)
+```
+
+The Calvin protocol is similar to Aria, but does not need to add ReOrderingFlag
+
+For the Serial protocol, please pass parameters in the following way.
+
+```
+Serial:EVMType:1
+```
+
 
 # Caution
 
