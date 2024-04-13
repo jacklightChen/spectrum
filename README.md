@@ -53,22 +53,3 @@ If you clang version is not 17 by default, use the following command for buildin
 ```sh
 CXX=clang++-17 CC=clang-17 cmake -S . -B build
 ```
-
-# Experiments
-
-We conduct experiments to show that Spectrum protocol is better than Sparkle protocol and Aria protocol in high-contention scenarios, and only have minor performance gap in comparison to Sparkle protocol in low-contention scenarios. 
-
-# Credit
-
-+ hananbeer/sqlidity
-
-# Implementation Details
-
-## Sparkle
-
-There is a minor bug that we fixed previously. 
-
-When we send shutdown signal to sparkle executors, some of them may stop immediately and destruct its holding transaction, while its read dependencies (implemented as raw pointers) are still held inside the multi-version table (SparkleTable) and accessed by other transactions in their execution phase. 
-
-The solution is to add the transaction back to idling queue. 
-
