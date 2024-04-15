@@ -37,7 +37,7 @@ The executable the we use is called bench. The basic usage is:
 ./build/bench [PROTOCOL] [WORKLOAD] [BENCH TIME]
 ```
 
-# Test
+# Evaluation
 
 The scripts folder contains scripts to test all protocols, including testing fixed zipf with varying threads and fixed threads with varying zipf.
 

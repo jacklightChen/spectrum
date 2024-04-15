@@ -9,3 +9,4 @@ perf*
 **/__pycache__
 .cache
 *.ans
+.vscode
