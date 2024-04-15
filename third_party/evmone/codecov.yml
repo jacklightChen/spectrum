@@ -1,6 +1,0 @@
-comment:
-  layout: "diff, flags, files"
-
-flags:
-  consensus:
-    joined: false

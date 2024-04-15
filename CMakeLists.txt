@@ -1,109 +1,245 @@
-cmake_minimum_required(VERSION 3.16.2)
+cmake_minimum_required(VERSION 3.16...3.27)
 
-# if(NOT EXISTS ${CMAKE_CURRENT_SOURCE_DIR}/third_party/evmone/evmc/.git)
-#   message(FATAL_ERROR "Git submodules not initialized, execute:\n  git submodule update --init --recursive")
-# endif()
+# -- Configure project compiler options
+project(spectrum LANGUAGES CXX C)
+set(CMAKE_CXX_STANDARD 20)
+set(CMAKE_CXX_STANDARD_REQUIRED ON)
+set(CMAKE_EXPORT_COMPILE_COMMANDS true)
+set(CMAKE_RUNTIME_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/bin)
+set(CMAKE_LIBRARY_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/lib)
+set(CMAKE_ARCHIVE_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/lib)
+set(ENV{CC}     ${CMAKE_C_COMPILER})
+set(ENV{CXX}    ${CMAKE_CXX_COMPILER})
 
-get_directory_property(SILKWORM_HAS_PARENT PARENT_DIRECTORY)
-if(NOT SILKWORM_HAS_PARENT)
-  include(third_party/evmone/cmake/cable/bootstrap.cmake)
-  include(CableBuildType)
-  include(CableBuildInfo)
-  cable_set_build_type(DEFAULT Release CONFIGURATION_TYPES Release Debug)
+option(NDEBUG ON)
 
-  if(NOT CMAKE_TOOLCHAIN_FILE)
-    set(CMAKE_TOOLCHAIN_FILE ${CMAKE_CURRENT_SOURCE_DIR}/cmake/toolchain/cxx20.cmake CACHE FILEPATH "" FORCE)
-  endif()
+find_package(Threads REQUIRED) # we need threads support for OS. 
 
-  include(third_party/evmone/cmake/cable/HunterGate.cmake)
-  HunterGate(
-    URL "https://github.com/cpp-pm/hunter/archive/v0.24.3.tar.gz"
-    SHA1 "10738b59e539818a01090e64c2d09896247530c7"
-    LOCAL
+# -- Manage External Dependencies Using Github
+
+function(Execute)
+    cmake_parse_arguments(EX "OUTPUT_QUIET;ERROR_QUIET" "WORKING_DIRECTORY;COMMAND_ERROR_IS_FATAL" "COMMAND" "${ARGV}")
+    list(JOIN EX_COMMAND " " EX_COMMAND)
+    message(STATUS "+ " ${EX_COMMAND})
+    execute_process(
+        ${ARGN}
+        COMMAND_ERROR_IS_FATAL  ANY
+        OUTPUT_QUIET ERROR_QUIET
+    )
+endfunction()
+
+function(GitHub)
+    cmake_parse_arguments(GH "" "USER;REPO;BRANCH;AS;PACK;FLAGS;DIR" "" "${ARGV}")
+    message(STATUS "GITHUB " ${GH_USER}/${GH_REPO}/${GH_BRANCH})
+    # download package from github
+    if (NOT EXISTS "${CMAKE_BINARY_DIR}/_deps/${GH_USER}/${GH_REPO}/.git")
+        Execute(
+            COMMAND                 git clone --quiet --depth 1 --branch "${GH_BRANCH}" "https://github.com/${GH_USER}/${GH_REPO}" "${CMAKE_BINARY_DIR}/_deps/${GH_USER}/${GH_REPO}"
+            WORKING_DIRECTORY       ${CMAKE_BINARY_DIR}
+            COMMAND_ERROR_IS_FATAL  ANY
+            OUTPUT_QUIET ERROR_QUIET
+        )
+    endif()
+    # configure how this package is added to current project
+    if(${GH_AS} STREQUAL "CMAKE SUBDIR")
+        set(CMAKE_MESSAGE_LOG_LEVEL__ ${CMAKE_MESSAGE_LOG_LEVEL})
+        set(CMAKE_MESSAGE_LOG_LEVEL ERROR)
+        add_subdirectory(${CMAKE_BINARY_DIR}/_deps/${GH_USER}/${GH_REPO} EXCLUDE_FROM_ALL)
+        set(CMAKE_MESSAGE_LOG_LEVEL ${CMAKE_MESSAGE_LOG_LEVEL__})
+    elseif(${GH_AS} STREQUAL "CMAKE INSTALL" OR ${GH_AS} STREQUAL "CMAKE SCANLIB")
+        # run the build command if it targeted directory don't exists
+        if(NOT EXISTS ${CMAKE_BINARY_DIR}/_deps/${GH_USER}/${GH_REPO}/install)
+            Execute(
+                COMMAND                 cmake -S . -B build ${GH_FLAGS} -DCMAKE_INSTALL_PREFIX=${CMAKE_BINARY_DIR}/_deps/${GH_USER}/${GH_REPO}/install
+                WORKING_DIRECTORY       ${CMAKE_BINARY_DIR}/_deps/${GH_USER}/${GH_REPO}
+            )
+            Execute(
+                COMMAND                 cmake --build build -j
+                WORKING_DIRECTORY       ${CMAKE_BINARY_DIR}/_deps/${GH_USER}/${GH_REPO}
+            )
+            Execute(
+                COMMAND                 cmake --build build --target install
+                WORKING_DIRECTORY       ${CMAKE_BINARY_DIR}/_deps/${GH_USER}/${GH_REPO}
+            )
+        endif()
+        set(CMAKE_PREFIX_PATH "${CMAKE_BINARY_DIR}/_deps/${GH_USER}/${GH_REPO}/install")
+        if("${GH_PACK}" STREQUAL "")
+            set(GH_PACK ${GH_REPO})
+        endif()
+        if(${GH_AS} STREQUAL "CMAKE INSTALL")
+            find_package(${GH_PACK} REQUIRED QUIET)
+        elseif(${GH_AS} STREQUAL "CMAKE SCANLIB")
+            include_directories(${CMAKE_BINARY_DIR}/_deps/${GH_USER}/${GH_REPO}/install/include)
+            link_directories(${CMAKE_BINARY_DIR}/_deps/${GH_USER}/${GH_REPO}/install/lib)
+        endif()
+    elseif(${GH_AS} STREQUAL "AUTOMAKE INSTALL")
+        # run the build command if it targeted directory don't exists
+        if(NOT EXISTS ${CMAKE_BINARY_DIR}/_deps/${GH_USER}/${GH_REPO}/install)
+            Execute(
+                COMMAND                 ./autogen.sh --prefix ${CMAKE_BINARY_DIR}/_deps/${GH_USER}/${GH_REPO}/install
+                WORKING_DIRECTORY       ${CMAKE_BINARY_DIR}/_deps/${GH_USER}/${GH_REPO}
+            )
+            Execute(
+                COMMAND                 make install -j4
+                WORKING_DIRECTORY       ${CMAKE_BINARY_DIR}/_deps/${GH_USER}/${GH_REPO}
+            )
+        endif()
+        include_directories(${CMAKE_BINARY_DIR}/_deps/${GH_USER}/${GH_REPO}/install/include)
+        link_directories(${CMAKE_BINARY_DIR}/_deps/${GH_USER}/${GH_REPO}/install/lib)
+    else()
+        message(FATAL_ERROR "UNKNOWN \"AUTOFIND OPTION\"")
+    endif()
+endfunction()
+
+GitHub(
+    USER    "ethereum"
+    REPO    "evmc"
+    BRANCH  "v11.0.1"
+    AS      "CMAKE SUBDIR"
+)
+GitHub(
+    USER    "fmtlib"
+    REPO    "fmt"
+    BRANCH  "10.2.1"
+    AS      "CMAKE INSTALL"
+    FLAGS   "-DBUILD_SHARED_LIBS=TRUE"
+)
+GitHub(
+    USER    "chfast"
+    REPO    "ethash"
+    BRANCH  "v1.0.1"
+    AS      "CMAKE INSTALL"
+)
+GitHub(
+    USER    "chfast"
+    REPO    "intx"
+    BRANCH  "v0.10.1"
+    AS      "CMAKE INSTALL"
+)
+GitHub(
+    USER    "gflags"
+    REPO    "gflags"
+    BRANCH  "v2.2.2"
+    AS      "CMAKE INSTALL"
+    FLAGS   "-DBUILD_SHARED_LIBS=ON"
+)
+GitHub(
+    USER    "google"
+    REPO    "glog"
+    BRANCH  "v0.7.0"
+    AS      "CMAKE INSTALL"
+    FLAGS   "-Dgflags_DIR=${gflags_DIR}"
+)
+GitHub(
+    USER    "google"
+    REPO    "googletest"
+    BRANCH  "v1.14.0"
+    PACK    "GTest"
+    AS      "CMAKE SUBDIR"
+)
+GitHub(
+    USER    "gperftools"
+    REPO    "gperftools"
+    BRANCH  "gperftools-2.15"
+    AS      "CMAKE SCANLIB"
+)
+GitHub(
+    USER    "jemalloc"
+    REPO    "jemalloc"
+    BRANCH  "5.3.0"
+    AS      "AUTOMAKE INSTALL"
+)
+
+# -- Manage Compile Options w/ ASAN flag
+
+if(NDEBUG)
+    add_compile_options(
+        -O3 -Werror -Wno-attributes
+        -DNDEBUG=1
+        -DPROJECT_VERSION=""
+        -DEVMONE_X86_64_ARCH_LEVEL=2
+    )
+else()
+    add_compile_options(-fsanitize=address)
+    add_link_options(-fsanitize=address)
+    add_compile_options(
+        -O0 -ggdb -Werror -Wno-attributes
+        -DPROJECT_VERSION=""
+        -DEVMONE_X86_64_ARCH_LEVEL=2
     )
 endif()
 
-project(specturm)
-set(PROJECT_VERSION 0.0.1)
+# -- Process Main Library & Unit Tests
 
-set(CMAKE_CXX_STANDARD 20)
-set(CMAKE_EXPORT_COMPILE_COMMANDS ON) 
+file(GLOB_RECURSE SRC lib/*.cpp lib/*.c)
+file(GLOB_RECURSE INC lib/*.hpp lib/*.h)
+file(GLOB_RECURSE SRC_TEST lib/*.test.cpp)
+file(GLOB_RECURSE INC_TEST lib/*.test.hpp lib/*.test.h)
 
-cable_add_buildinfo_library(PROJECT_NAME ${PROJECT_NAME})
+list(REMOVE_ITEM SRC ${SRC_TEST}) # remove *.test.cpp and *.test.hpp from target
+list(REMOVE_ITEM INC ${INC_TEST})
 
-include(${CMAKE_CURRENT_SOURCE_DIR}/cmake/compiler_settings.cmake)
-include(${CMAKE_CURRENT_SOURCE_DIR}/cmake/Hunter/core_packages.cmake)
+foreach(F ${INC}) # copy headers
+    file(RELATIVE_PATH R ${CMAKE_CURRENT_SOURCE_DIR}/lib ${F})
+    configure_file(lib/${R} include/spectrum/${R} COPYONLY)
+endforeach(F R)
 
-add_compile_definitions(EVMC_LOADER_MOCK)
+add_library(spectrum STATIC ${SRC})
 
-find_package(intx CONFIG REQUIRED)   # Required from here below
-find_package(ethash CONFIG REQUIRED) # Required from here below
-find_package(Microsoft.GSL CONFIG REQUIRED)
-find_package(nlohmann_json CONFIG REQUIRED)
-find_package(Catch2 CONFIG REQUIRED)
+target_include_directories(
+    spectrum
+    PUBLIC  ${CMAKE_BINARY_DIR}/include
+)
+target_compile_features(
+    spectrum
+    PUBLIC cxx_std_20
+)
+target_link_libraries(
+    spectrum
+    PUBLIC  fmt::fmt evmc intx::intx glog::glog gflags
+    PRIVATE ethash::keccak Threads::Threads jemalloc
+)
 
-add_subdirectory(third_party/evmone/evmc)
+set(gtest_force_shared_crt ON CACHE BOOL "" FORCE)
 
-add_library(evmone third_party/evmone/lib/evmone/advanced_analysis.cpp
-                   third_party/evmone/lib/evmone/advanced_analysis.hpp
-                   third_party/evmone/lib/evmone/advanced_execution.cpp
-                   third_party/evmone/lib/evmone/advanced_execution.hpp
-                   third_party/evmone/lib/evmone/advanced_instructions.cpp
-                   third_party/evmone/lib/evmone/baseline_instruction_table.cpp
-                   third_party/evmone/lib/evmone/baseline_instruction_table.hpp
-                   third_party/evmone/lib/evmone/baseline.cpp
-                   third_party/evmone/lib/evmone/baseline.hpp
-                   third_party/evmone/lib/evmone/execution_state.hpp
-                   third_party/evmone/lib/evmone/instructions_calls.cpp
-                   third_party/evmone/lib/evmone/instructions_traits.hpp
-                   third_party/evmone/lib/evmone/instructions_xmacro.hpp
-                   third_party/evmone/lib/evmone/instructions.hpp
-                   third_party/evmone/lib/evmone/opcodes_helpers.h
-                   third_party/evmone/lib/evmone/tracing.cpp
-                   third_party/evmone/lib/evmone/tracing.hpp
-                   third_party/evmone/lib/evmone/vm.cpp
-                   third_party/evmone/lib/evmone/vm.hpp)
-set_source_files_properties(third_party/evmone/lib/evmone/vm.cpp PROPERTIES COMPILE_DEFINITIONS PROJECT_VERSION="0.9.0-dev")
-target_include_directories(evmone PUBLIC third_party/evmone/include third_party/evmone/lib)
-target_link_libraries(evmone PUBLIC evmc intx::intx PRIVATE evmc::instructions evmc::hex)
+message(STATUS "SPECTRUM LIBRARY")
+foreach(F ${SRC})
+    message(STATUS "+ " ${F})
+endforeach(F R)
 
-if(MSVC)
-  target_compile_options(evmone PRIVATE /EHsc /w)
-else()
-  target_compile_options(evmone PRIVATE -fno-exceptions)
-endif()
-# add_subdirectory(third_party/silkpre)
+message(STATUS "UNIT TESTS")
+enable_testing()
+include(GoogleTest)
+foreach(F ${SRC_TEST}) # unit tests
+    file(RELATIVE_PATH R ${CMAKE_CURRENT_SOURCE_DIR} ${F})
+    string(REPLACE "/" "-" R ${R})
+    string(REPLACE ".cpp" "" R ${R})
+    message(STATUS "+ " ${F})
+    add_executable(${R} ${F})
+    target_link_libraries(${R} GTest::gtest_main spectrum)
+    set_target_properties(${R}
+        PROPERTIES
+        RUNTIME_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/Testing
+    )
+    gtest_add_tests(TARGET ${R})
+endforeach(F N)
 
-if(NOT MSVC)
-  # add_compile_options(-Werror -Wall -Wextra -pedantic)
-  # add_compile_options(-Wshadow -Wimplicit-fallthrough -Wsign-conversion)
-  # add_compile_options($<$<COMPILE_LANGUAGE:CXX>:-Wold-style-cast>)
-  # add_compile_options(-Wno-missing-field-initializers -Wnon-virtual-dtor)
-  # HZC
-  add_compile_options(-pthread -Wall -Wextra -Wno-unused-variable -Wno-unused-function -Wno-unused-label -Wno-variadic-macros -Wno-unused-parameter -Wno-attributes -Wno-missing-field-initializers -Wno-type-limits -Wno-unused-but-set-variable -Wno-deprecated-copy -pedantic -O2)
+unset(SRC_TEST)
+unset(INC_TEST)
+unset(INC)
+unset(SRC)
 
-  if(CMAKE_CXX_COMPILER_ID STREQUAL "GNU")
-    add_compile_options(-Wno-attributes)
+# -- Process Executables
 
-    # coroutines support
-    if((CMAKE_CXX_STANDARD GREATER_EQUAL 20) AND (NOT SILKWORM_WASM_API))
-      add_compile_options(-fcoroutines)
-    endif()
-  endif()
+file(GLOB_RECURSE SRC bin/*.cpp)
 
-  if(CMAKE_CXX_COMPILER_ID MATCHES "Clang" AND CMAKE_SYSTEM_NAME MATCHES "Darwin")
-    add_compile_definitions(_LIBCPP_ENABLE_THREAD_SAFETY_ANNOTATIONS)
-    add_compile_options(-Wthread-safety)
-  endif()
-endif()
+message(STATUS "EXECUTABLES")
+foreach(F ${SRC})
+    message(STATUS "+ " ${F})
+    file(RELATIVE_PATH R ${CMAKE_CURRENT_SOURCE_DIR}/bin ${F})
+    string(REPLACE ".cpp" "" R ${R})
+    add_executable(${R} ${F})
+    target_link_libraries(${R} PRIVATE spectrum Threads::Threads)
+endforeach(F R)
 
-find_package(Jemalloc REQUIRED)
-
-include_directories(${CMAKE_SOURCE_DIR}/src)
-add_subdirectory(src)
-
-add_executable(dcc_bench main.cpp)
-target_link_libraries(dcc_bench silkworm_core glog gflags ${JEMALLOC_LIBRARIES})
-# target_link_libraries(dcc_bench silkworm_core glog gflags)
-# target_link_libraries(dcc_bench silkworm_core glog gflags)
-# target_link_libraries(dcc_bench silkworm_core glog gflags tcmalloc)
+unset(SRC)

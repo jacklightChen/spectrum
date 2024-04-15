@@ -1,26 +1,12 @@
-.DS_Store
-build
+/build
+/build-dbg
+/cmake-build-*
+/.idea
+/scripts/exp_results
+/Testing
+perf*
+**.swp
+**/__pycache__
 .cache
-
-# local env files
-.env.local
-.env.*.local
-
-# Editor directories and files
-.idea
+*.ans
 .vscode
-*.suo
-*.ntvs*
-*.njsproj
-*.sln
-*.sw?
-
-xcode
-*.code-workspace
-.idea
-.vscode
-.vs
-CMakeFiles
-Makefile
-cmake-build-*
-build-*

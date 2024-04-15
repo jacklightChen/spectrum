@@ -1,7 +1,0 @@
-[submodule "third_party/libff"]
-	path = third_party/libff
-	url = https://github.com/torquem-ch/libff.git
-	branch = win
-[submodule "third_party/secp256k1"]
-	path = third_party/secp256k1
-	url = https://github.com/bitcoin-core/secp256k1.git
