@@ -6,6 +6,25 @@ This repo is for the reproducibility of Spectrum.
 
 Zhihao Chen, Tianji Yang, Yixiao Zheng, Zhao Zhang, Cheqing Jin, and Aoying Zhou. Spectrum: Speedy and Strictly-Deterministic Smart Contract Transactions for Blockchain Ledgers. (under revision)
 
+
+# Preparation
+
+This project heavily used CXX_20 features. 
+
+Therefore, to compile this project, you either need clang >= 17 or gcc/g++ >= 12 . 
+
+If you have apt (Advanced Packaging Tool), you can use the following command to install clang 17. 
+
+```
+wget -qO- https://apt.llvm.org/llvm.sh | sudo bash -s 17
+```
+
+If your clang version is not 17 by default, use the following command for building with clang. 
+
+```sh
+CXX=clang++-17 CC=clang-17 cmake -S . -B build
+```
+
 # Building Instructions
 
 We use `cmake` as the building system.
@@ -16,7 +35,7 @@ To configure the building plan, we use the following instruction.
 cmake -S . -B build
 ```
 
-Optionally, we can use debug option to generate debug logs. 
+Optionally, one can use debug option to generate debug logs. 
 Note that performance will deteriorate significantly if debug mode is enabled. 
 
 ```sh
@@ -31,13 +50,13 @@ cmake --build build -j
 
 This build command will compile and link the main library along with several executables. 
 
-The executable the we use is called bench. The basic usage is: 
+The generated executable is called `bench`. Its basic usage is as follows:
 
 ```sh
 ./build/bench [PROTOCOL] [WORKLOAD] [BENCH TIME]
 ```
 
-Example:
+For example:
 
 ```sh
 ./build/bench Spectrum:36:9973:COPYONWRITE Smallbank:1000000:0 2s
@@ -45,7 +64,7 @@ Example:
 
 # Evaluation
 
-The scripts folder contains scripts to test all protocols, including testing fixed zipf with varying threads and fixed threads with varying zipf.
+The scripts folder contains scripts to test all execution schemes, including testing fixed zipf with varying threads and fixed threads with varying zipf.
 
 The parameters in **bench-threads-tps.py/bench-skew-tps.py** can be modified to test different benchmarks.
 
@@ -58,9 +77,7 @@ The parameters in **bench-threads-tps.py/bench-skew-tps.py** can be modified to 
 | zipf         | Zipf distribution parameter        |
 | times_to_run | Duration of each bench test        |
 
-The protocols list in bench-xxx-tps.py include different protocols in this bench.
-
-All Spectrum protocols and Sparkle protocols(except original Sparkle) has three parameters. The original Sparkle protocol does not need to add EVMType. Please pass parameters in the following way.
+All Spectrum schemes and Sparkle schemes(except original Sparkle) have three parameters. The original Sparkle scheme does not need to include EVMType. Please pass parameters in the following way.
 
 ```
 Spectrum:threads:table_partition:EVMType
@@ -69,35 +86,16 @@ Spectrum:threads:table_partition:EVMType
 The EVMType can be one of the following options: **EVMCOW, STRAWMAN, BASIC**
 
 
-For the Aria/AriaFB protocol, please pass parameters in the following way.
+For the Aria/AriaFB scheme, please pass parameters in the following way.
 
 ```
 Aria:threads:table_partition:batchsize/threads:ReOrderingFlag(True or False)
 ```
 
-The Calvin protocol is similar to Aria, but does not need to add ReOrderingFlag
+The Calvin scheme is similar to Aria, but does not need to include ReOrderingFlag.
 
-For the Serial protocol, please pass parameters in the following way.
+For the Serial scheme, please pass parameters in the following way.
 
 ```
 Serial:EVMType:1
-```
-
-
-# Caution
-
-This project heavily used CXX_20 features. 
-
-Therefore, to compile this project, you either need clang >= 17 or gcc/g++ >= 12 . 
-
-If you have apt (Advanced Packaging Tool), you can use the following command to install clang 17. 
-
-```
-wget -qO- https://apt.llvm.org/llvm.sh | sudo bash -s 17
-```
-
-If you clang version is not 17 by default, use the following command for building with clang. 
-
-```sh
-CXX=clang++-17 CC=clang-17 cmake -S . -B build
 ```
