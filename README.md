@@ -37,11 +37,17 @@ The executable the we use is called bench. The basic usage is:
 ./build/bench [PROTOCOL] [WORKLOAD] [BENCH TIME]
 ```
 
+Example:
+
+```sh
+./build/bench Spectrum:36:9973:COPYONWRITE Smallbank:1000000:0 2s
+```
+
 # Evaluation
 
 The scripts folder contains scripts to test all protocols, including testing fixed zipf with varying threads and fixed threads with varying zipf.
 
-The parameters in bench-xxx-tps.py can be modified to test different benchmarks.
+The parameters in **bench-threads-tps.py/bench-skew-tps.py** can be modified to test different benchmarks.
 
 | Parameter    | Meaning                           |
 | ------------ | --------------------------------- |
