@@ -4,10 +4,6 @@ import pandas as pd
 import re
 import time
 
-import sys
-sys.path.extend(['.', '..', '../..'])
-from plot.plot import MyPlot
-
 keys = 1000000
 workload = 'YCSB'
 repeat = 10
@@ -30,12 +26,8 @@ if __name__ == '__main__':
                 f"Aria:{threads}:{table_partitions}:{batch_size // threads}:FALSE", 
                 f"Aria:{threads}:{table_partitions}:{batch_size // threads}:TRUE",
                 f"Sparkle:{threads}:{table_partitions}", 
-                # f"SparklePreSched:{threads}:{table_partitions}:BASIC",
-                f"SpectrumNoPartial:{threads}:{table_partitions}:BASIC",
-                # f"Spectrum:{threads}:{table_partitions}:STRAWMAN",
                 f"Spectrum:{threads}:{table_partitions}:COPYONWRITE",
-                f"SpectrumPreSched:{threads}:{table_partitions}:COPYONWRITE",
-                # f"SpectrumNoPartial:{threads}:{table_partitions}:BASIC",
+                # f"SpectrumPreSched:{threads}:{table_partitions}:COPYONWRITE",
             ]
             for cc in protocols:
                 print(f"#COMMIT-{hash}",  f"CONFIG-{cc}")
@@ -69,6 +61,7 @@ if __name__ == '__main__':
                         succeed_repeat += 1
                     except Exception as e:
                         print(e)
+                        
                 df.loc[len(df)] = {
                     # 'protocol': cc.split(':')[0] + cc.split(':')[-1], 
                     'protocol': cc.split(':')[0] if cc.split(':')[-1] != 'FALSE' else 'AriaFB', 
@@ -87,20 +80,3 @@ if __name__ == '__main__':
                 print(df)
 
     df.to_csv(f'./exp_results/bench_results_{timestamp}.csv')
-
-    recs = df
-    X, XLABEL = "zipf", "Contention"
-    Y, YLABEL = "commit", "Troughput(Txn/s)"
-    p = MyPlot(1, 1)
-    ax: plt.Axes = p.axes
-    ax.grid(axis=p.grid, linewidth=p.border_width)
-    p.init(ax)
-    for idx, schema in enumerate(recs['protocol'].unique()):
-        records = recs[recs['protocol'] == schema]
-        p.plot(ax, xdata=records[X], ydata=records[Y], color=None, legend_label=schema,)
-    ax.set_xticks(recs['zipf'].unique(), [str(t) for t in recs['zipf'].unique()])
-    p.format_yticks(ax, suffix='K')
-    # ax.set_ylim(None, p.max_y_data * 1.15)       # 折线图的Y轴上限设置为数据最大值的1.15倍
-    p.set_labels(ax, XLABEL, YLABEL)
-    p.legend(ax, loc="upper center", ncol=3, anchor=(0.5, 1.25))
-    p.save(f'exp_results/bench_results_{timestamp}.pdf')
