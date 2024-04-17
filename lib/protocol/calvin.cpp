@@ -3,7 +3,7 @@
 #include <fmt/core.h>
 
 /*
-    This is a implementation of "Calvin: fast distributed transactions for partitioned database systems" (Alexander Thomson, Thaddeus Diamond, Shu-Chun Weng, Kun Ren, Philip Shao, Daniel J. Abadi). (single-partition)
+    This is an implementation of "Calvin: fast distributed transactions for partitioned database systems" (Alexander Thomson, Thaddeus Diamond, Shu-Chun Weng, Kun Ren, Philip Shao, Daniel J. Abadi). (single-partition)
  */
 
 namespace spectrum 

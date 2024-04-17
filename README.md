@@ -11,7 +11,7 @@ Zhihao Chen, Tianji Yang, Yixiao Zheng, Zhao Zhang, Cheqing Jin, and Aoying Zhou
 
 This project heavily used CXX_20 features. 
 
-Therefore, to compile this project, you either need clang >= 17 or gcc/g++ >= 12 . 
+Therefore, to compile this project, you either need `clang >= 17 or gcc/g++ >= 12` . 
 
 If you have apt (Advanced Packaging Tool), you can use the following command to install clang 17. 
 
@@ -39,7 +39,7 @@ Optionally, one can use debug option to generate debug logs.
 Note that performance will deteriorate significantly if debug mode is enabled. 
 
 ```sh
-cmake -S . -B build -DASAN=1
+cmake -S . -B build -DNDEBUG=1
 ```
 
 To build this project, we use the following command. 

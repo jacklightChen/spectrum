@@ -9,6 +9,10 @@
 #include <ranges>
 #include <fmt/core.h>
 
+/*
+    Discarded 
+ */
+ 
 namespace spectrum {
 
 using namespace std::chrono;

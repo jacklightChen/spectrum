@@ -3,8 +3,8 @@
 #include <fmt/core.h>
 
 /*
-    This is a implementation of "Aria: A Fast and Practical Deterministic OLTP Database" (Yi Lu, Xiangyao Yu, Lei Cao, Samuel Madden). 
-    In this implementation we adopt the fallback strategy and reordering strategy discussed in this paper. 
+    This is an implementation of "Aria: A Fast and Practical Deterministic OLTP Database" (Yi Lu, Xiangyao Yu, Lei Cao, Samuel Madden). 
+    In this implementation we adopt the fallback strategy and reordering strategy (optional) discussed in this paper. 
  */
 
 namespace spectrum 
