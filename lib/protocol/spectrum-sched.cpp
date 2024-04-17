@@ -10,9 +10,9 @@
 #include <fmt/core.h>
 
 /*
-    Discarded 
+    DISCARDED.
  */
- 
+
 namespace spectrum {
 
 using namespace std::chrono;

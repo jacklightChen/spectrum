@@ -13,7 +13,7 @@
 
 /*
     This is an implementation of "Spectrum: Speedy and Strictly-Deterministic Smart Contract Transactions for Blockchain Ledgers" (Zhihao Chen, Tianji Yang, Yixiao Zheng, Zhao Zhang, Cheqing Jin and Aoying Zhou). 
-    with partial rollback and predictive scheduling
+    (with partial rollback and predictive scheduling)
  */
 
 namespace spectrum {

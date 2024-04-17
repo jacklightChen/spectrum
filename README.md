@@ -8,7 +8,13 @@ Zhihao Chen, Tianji Yang, Yixiao Zheng, Zhao Zhang, Cheqing Jin, and Aoying Zhou
 
 
 # Preparation
+#### Clone Project
+For quick clone, use the shallow clone flag `--depth 1`.
 
+```
+git clone --depth 1 https://github.com/jacklightChen/spectrum.git
+```
+#### Compile Env
 This project heavily used CXX_20 features. 
 
 Therefore, to compile this project, you either need `clang >= 17 or gcc/g++ >= 12` . 

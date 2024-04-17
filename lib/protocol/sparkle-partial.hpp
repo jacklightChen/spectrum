@@ -10,6 +10,10 @@
 #include <thread>
 #include <barrier>
 
+/*
+    This is an implementation of "Sparkle: Speculative Deterministic Concurrency Control for Partially Replicated Transactional Data Stores" (Zhongmiao Li, Peter Van Roy and Paolo Romano). 
+    (with partial rollback proposed by Spectrum)
+ */
 namespace spectrum {
 
 // some shorthands to prevent prohibitively long names

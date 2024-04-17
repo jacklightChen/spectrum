@@ -4,7 +4,7 @@
 
 /*
     This is an implementation of "Aria: A Fast and Practical Deterministic OLTP Database" (Yi Lu, Xiangyao Yu, Lei Cao, Samuel Madden). 
-    In this implementation we adopt the fallback strategy and reordering strategy (optional) discussed in this paper. 
+    In this implementation we adopt the fallback strategy and reordering strategy (enabled by the option) discussed in this paper. 
  */
 
 namespace spectrum 
