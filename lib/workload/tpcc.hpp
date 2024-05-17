@@ -1,5 +1,6 @@
 #include <spectrum/workload/abstraction.hpp>
 #include <spectrum/common/random.hpp>
+#include <map>
 
 namespace spectrum {
 
@@ -12,9 +13,11 @@ class TPCC : public Workload {
     size_t                      num_items;
     size_t                      num_orders;
     std::atomic<size_t>         order_count{0};
+    std::atomic<size_t>         delivery_count{0};
     std::atomic<bool>           is_first_transaction;
     std::basic_string<uint8_t> CreateTable();
     std::basic_string<uint8_t> Payment();
+    std::basic_string<uint8_t> Delivery();
     std::basic_string<uint8_t> NewOrder();
 
     public:

@@ -34,6 +34,8 @@ contract TPCCStorage {
         uint256 o_entry_d;
         uint256 o_carrier_id;
         uint256 o_ol_cnt;
+        uint256 o_delivery_d;
+        uint256 total_ol_amount;
         bool o_all_local;
     }
 
@@ -55,7 +57,8 @@ contract TPCCStorage {
     }
 
     struct Orderline {
-        uint256 ol_number;
+        // uint256 ol_number;
+        uint256 ol_amount;
     }
 
     mapping (uint256 => Warehouse) warehouse_map;
@@ -121,6 +124,8 @@ contract TPCCStorage {
             o_entry_d: o_entry_d,
             o_carrier_id: 0,
             o_ol_cnt: i_ids.length,
+            o_delivery_d: 0,
+            total_ol_amount: 0,
             o_all_local: all_items_local
         });
         uint256 total_ol_amount = 0;
@@ -144,10 +149,21 @@ contract TPCCStorage {
             uint256 ol_w_id = i_w_ids[i];
             uint256 ol_number = i + 1;
             orderline_map[ol_w_id][ol_d_id][o_id][ol_number] = Orderline({
-                ol_number: ol_number
+                // ol_number: ol_number,
+                ol_amount: ol_amount
             });
         }
+        order_map[w_id][d_id][o_id].total_ol_amount = total_ol_amount;
         return;
+    }
+
+    function Delivery(uint256 w_id, uint256 d_id, uint256 o_id, uint256 o_delivery_d) public {
+        for (uint256 i = o_id; i < o_id + 10; i += 1) {
+            Order storage order = order_map[w_id][d_id][i];
+            order.o_delivery_d = o_delivery_d;
+            Customer storage customer = customer_map[order.o_c_id];
+            customer.balance += order.total_ol_amount;
+        }
     }
 
     function Payment(uint256 c_id, uint256 h_amount) public {
