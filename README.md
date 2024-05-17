@@ -4,7 +4,8 @@ Spectrum is the first concurrent deterministic execution scheme that preserves c
 
 This repo is for the reproducibility of Spectrum.
 
-Zhihao Chen, Tianji Yang, Yixiao Zheng, Zhao Zhang, Cheqing Jin, and Aoying Zhou. Spectrum: Speedy and Strictly-Deterministic Smart Contract Transactions for Blockchain Ledgers. (under revision)
+Zhihao Chen, Tianji Yang, Yixiao Zheng, Zhao Zhang, Cheqing Jin, and Aoying Zhou. Spectrum: Speedy and Strictly-Deterministic Smart Contract Transactions for Blockchain Ledgers.
+In Proceedings of the 50th International Conference on Very Large Data Bases (VLDB 2024), Pages TBD, Guangzhou, China, August, 2024.
 
 
 # Preparation
