@@ -6,25 +6,6 @@ Spectrum is the first deterministic concurrency control (DCC) scheme that preser
 
 This repo is for the reproducibility of Spectrum.
 
-# Citation
-If you find this repo useful, please cite our paper.
-```
-@article{chen2024spectrum,
-  author       = {Zhihao Chen and
-                  Tianji Yang and
-                  Yixiao Zheng and
-                  Zhao Zhang and
-                  Cheqing Jin and
-                  Aoying Zhou},
-  title        = {Spectrum: Speedy and Strictly-Deterministic Smart Contract Transactions for Blockchain Ledgers},
-  journal      = {Proc. {VLDB} Endow.},
-  volume       = {17},
-  number       = {10},
-  pages        = {2541--2554},
-  year         = {2024}
-}
-```
-
 # Preparation
 #### Clone Project
 For quick clone, use the shallow clone flag `--depth 1`.
@@ -122,4 +103,24 @@ For the Serial scheme, please pass parameters in the following way.
 
 ```
 Serial:EVMType:1
+```
+
+# Citation
+If you find this repo useful, please cite our paper.
+```
+@article{DBLP:journals/pvldb/ChenYZZJZ24,
+  author       = {Zhihao Chen and
+                  Tianji Yang and
+                  Yixiao Zheng and
+                  Zhao Zhang and
+                  Cheqing Jin and
+                  Aoying Zhou},
+  title        = {Spectrum: Speedy and Strictly-Deterministic Smart Contract Transactions
+                  for Blockchain Ledgers},
+  journal      = {Proc. {VLDB} Endow.},
+  volume       = {17},
+  number       = {10},
+  pages        = {2541--2554},
+  year         = {2024}
+}
 ```
