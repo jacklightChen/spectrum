@@ -1,13 +1,29 @@
 # Spectrum
 
-Spectrum is the first concurrent deterministic execution scheme that preserves consensus-established ordering fairness (by ensuring strict determinism) with high performance for blockchain ledgers.
+* Zhihao Chen, Tianji Yang, Yixiao Zheng, Zhao Zhang, Cheqing Jin, and Aoying Zhou. "Spectrum: Speedy and Strictly-Deterministic Smart Contract Transactions for Blockchain Ledgers." In Proceedings of the 50th International Conference on Very Large Data Bases (VLDB 2024), Pages 2541--2554, Guangzhou, China, August, 2024.
+
+Spectrum is the first deterministic concurrency control (DCC) scheme that preserves consensus-established ordering fairness (by ensuring strict determinism) with high performance for blockchain ledgers.
 
 This repo is for the reproducibility of Spectrum.
 
-Zhihao Chen, Tianji Yang, Yixiao Zheng, Zhao Zhang, Cheqing Jin, and Aoying Zhou. "Spectrum: Speedy and Strictly-Deterministic Smart Contract Transactions for Blockchain Ledgers."
-
-In Proceedings of the 50th International Conference on Very Large Data Bases (VLDB 2024), Pages TBD, Guangzhou, China, August, 2024.
-
+# Citation
+If you find this repo useful, please cite our paper.
+```
+@article{chen2024spectrum,
+  author       = {Zhihao Chen and
+                  Tianji Yang and
+                  Yixiao Zheng and
+                  Zhao Zhang and
+                  Cheqing Jin and
+                  Aoying Zhou},
+  title        = {Spectrum: Speedy and Strictly-Deterministic Smart Contract Transactions for Blockchain Ledgers},
+  journal      = {Proc. {VLDB} Endow.},
+  volume       = {17},
+  number       = {10},
+  pages        = {2541--2554},
+  year         = {2024}
+}
+```
 
 # Preparation
 #### Clone Project
