@@ -7,6 +7,7 @@
 #include <iostream>
 #include <sstream>
 
+
 const static char* CODE = 
     #include "../../contracts/tpcc.bin"
 ;
@@ -52,6 +53,7 @@ std::basic_string<uint8_t> TPCC::NewOrder() { return spectrum::from_hex([&]() {
     // compute last three params index
     // the first index are fixed: 224
     auto i_ids_idx_num = 224;
+    // auto num_orders = rng->Next() % 11 + 5;
     auto i_w_ids_idx_num = i_ids_idx_num + 32 * (num_orders + 1);
     auto i_qtys_idx_num = i_w_ids_idx_num + 32 * (num_orders + 1);
     auto i_ids_idx = to_hex_string(i_ids_idx_num);
@@ -75,22 +77,42 @@ std::basic_string<uint8_t> TPCC::NewOrder() { return spectrum::from_hex([&]() {
     return s;
 }()).value(); }
 
+std::basic_string<uint8_t> TPCC::Delivery() { return spectrum::from_hex([&]() {
+    auto s = std::string{"2690e6b3"};
+    // fix warehouse = 0
+    auto w_id = to_hex_string(0);
+    // fix district = 0
+    auto d_id = to_hex_string(0);
+    // o_id is which not delivery
+    auto o_id = delivery_count.fetch_add(10);
+    if (delivery_count.load() > order_count.load() - 10) { 
+        o_id = rng->Next() % order_count.load(); 
+    }
+    // fix delivery date = 0
+    auto o_delivery_d = to_hex_string(0);
+    s = s + w_id + d_id + to_hex_string(o_id) + o_delivery_d;
+    // LOG(ERROR) << s;
+    return s;
+}()).value(); }
+
 std::basic_string<uint8_t> TPCC::Payment() { return spectrum::from_hex([&]() {
     auto s = std::string{"7c3f9309"};
     // customer id and h_amount are random now, h_amount is in [0, 1000)
     auto c_id = rng->Next();
     auto h_amount = rng->Next() % 1000;
-    s = s + to_hex_string(c_id) + to_hex_string(h_amount);
-    // LOG(ERROR) << s;
-    return s;
+    return s + to_hex_string(c_id) + to_hex_string(h_amount);
 }()).value(); }
 
 Transaction TPCC::Next() {
-    auto option = rng->Next() % 2;
-    if (option < 1) {
+    auto option = rng->Next() % 23;
+    if (option < 11) {
         auto input = NewOrder();
         return Transaction(this->evm_type, evmc::address{0x1}, evmc::address{0x1}, std::span{code}, std::span{input});
-    }
+    } 
+    else if (option < 12) {
+        auto input = Delivery();
+        return Transaction(this->evm_type, evmc::address{0x1}, evmc::address{0x1}, std::span{code}, std::span{input});
+    } 
     else {
         auto input = Payment();
         return Transaction(this->evm_type, evmc::address{0x1}, evmc::address{0x1}, std::span{code}, std::span{input});
