@@ -1,6 +1,6 @@
 # Spectrum
 
-* Zhihao Chen, Tianji Yang, Yixiao Zheng, Zhao Zhang, Cheqing Jin, and Aoying Zhou. "Spectrum: Speedy and Strictly-Deterministic Smart Contract Transactions for Blockchain Ledgers." In Proceedings of the 50th International Conference on Very Large Data Bases (VLDB 2024), Pages 2541--2554, Guangzhou, China, August, 2024.
+* Zhihao Chen, Tianji Yang, Yixiao Zheng, Zhao Zhang, Cheqing Jin, and Aoying Zhou. "Spectrum: Speedy and Strictly-Deterministic Smart Contract Transactions for Blockchain Ledgers." In Proceedings of the 50th International Conference on Very Large Data Bases (VLDB 2024), Pages 2541--2554, Guangzhou, China, August, 2024. <a target="_blank" style="color:black;font-weight: normal; text-decoration: underline;" href="https://dl.acm.org/doi/10.14778/3675034.3675045">[Paper]</a> <a target="_blank" style="color:black;font-weight: normal; text-decoration: underline;" href="https://zhihaochen.cn/slides/spectrum_slides.pdf">[Slides]</a> <a target="_blank" style="color:black;font-weight: normal; text-decoration: underline;" href="https://dblp.uni-trier.de/rec/journals/pvldb/ChenYZZJZ24.html?view=bibtex&param=0">[Ref<img src="https://dblp.uni-trier.de/img/favicon.ico" width="16px"></img>]</a>
 
 Spectrum is the first deterministic concurrency control (DCC) scheme that preserves consensus-established ordering fairness (by ensuring strict determinism) with high performance for blockchain ledgers.
 
