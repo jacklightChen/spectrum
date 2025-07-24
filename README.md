@@ -107,7 +107,7 @@ Serial:EVMType:1
 
 # Citation
 If you find this repo useful, please cite our paper.
-```
+```bibtex
 @article{DBLP:journals/pvldb/ChenYZZJZ24,
   author       = {Zhihao Chen and
                   Tianji Yang and
